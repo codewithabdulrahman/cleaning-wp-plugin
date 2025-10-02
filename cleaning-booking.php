@@ -1,0 +1,126 @@
+<?php
+/**
+ * Plugin Name: Cleaning Booking System
+ * Plugin URI: https://example.com/cleaning-booking
+ * Description: Custom booking system for cleaning services with WooCommerce integration
+ * Version: 1.0.0
+ * Author: Your Name
+ * License: GPL v2 or later
+ * Text Domain: cleaning-booking
+ * Requires at least: 5.0
+ * Tested up to: 6.4
+ * Requires PHP: 7.4
+ * WC requires at least: 5.0
+ * WC tested up to: 8.0
+ */
+
+// Prevent direct access
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+// Define plugin constants
+define('CB_PLUGIN_FILE', __FILE__);
+define('CB_PLUGIN_DIR', plugin_dir_path(__FILE__));
+define('CB_PLUGIN_URL', plugin_dir_url(__FILE__));
+define('CB_VERSION', '1.0.0');
+
+// WooCommerce integration is optional
+// The plugin can work standalone or with WooCommerce for payment processing
+
+// Main plugin class
+class CleaningBooking {
+    
+    public function __construct() {
+        add_action('init', array($this, 'init'));
+        register_activation_hook(__FILE__, array($this, 'activate'));
+        register_deactivation_hook(__FILE__, array($this, 'deactivate'));
+    }
+    
+    public function init() {
+        // Load text domain
+        load_plugin_textdomain('cleaning-booking', false, dirname(plugin_basename(__FILE__)) . '/languages');
+        
+        // Include required files
+        $this->includes();
+        
+        // Initialize components
+        $this->init_hooks();
+    }
+    
+    private function includes() {
+        require_once CB_PLUGIN_DIR . 'includes/class-cb-database.php';
+        require_once CB_PLUGIN_DIR . 'includes/class-cb-admin.php';
+        require_once CB_PLUGIN_DIR . 'includes/class-cb-rest-api.php';
+        require_once CB_PLUGIN_DIR . 'includes/class-cb-frontend.php';
+        require_once CB_PLUGIN_DIR . 'includes/class-cb-woocommerce.php';
+        require_once CB_PLUGIN_DIR . 'includes/class-cb-slot-manager.php';
+    }
+    
+    private function init_hooks() {
+        // Initialize database
+        new CB_Database();
+        
+        // Initialize admin interface
+        if (is_admin()) {
+            new CB_Admin();
+        }
+        
+        // Initialize REST API
+        new CB_REST_API();
+        
+        // Initialize frontend
+        new CB_Frontend();
+        
+        // Initialize WooCommerce integration
+        new CB_WooCommerce();
+        
+        // Initialize slot manager
+        new CB_Slot_Manager();
+    }
+    
+    public function activate() {
+        // Include required files for activation
+        require_once CB_PLUGIN_DIR . 'includes/class-cb-database.php';
+        
+        // Create database tables
+        CB_Database::create_tables();
+        
+        // Set default options
+        $this->set_default_options();
+        
+        // Flush rewrite rules
+        flush_rewrite_rules();
+    }
+    
+    public function deactivate() {
+        // Flush rewrite rules
+        flush_rewrite_rules();
+    }
+    
+    private function set_default_options() {
+        $defaults = array(
+            'cb_slot_duration' => 30, // minutes
+            'cb_buffer_time' => 15, // minutes
+            'cb_booking_hold_time' => 15, // minutes
+            'cb_business_hours' => array(
+                'monday' => array('start' => '09:00', 'end' => '17:00', 'enabled' => true),
+                'tuesday' => array('start' => '09:00', 'end' => '17:00', 'enabled' => true),
+                'wednesday' => array('start' => '09:00', 'end' => '17:00', 'enabled' => true),
+                'thursday' => array('start' => '09:00', 'end' => '17:00', 'enabled' => true),
+                'friday' => array('start' => '09:00', 'end' => '17:00', 'enabled' => true),
+                'saturday' => array('start' => '10:00', 'end' => '16:00', 'enabled' => true),
+                'sunday' => array('start' => '10:00', 'end' => '16:00', 'enabled' => false),
+            )
+        );
+        
+        foreach ($defaults as $key => $value) {
+            if (get_option($key) === false) {
+                add_option($key, $value);
+            }
+        }
+    }
+}
+
+// Initialize the plugin
+new CleaningBooking();

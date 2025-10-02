@@ -1,0 +1,248 @@
+/**
+ * Admin styles for Cleaning Booking plugin
+ */
+
+.cb-admin-section {
+    background: #fff;
+    padding: 20px;
+    margin: 20px 0;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+}
+
+.cb-admin-section h2 {
+    margin-top: 0;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+}
+
+.cb-admin-section code {
+    background: #f1f1f1;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: monospace;
+}
+
+.cb-admin-section ul {
+    margin-left: 20px;
+}
+
+.cb-admin-section li {
+    margin-bottom: 5px;
+}
+
+/* Business Hours Time Inputs */
+.cb-time-label {
+    display: inline-block;
+    margin-right: 20px;
+    margin-bottom: 10px;
+    font-weight: 500;
+    color: #333;
+}
+
+.cb-time-input {
+    width: 140px !important;
+    height: 40px !important;
+    padding: 8px 12px !important;
+    font-size: 16px !important;
+    border: 2px solid #ddd !important;
+    border-radius: 6px !important;
+    margin-left: 8px !important;
+    background: #fff !important;
+    transition: border-color 0.3s ease !important;
+}
+
+.cb-time-input:focus {
+    border-color: #0073aa !important;
+    outline: none !important;
+    box-shadow: 0 0 0 2px rgba(0, 115, 170, 0.1) !important;
+}
+
+.cb-time-input:hover {
+    border-color: #999 !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .cb-time-label {
+        display: block;
+        margin-right: 0;
+        margin-bottom: 15px;
+    }
+    
+    .cb-time-input {
+        width: 120px !important;
+        height: 36px !important;
+        font-size: 14px !important;
+    }
+}
+
+/* Admin table styles */
+.cb-admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+.cb-admin-table th,
+.cb-admin-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.cb-admin-table th {
+    background-color: #f9f9f9;
+    font-weight: 600;
+}
+
+.cb-admin-table tr:hover {
+    background-color: #f5f5f5;
+}
+
+/* Action buttons */
+.cb-action-btn {
+    padding: 6px 12px;
+    margin: 2px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 12px;
+}
+
+.cb-action-btn.edit {
+    background-color: #0073aa;
+    color: white;
+}
+
+.cb-action-btn.delete {
+    background-color: #dc3232;
+    color: white;
+}
+
+.cb-action-btn:hover {
+    opacity: 0.8;
+}
+
+/* Status indicators */
+.cb-status {
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.cb-status.active {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.cb-status.inactive {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.cb-status.pending {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+/* Form improvements */
+.cb-form-group {
+    margin-bottom: 20px;
+}
+
+.cb-form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+}
+
+.cb-form-group input,
+.cb-form-group select,
+.cb-form-group textarea {
+    width: 100%;
+    max-width: 400px;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.cb-form-group input:focus,
+.cb-form-group select:focus,
+.cb-form-group textarea:focus {
+    border-color: #0073aa;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0, 115, 170, 0.1);
+}
+
+/* Notices */
+.cb-notice {
+    padding: 12px;
+    margin: 20px 0;
+    border-left: 4px solid;
+    background: #fff;
+}
+
+.cb-notice.success {
+    border-left-color: #46b450;
+    background-color: #ecf7ed;
+}
+
+.cb-notice.error {
+    border-left-color: #dc3232;
+    background-color: #fbeaea;
+}
+
+.cb-notice.warning {
+    border-left-color: #ffb900;
+    background-color: #fff8e5;
+}
+
+.cb-notice.info {
+    border-left-color: #0073aa;
+    background-color: #e7f3ff;
+}
+
+/* Form table improvements */
+.cb-form .form-table th {
+    width: 200px;
+}
+
+/* Text utilities */
+.text-center {
+    text-align: center;
+}
+
+.text-muted {
+    color: #666;
+}
+
+/* Booking status styles */
+.cb-status-pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.cb-status-confirmed {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.cb-status-paid {
+    background: #d4edda;
+    color: #155724;
+}
+
+.cb-status-cancelled {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.cb-status-completed {
+    background: #d1ecf1;
+    color: #0c5460;
+}
