@@ -36,7 +36,14 @@ class CB_REST_API {
         register_rest_route('cleaning-booking/v1', '/extras', array(
             'methods' => 'GET',
             'callback' => array($this, 'get_extras'),
-            'permission_callback' => '__return_true'
+            'permission_callback' => '__return_true',
+            'args' => array(
+                'service_id' => array(
+                    'required' => false,
+                    'type' => 'string',
+                    'sanitize_callback' => 'sanitize_text_field'
+                )
+            )
         ));
         
         register_rest_route('cleaning-booking/v1', '/calculate-price', array(
@@ -240,17 +247,38 @@ class CB_REST_API {
     }
     
     public function get_extras($request) {
-        $extras = CB_Database::get_extras();
+        $service_id_param = $request->get_param('service_id');
         
         $formatted_extras = array();
-        foreach ($extras as $extra) {
-            $formatted_extras[] = array(
-                'id' => $extra->id,
-                'name' => $extra->name,
-                'description' => $extra->description,
-                'price' => floatval($extra->price),
-                'duration' => intval($extra->duration)
-            );
+        
+        if (!empty($service_id_param)) {
+            // Handle single ID or comma-separated IDs
+            $service_ids = array_map('intval', explode(',', $service_id_param));
+            
+            // Get extras for specific services
+            foreach ($service_ids as $service_id) {
+                // Get only ACTIVE extras for frontend use
+                $extras = CB_Database::get_service_extras($service_id, true);
+                
+                foreach ($extras as $extra) {
+                    $formatted_extras[] = array(
+                        'id' => $extra->id,
+                        'service_id' => $extra->service_id,
+                        'name' => $extra->name,
+                        'description' => $extra->description,
+                        'price' => floatval($extra->price),
+                        'duration' => intval($extra->duration)
+                    );
+                }
+            }
+        } else {
+            // Return empty array if no service_id provided
+            // Frontend should call this endpoint with service_id when service is selected
+            return new WP_REST_Response(array(
+                'success' => true,
+                'extras' => array(),
+                'message' => __('Please provide service_id parameter (e.g., ?service_id=1 or ?service_id=1,2,3)', 'cleaning-booking')
+            ), 200);
         }
         
         return new WP_REST_Response(array(
@@ -294,13 +322,14 @@ class CB_REST_API {
         $extras_details = array();
         
         if (!empty($extras)) {
-            $extras_table = $wpdb->prefix . 'cb_extras';
+            $service_extras_table = $wpdb->prefix . 'cb_service_extras';
             $extra_ids = array_map('intval', $extras);
             $placeholders = implode(',', array_fill(0, count($extra_ids), '%d'));
             
+            // Get extras with service validation to ensure security
             $extras_data = $wpdb->get_results($wpdb->prepare(
-                "SELECT * FROM $extras_table WHERE id IN ($placeholders) AND is_active = 1",
-                $extra_ids
+                "SELECT * FROM $service_extras_table WHERE id IN ($placeholders) AND service_id = %d AND is_active = 1",
+                array_merge($extra_ids, array($service_id))
             ));
             
             foreach ($extras_data as $extra) {

@@ -16,9 +16,16 @@ class CB_Admin {
         add_action('wp_ajax_cb_delete_service', array($this, 'ajax_delete_service'));
         add_action('wp_ajax_cb_save_extra', array($this, 'ajax_save_extra'));
         add_action('wp_ajax_cb_delete_extra', array($this, 'ajax_delete_extra'));
+        add_action('wp_ajax_cb_get_service_extras', array($this, 'ajax_get_service_extras'));
+        add_action('wp_ajax_cb_remove_service_extra', array($this, 'ajax_remove_service_extra'));
+        add_action('wp_ajax_cb_update_extra_status', array($this, 'ajax_update_extra_status'));
         add_action('wp_ajax_cb_save_zip_code', array($this, 'ajax_save_zip_code'));
         add_action('wp_ajax_cb_delete_zip_code', array($this, 'ajax_delete_zip_code'));
         add_action('wp_ajax_cb_update_booking_status', array($this, 'ajax_update_booking_status'));
+        add_action('wp_ajax_cb_get_booking_details', array($this, 'ajax_get_booking_details'));
+        add_action('wp_ajax_cb_update_booking', array($this, 'ajax_update_booking'));
+        add_action('wp_ajax_cb_delete_booking', array($this, 'ajax_delete_booking'));
+        add_action('wp_ajax_cb_save_booking', array($this, 'ajax_save_booking'));
     }
     
     public function add_admin_menu() {
@@ -27,17 +34,17 @@ class CB_Admin {
             __('Cleaning Booking', 'cleaning-booking'),
             'manage_options',
             'cleaning-booking',
-            array($this, 'admin_page'),
+            array($this, 'bookings_page'),
             'dashicons-calendar-alt',
             30
         );
         
         add_submenu_page(
             'cleaning-booking',
-            __('Bookings', 'cleaning-booking'),
-            __('Bookings', 'cleaning-booking'),
+            __('All Bookings', 'cleaning-booking'),
+            __('All Bookings', 'cleaning-booking'),
             'manage_options',
-            'cleaning-booking',
+            'cb-all-bookings',
             array($this, 'bookings_page')
         );
         
@@ -50,14 +57,6 @@ class CB_Admin {
             array($this, 'services_page')
         );
         
-        add_submenu_page(
-            'cleaning-booking',
-            __('Extras', 'cleaning-booking'),
-            __('Extras', 'cleaning-booking'),
-            'manage_options',
-            'cb-extras',
-            array($this, 'extras_page')
-        );
         
         add_submenu_page(
             'cleaning-booking',
@@ -109,7 +108,12 @@ class CB_Admin {
         $bookings_table = $wpdb->prefix . 'cb_bookings';
         $services_table = $wpdb->prefix . 'cb_services';
         
-        // Handle status updates
+        // Handle booking creation (AJAX will handle most cases, this is fallback)
+        if (isset($_POST['create_booking']) && wp_verify_nonce($_POST['_wpnonce'], 'cb_create_booking')) {
+            // This would be handled by AJAX, this is just a fallback
+        }
+        
+        // Handle status updates (fallback for non-AJAX)
         if (isset($_POST['update_status']) && wp_verify_nonce($_POST['_wpnonce'], 'cb_update_booking_status')) {
             $booking_id = intval($_POST['booking_id']);
             $new_status = sanitize_text_field($_POST['status']);
@@ -134,10 +138,6 @@ class CB_Admin {
         include CB_PLUGIN_DIR . 'templates/admin/services.php';
     }
     
-    public function extras_page() {
-        $extras = CB_Database::get_extras(false);
-        include CB_PLUGIN_DIR . 'templates/admin/extras.php';
-    }
     
     public function zip_codes_page() {
         $zip_codes = CB_Database::get_zip_codes(false);
@@ -224,15 +224,14 @@ class CB_Admin {
             wp_die(__('Insufficient permissions', 'cleaning-booking'));
         }
         
-        global $wpdb;
-        $table = $wpdb->prefix . 'cb_services';
+        $service_id = intval($_POST['id']);
         
-        $result = $wpdb->delete($table, array('id' => intval($_POST['id'])));
+        $result = CB_Database::delete_service_and_extras($service_id);
         
         if ($result) {
-            wp_send_json_success(array('message' => __('Service deleted successfully!', 'cleaning-booking')));
+            wp_send_json_success(array('message' => __('Service and all its extras deleted successfully!', 'cleaning-booking')));
         } else {
-            wp_send_json_error(array('message' => __('Error deleting service', 'cleaning-booking')));
+            wp_send_json_error(array('message' => __('Error deleting service and extras', 'cleaning-booking')));
         }
     }
     
@@ -243,10 +242,9 @@ class CB_Admin {
             wp_die(__('Insufficient permissions', 'cleaning-booking'));
         }
         
-        global $wpdb;
-        $table = $wpdb->prefix . 'cb_extras';
+        $service_id = intval($_POST['service_id']); // This should be passed from frontend
         
-        $data = array(
+        $extra_data = array(
             'name' => sanitize_text_field($_POST['name']),
             'description' => sanitize_textarea_field($_POST['description']),
             'price' => floatval($_POST['price']),
@@ -256,10 +254,10 @@ class CB_Admin {
         );
         
         if (isset($_POST['id']) && !empty($_POST['id'])) {
-            $result = $wpdb->update($table, $data, array('id' => intval($_POST['id'])));
+            $result = CB_Database::update_service_extra($service_id, intval($_POST['id']), $extra_data);
             $message = $result ? __('Extra updated successfully!', 'cleaning-booking') : __('Error updating extra', 'cleaning-booking');
         } else {
-            $result = $wpdb->insert($table, $data);
+            $result = CB_Database::add_service_extra($service_id, $extra_data);
             $message = $result ? __('Extra created successfully!', 'cleaning-booking') : __('Error creating extra', 'cleaning-booking');
         }
         
@@ -350,4 +348,249 @@ class CB_Admin {
             wp_send_json_error(array('message' => __('Error updating booking status', 'cleaning-booking')));
         }
     }
+    
+    public function ajax_get_service_extras() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Insufficient permissions', 'cleaning-booking'));
+        }
+        
+        $service_id = intval($_POST['service_id']);
+        // Get all extras (both active and inactive) for admin display
+        $extras = CB_Database::get_service_extras($service_id, false);
+        $available_extras = CB_Database::get_available_extras_for_service($service_id);
+        
+        wp_send_json_success(array(
+            'extras' => $extras,
+            'available_extras' => $available_extras
+        ));
+    }
+    
+    public function ajax_update_extra_status() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Insufficient permissions', 'cleaning-booking'));
+        }
+        
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_service_extras';
+        
+        $extra_id = intval($_POST['extra_id']);
+        $is_active = intval($_POST['is_active']);
+        
+        $result = $wpdb->update(
+            $table,
+            array('is_active' => $is_active),
+            array('id' => $extra_id),
+            array('%d'),
+            array('%d')
+        );
+        
+        if ($result !== false) {
+            wp_send_json_success(array('message' => __('Extra status updated successfully!', 'cleaning-booking')));
+        } else {
+            wp_send_json_error(array('message' => __('Error updating extra status', 'cleaning-booking')));
+        }
+    }
+    
+    public function ajax_remove_service_extra() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Insufficient permissions', 'cleaning-booking'));
+        }
+        
+        $service_id = intval($_POST['service_id']);
+        $extra_id = intval($_POST['extra_id']);
+        
+        $result = CB_Database::remove_service_extra($service_id, $extra_id);
+        
+        if ($result) {
+            wp_send_json_success(array('message' => __('Extra removed from service successfully!', 'cleaning-booking')));
+        } else {
+            wp_send_json_error(array('message' => __('Error removing extra from service', 'cleaning-booking')));
+        }
+    }
+    
+    public function ajax_get_booking_details() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Insufficient permissions', 'cleaning-booking'));
+        }
+        
+        $booking_id = intval($_POST['booking_id']);
+        
+        global $wpdb;
+        $bookings_table = $wpdb->prefix . 'cb_bookings';
+        $services_table = $wpdb->prefix . 'cb_services';
+        
+        $booking = $wpdb->get_row($wpdb->prepare(
+            "SELECT b.*, s.name as service_name 
+             FROM $bookings_table b 
+             LEFT JOIN $services_table s ON b.service_id = s.id 
+             WHERE b.id = %d",
+            $booking_id
+        ));
+        
+        if ($booking) {
+            // Format the booking data for frontend
+            $booking_data = array(
+                'id' => $booking->id,
+                'booking_reference' => $booking->booking_reference,
+                'customer_name' => $booking->customer_name,
+                'customer_email' => $booking->customer_email,
+                'customer_phone' => $booking->customer_phone,
+                'address' => $booking->address,
+                'service_name' => $booking->service_name,
+                'square_meters' => $booking->square_meters,
+                'booking_date' => date('M j, Y', strtotime($booking->booking_date)),
+                'booking_time' => date('g:i A', strtotime($booking->booking_time)),
+                'total_duration' => $booking->total_duration,
+                'total_price' => number_format($booking->total_price, 2),
+                'status' => $booking->status,
+                'notes' => $booking->notes,
+                'created_at' => $booking->created_at
+            );
+            
+            wp_send_json_success($booking_data);
+        } else {
+            wp_send_json_error(array('message' => __('Booking not found', 'cleaning-booking')));
+        }
+    }
+    
+    public function ajax_update_booking() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Insufficient permissions', 'cleaning-booking'));
+        }
+        
+        $booking_id = intval($_POST['booking_id']);
+        
+        $data = array(
+            'customer_name' => sanitize_text_field($_POST['customer_name']),
+            'customer_email' => sanitize_email($_POST['customer_email']),
+            'customer_phone' => sanitize_text_field($_POST['customer_phone']),
+            'address' => sanitize_textarea_field($_POST['address']),
+            'service_id' => intval($_POST['service_id']),
+            'square_meters' => intval($_POST['square_meters']),
+            'booking_date' => sanitize_text_field($_POST['booking_date']),
+            'booking_time' => sanitize_text_field($_POST['booking_time']),
+            'notes' => sanitize_textarea_field($_POST['notes'])
+        );
+        
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_bookings';
+        
+        $result = $wpdb->update($table, $data, array('id' => $booking_id));
+        
+        if ($result !== false) {
+            wp_send_json_success(array('message' => __('Booking updated successfully!', 'cleaning-booking')));
+        } else {
+            wp_send_json_error(array('message' => __('Error updating booking', 'cleaning-booking')));
+        }
+    }
+    
+    public function ajax_delete_booking() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Insufficient permissions', 'cleaning-booking'));
+        }
+        
+        $booking_id = intval($_POST['booking_id']);
+        
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_bookings';
+        
+        $result = $wpdb->delete($table, array('id' => $booking_id));
+        
+        if ($result) {
+            wp_send_json_success(array('message' => __('Booking deleted successfully!', 'cleaning-booking')));
+        } else {
+            wp_send_json_error(array('message' => __('Error deleting booking', 'cleaning-booking')));
+        }
+    }
+    
+    public function ajax_get_services() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Insufficient permissions', 'cleaning-booking'));
+        }
+        
+        $services = CB_Database::get_services(false);
+        
+        $formatted_services = array();
+        foreach ($services as $service) {
+            $formatted_services[] = array(
+                'id' => $service->id,
+                'name' => $service->name,
+                'description' => $service->description,
+                'base_price' => floatval($service->base_price)
+            );
+        }
+        
+        wp_send_json_success($formatted_services);
+    }
+    
+    public function ajax_save_booking() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Insufficient permissions', 'cleaning-booking'));
+        }
+        
+        // Split datetime-local back into date and time
+        $booking_datetime = sanitize_text_field($_POST['booking_datetime']);
+        $date_time_parts = explode('T', $booking_datetime);
+        $booking_date = $date_time_parts[0]; // YYYY-MM-DD
+        $booking_time = isset($date_time_parts[1]) ? $date_time_parts[1] : '09:00'; // HH:MM
+        
+        $data = array(
+            'customer_name' => sanitize_text_field($_POST['customer_name']),
+            'customer_email' => sanitize_email($_POST['customer_email']),
+            'customer_phone' => sanitize_text_field($_POST['customer_phone']),
+            'address' => sanitize_textarea_field($_POST['address']),
+            'service_id' => intval($_POST['service_id']),
+            'square_meters' => intval($_POST['square_meters']),
+            'booking_date' => $booking_date,
+            'booking_time' => $booking_time,
+            'notes' => sanitize_textarea_field($_POST['notes']),
+            'status' => sanitize_text_field($_POST['status'])
+        );
+        
+        $booking_id = intval($_POST['id']);
+        
+        if ($booking_id && $booking_id > 0) {
+            // Update existing booking
+            $result = CB_Database::update_booking($booking_id, $data);
+            
+            if ($result) {
+                wp_send_json_success(array(
+                    'message' => __('Booking updated successfully!', 'cleaning-booking'),
+                    'booking_id' => $booking_id
+                ));
+            } else {
+                wp_send_json_error(array('message' => __('Error updating booking', 'cleaning-booking')));
+            }
+        } else {
+            // Create new booking
+            $data['booking_reference'] = 'CB-' . date('Ymd') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+            $result = CB_Database::create_booking($data);
+            
+            if ($result) {
+                wp_send_json_success(array(
+                    'message' => __('Booking created successfully!', 'cleaning-booking'),
+                    'booking_id' => $result
+                ));
+            } else {
+                wp_send_json_error(array('message' => __('Error creating booking', 'cleaning-booking')));
+            }
+        }
+    }
+    
 }

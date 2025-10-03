@@ -35,10 +35,11 @@ class CB_Database {
             PRIMARY KEY (id)
         ) $charset_collate;";
         
-        // Extras table
-        $extras_table = $wpdb->prefix . 'cb_extras';
-        $extras_sql = "CREATE TABLE $extras_table (
+        // Service extras table (combining previous extras + junction table)
+        $service_extras_table = $wpdb->prefix . 'cb_service_extras';
+        $service_extras_sql = "CREATE TABLE $service_extras_table (
             id mediumint(9) NOT NULL AUTO_INCREMENT,
+            service_id mediumint(9) NOT NULL,
             name varchar(255) NOT NULL,
             description text,
             price decimal(10,2) NOT NULL DEFAULT 0.00,
@@ -47,7 +48,10 @@ class CB_Database {
             sort_order int(11) NOT NULL DEFAULT 0,
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
             updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (id)
+            PRIMARY KEY (id),
+            KEY service_id (service_id),
+            KEY is_active (is_active),
+            KEY sort_order (sort_order)
         ) $charset_collate;";
         
         // ZIP codes table
@@ -127,14 +131,90 @@ class CB_Database {
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         
         dbDelta($services_sql);
-        dbDelta($extras_sql);
+        dbDelta($service_extras_sql);
         dbDelta($zip_codes_sql);
         dbDelta($bookings_sql);
         dbDelta($booking_extras_sql);
         dbDelta($slot_holds_sql);
         
+        // Ensure service_extras table exists for existing installations
+        self::check_service_extras_table();
+        
         // Insert default data
         self::insert_default_data();
+    }
+    
+    private static function check_service_extras_table() {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'cb_service_extras';
+        $old_extras_table = $wpdb->prefix . 'cb_extras';
+        
+        // Check if table exists
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'") == $table_name;
+        $old_table_exists = $wpdb->get_var("SHOW TABLES LIKE '$old_extras_table'") == $old_extras_table;
+        
+        if (!$table_exists) {
+            $charset_collate = $wpdb->get_charset_collate();
+            
+            $service_extras_sql = "CREATE TABLE $table_name (
+                id mediumint(9) NOT NULL AUTO_INCREMENT,
+                service_id mediumint(9) NOT NULL,
+                name varchar(255) NOT NULL,
+                description text,
+                price decimal(10,2) NOT NULL DEFAULT 0.00,
+                duration int(11) NOT NULL DEFAULT 0,
+                is_active tinyint(1) NOT NULL DEFAULT 1,
+                sort_order int(11) NOT NULL DEFAULT 0,
+                created_at datetime DEFAULT CURRENT_TIMESTAMP,
+                updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                KEY service_id (service_id),
+                KEY is_active (is_active),
+                KEY sort_order (sort_order)
+            ) $charset_collate;";
+            
+            require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+            dbDelta($service_extras_sql);
+        }
+        
+        // Migration: Migrate existing extras data
+        if ($old_table_exists) {
+            self::migrate_extras_data();
+        }
+    }
+    
+    private static function migrate_extras_data() {
+        global $wpdb;
+        
+        $old_extras_table = $wpdb->prefix . 'cb_extras';
+        $new_service_extras_table = $wpdb->prefix . 'cb_service_extras';
+        
+        // Get all existing extras
+        $extras = $wpdb->get_results("SELECT * FROM $old_extras_table");
+        
+        if (!empty($extras)) {
+            // Get the first service to assign existing extras to
+            $services = CB_Database::get_services(false);
+            $default_service_id = isset($services[0]) ? $services[0]->id : null;
+            
+            foreach ($extras as $extra) {
+                $wpdb->insert($new_service_extras_table, array(
+                    'service_id' => $default_service_id ?: 1,
+                    'name' => $extra->name,
+                    'description' => $extra->description,
+                    'price' => $extra->price,
+                    'duration' => $extra->duration,
+                    'is_active' => $extra->is_active,
+                    'sort_order' => $extra->sort_order,
+                    'created_at' => $extra->created_at,
+                    'updated_at' => $extra->updated_at
+                ));
+            }
+        }
+        
+        // Drop the old extras table after migration
+        $wpdb->query("DROP TABLE IF EXISTS $old_extras_table");
     }
     
     private static function insert_default_data() {
@@ -184,48 +264,33 @@ class CB_Database {
             }
         }
         
-        // Insert default extras
-        $extras_table = $wpdb->prefix . 'cb_extras';
+        // Insert default extras for each service
+        $service_extras_table = $wpdb->prefix . 'cb_service_extras';
         $default_extras = array(
-            array(
-                'name' => 'Dishwashing',
-                'description' => 'Wash and put away dishes',
-                'price' => 15.00,
-                'duration' => 30,
-                'sort_order' => 1
-            ),
-            array(
-                'name' => 'Ironing',
-                'description' => 'Iron clothes and linens',
-                'price' => 20.00,
-                'duration' => 45,
-                'sort_order' => 2
-            ),
-            array(
-                'name' => 'Cooking',
-                'description' => 'Prepare simple meals',
-                'price' => 25.00,
-                'duration' => 60,
-                'sort_order' => 3
-            ),
-            array(
-                'name' => 'Window Cleaning',
-                'description' => 'Clean interior and exterior windows',
-                'price' => 30.00,
-                'duration' => 45,
-                'sort_order' => 4
-            )
+            array('name' => 'Dishwashing', 'description' => 'Wash and put away dishes', 'price' => 15.00, 'duration' => 30, 'sort_order' => 1),
+            array('name' => 'Ironing', 'description' => 'Iron clothes and linens', 'price' => 20.00, 'duration' => 45, 'sort_order' => 2),
+            array('name' => 'Cooking', 'description' => 'Prepare simple meals', 'price' => 25.00, 'duration' => 60, 'sort_order' => 3),
+            array('name' => 'Window Cleaning', 'description' => 'Clean interior and exterior windows', 'price' => 30.00, 'duration' => 45, 'sort_order' => 4)
         );
         
-        foreach ($default_extras as $extra) {
-            // Check if extra already exists
-            $existing = $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM $extras_table WHERE name = %s",
-                $extra['name']
-            ));
-            
-            if (!$existing) {
-            $wpdb->insert($extras_table, $extra);
+        // Get default services to assign extras to
+        $services = $wpdb->get_results("SELECT id FROM $services_table ORDER BY sort_order");
+        
+        if (!empty($services)) {
+            foreach ($services as $service) {
+                foreach ($default_extras as $extra) {
+                    // Check if extra already exists for this service
+                    $existing = $wpdb->get_var($wpdb->prepare(
+                        "SELECT COUNT(*) FROM $service_extras_table WHERE service_id = %d AND name = %s",
+                        $service->id,
+                        $extra['name']
+                    ));
+                    
+                    if (!$existing) {
+                        $extra_data = array_merge($extra, array('service_id' => $service->id));
+                        $wpdb->insert($service_extras_table, $extra_data);
+                    }
+                }
             }
         }
         
@@ -259,12 +324,6 @@ class CB_Database {
         return $wpdb->get_results("SELECT * FROM $table $where ORDER BY sort_order, name");
     }
     
-    public static function get_extras($active_only = true) {
-        global $wpdb;
-        $table = $wpdb->prefix . 'cb_extras';
-        $where = $active_only ? 'WHERE is_active = 1' : '';
-        return $wpdb->get_results("SELECT * FROM $table $where ORDER BY sort_order, name");
-    }
     
     public static function get_zip_codes($active_only = true) {
         global $wpdb;
@@ -283,13 +342,27 @@ class CB_Database {
         return $result > 0;
     }
     
+    public static function check_zip_availability($zip_code) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_zip_codes';
+        
+        $result = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM $table WHERE zip_code = %s AND is_active = 1",
+            $zip_code
+        ));
+        
+        return $result > 0;
+    }
+    
     public static function get_zip_surcharge($zip_code) {
         global $wpdb;
         $table = $wpdb->prefix . 'cb_zip_codes';
-        return $wpdb->get_var($wpdb->prepare(
+        $result = $wpdb->get_var($wpdb->prepare(
             "SELECT surcharge FROM $table WHERE zip_code = %s AND is_active = 1",
             $zip_code
         ));
+        
+        return $result ?: 0;
     }
     
     public static function create_booking($data) {
@@ -369,5 +442,128 @@ class CB_Database {
         }
         
         return $wpdb->update($table, $data, array('id' => $booking_id));
+    }
+    
+    public static function update_booking($booking_id, $data) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_bookings';
+        
+        $update_data = array(
+            'customer_name' => sanitize_text_field($data['customer_name']),
+            'customer_email' => sanitize_email($data['customer_email']),
+            'customer_phone' => sanitize_text_field($data['customer_phone']),
+            'address' => sanitize_textarea_field($data['address']),
+            'service_id' => intval($data['service_id']),
+            'square_meters' => intval($data['square_meters']),
+            'booking_date' => sanitize_text_field($data['booking_date']),
+            'booking_time' => sanitize_text_field($data['booking_time']),
+            'notes' => sanitize_textarea_field($data['notes']),
+            'status' => sanitize_text_field($data['status'])
+        );
+        
+        return $wpdb->update($table, $update_data, array('id' => $booking_id));
+    }
+    
+    public static function get_service_extras($service_id, $active_only = false) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_service_extras';
+        $where = $wpdb->prepare("WHERE service_id = %d", $service_id);
+        
+        if ($active_only) {
+            $where .= " AND is_active = 1";
+        }
+        
+        return $wpdb->get_results("SELECT * FROM $table $where ORDER BY id DESC");
+    }
+    
+    public static function get_available_extras_for_service($service_id) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_service_extras';
+        
+        // Get extras from other services that are not yet assigned to this service
+        return $wpdb->get_results($wpdb->prepare("
+            SELECT DISTINCT name, description, price, duration 
+            FROM $table 
+            WHERE service_id != %d AND is_active = 1
+            AND name NOT IN (
+                SELECT name FROM $table 
+                WHERE service_id = %d AND is_active = 1
+            )
+            ORDER BY name
+        ", $service_id, $service_id));
+    }
+    
+    public static function add_service_extra($service_id, $extra_data) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_service_extras';
+        
+        $data = array(
+            'service_id' => $service_id,
+            'name' => sanitize_text_field($extra_data['name']),
+            'description' => sanitize_textarea_field($extra_data['description']),
+            'price' => floatval($extra_data['price']),
+            'duration' => intval($extra_data['duration']),
+            'is_active' => isset($extra_data['is_active']) ? intval($extra_data['is_active']) : 1,
+            'sort_order' => isset($extra_data['sort_order']) ? intval($extra_data['sort_order']) : 0
+        );
+        
+        return $wpdb->insert($table, $data);
+    }
+    
+    public static function remove_service_extra($service_id, $extra_id) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_service_extras';
+        
+        return $wpdb->delete($table, array(
+            'id' => $extra_id,
+            'service_id' => $service_id
+        ));
+    }
+    
+    public static function update_service_extra($service_id, $extra_id, $data) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_service_extras';
+        
+        $update_data = array();
+        if (isset($data['name'])) $update_data['name'] = sanitize_text_field($data['name']);
+        if (isset($data['description'])) $update_data['description'] = sanitize_textarea_field($data['description']);
+        if (isset($data['price'])) $update_data['price'] = floatval($data['price']);
+        if (isset($data['duration'])) $update_data['duration'] = intval($data['duration']);
+        if (isset($data['is_active'])) $update_data['is_active'] = intval($data['is_active']);
+        if (isset($data['sort_order'])) $update_data['sort_order'] = intval($data['sort_order']);
+        
+        return $wpdb->update($table, $update_data, array(
+            'id' => $extra_id,
+            'service_id' => $service_id
+        ));
+    }
+    
+    public static function delete_service_and_extras($service_id) {
+        global $wpdb;
+        
+        $services_table = $wpdb->prefix . 'cb_services';
+        $service_extras_table = $wpdb->prefix . 'cb_service_extras';
+        
+        // Start transaction
+        $wpdb->query('START TRANSACTION');
+        
+        try {
+            // Delete all extras for this service
+            $wpdb->delete($service_extras_table, array('service_id' => $service_id));
+            
+            // Delete the service
+            $result = $wpdb->delete($services_table, array('id' => $service_id));
+            
+            if ($result) {
+                $wpdb->query('COMMIT');
+                return true;
+            } else {
+                $wpdb->query('ROLLBACK');
+                return false;
+            }
+        } catch (Exception $e) {
+            $wpdb->query('ROLLBACK');
+            return false;
+        }
     }
 }

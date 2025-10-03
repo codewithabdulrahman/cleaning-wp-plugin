@@ -28,6 +28,14 @@ define('CB_VERSION', '1.0.0');
 // WooCommerce integration is optional
 // The plugin can work standalone or with WooCommerce for payment processing
 
+/**
+ * Load plugin translations
+ */
+function cb_load_textdomain() {
+    load_plugin_textdomain('cleaning-booking', false, dirname(plugin_basename(__FILE__)) . '/languages');
+}
+add_action('plugins_loaded', 'cb_load_textdomain');
+
 // Main plugin class
 class CleaningBooking {
     

@@ -246,3 +246,135 @@
     background: #d1ecf1;
     color: #0c5460;
 }
+
+/* Booking Management Styles */
+.cb-booking-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    align-items: center;
+}
+
+.cb-status-dropdown {
+    min-width: 120px;
+    margin-right: 5px;
+}
+
+/* Modal Styles */
+.cb-modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+}
+
+.cb-modal-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    border-radius: 5px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.cb-modal-header {
+    border-bottom: 1px solid #ddd;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f1f1f1;
+}
+
+.cb-modal-header h3 {
+    margin: 0;
+    color: #333;
+}
+
+.cb-modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #666;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cb-modal-close:hover {
+    color: #000;
+}
+
+.cb-modal-body {
+    padding: 20px;
+}
+
+.cb-modal-body table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.cb-modal-body table th,
+.cb-modal-body table td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+.cb-modal-body table th {
+    font-weight: bold;
+    color: #333;
+    width: 30%;
+}
+
+/* Edit Modal Form Styles */
+.cb-modal-form {
+    max-width: 800px;
+}
+
+.cb-modal-body .form-table {
+    margin: 0;
+}
+
+.cb-modal-body .form-table th {
+    width: 25%;
+    padding: 15px 10px 15px 0;
+}
+
+.cb-modal-body .form-table td {
+    padding: 15px 0;
+}
+
+.cb-booking-actions .button-secondary {
+    background: #dc3232;
+    border-color: #dc3232;
+    color: white;
+}
+
+.cb-booking-actions .button-secondary:hover {
+    background: #a00;
+    border-color: #a00;
+}
+
+.submit {
+    border-top: 1px solid #ddd;
+    padding-top: 15px;
+    margin-top: 20px;
+}
+
+.submit .button {
+    margin-right: 10px;
+}
