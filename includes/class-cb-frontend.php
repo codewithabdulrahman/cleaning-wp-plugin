@@ -10,7 +10,19 @@ if (!defined('ABSPATH')) {
 class CB_Frontend {
     
     public function __construct() {
-        add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
+        // Add inline script to head IMMEDIATELY to prevent Elementor conflicts
+        add_action('wp_head', array($this, 'add_early_cb_frontend_init'), 1);
+        
+        // Also add to multiple hooks with very high priority as backup
+        add_action('init', array($this, 'add_early_cb_frontend_init'), 1);
+        add_action('wp_print_scripts', array($this, 'add_early_cb_frontend_init'), 1);
+        add_action('wp_print_styles', array($this, 'add_early_cb_frontend_init'), 1);
+        
+        // Disable Elementor frontend script on pages with our booking widget
+        add_action('wp_enqueue_scripts', array($this, 'disable_elementor_conflicts'), 1);
+        
+        // Load our scripts early to prevent Elementor conflicts (priority 5)
+        add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'), 5);
         add_shortcode('cb_widget', array($this, 'booking_widget_shortcode'));
         add_action('wp_ajax_cb_switch_language', array($this, 'ajax_switch_language'));
         add_action('wp_ajax_nopriv_cb_switch_language', array($this, 'ajax_switch_language'));
@@ -22,6 +34,9 @@ class CB_Frontend {
         add_action('wp_ajax_cb_debug', array($this, 'ajax_debug'));
         add_action('wp_ajax_nopriv_cb_debug', array($this, 'ajax_debug'));
         
+        // Run database migrations for existing installations
+        $this->run_database_migrations();
+        
         // AJAX actions for authenticated users
         add_action('wp_ajax_cb_create_booking', array($this, 'ajax_create_booking'));
         add_action('wp_ajax_cb_check_zip_availability', array($this, 'ajax_check_zip_availability'));
@@ -29,6 +44,7 @@ class CB_Frontend {
         add_action('wp_ajax_cb_get_available_slots', array($this, 'ajax_get_available_slots'));
         add_action('wp_ajax_cb_get_services', array($this, 'ajax_get_services'));
         add_action('wp_ajax_cb_get_extras', array($this, 'ajax_get_extras'));
+        add_action('wp_ajax_cb_calculate_price', array($this, 'ajax_calculate_price'));
         
         // AJAX actions for non-authenticated users (public access)
         add_action('wp_ajax_nopriv_cb_create_booking', array($this, 'ajax_create_booking'));
@@ -37,14 +53,158 @@ class CB_Frontend {
         add_action('wp_ajax_nopriv_cb_get_available_slots', array($this, 'ajax_get_available_slots'));
         add_action('wp_ajax_nopriv_cb_get_services', array($this, 'ajax_get_services'));
         add_action('wp_ajax_nopriv_cb_get_extras', array($this, 'ajax_get_extras'));
+        add_action('wp_ajax_nopriv_cb_calculate_price', array($this, 'ajax_calculate_price'));
+    }
+    
+    /**
+     * Add early cb_frontend initialization directly to HTML head
+     * This runs with priority 1 to ensure it loads before any other scripts
+     */
+    public function add_early_cb_frontend_init() {
+        // Prevent duplicate output
+        static $already_output = false;
+        if ($already_output) {
+            return;
+        }
+        $already_output = true;
+        
+        // Only add on pages with our shortcode
+        global $post;
+        if (!is_a($post, 'WP_Post') || !has_shortcode($post->post_content, 'cb_widget')) {
+            return;
+        }
+        
+        ?>
+        <script type="text/javascript">
+        // IMMEDIATE initialization to prevent Elementor conflicts
+        (function() {
+            'use strict';
+            
+            // Create multiple global objects that Elementor might be expecting
+            window.cb_frontend = {
+                tools: {
+                    initOnReadyComponents: function() {
+                        console.log('Elementor called cb_frontend.tools.initOnReadyComponents - preventing error');
+                        return true;
+                    }
+                },
+                ajax_url: '',
+                nonce: '',
+                current_language: 'en',
+                translations: {},
+                strings: {},
+                init: function() {},
+                ready: function() {},
+                onReady: function() {},
+                components: {},
+                modules: {},
+                utils: {},
+                helpers: {},
+                Frontend: {
+                    initOnReadyComponents: function() {
+                        console.log('Elementor called cb_frontend.Frontend.initOnReadyComponents - preventing error');
+                        return true;
+                    },
+                    init: function() {}
+                }
+            };
+            
+            // Also create a global Frontend object that Elementor might be looking for
+            window.Frontend = {
+                tools: {
+                    initOnReadyComponents: function() {
+                        console.log('Elementor called Frontend.tools.initOnReadyComponents - preventing error');
+                        return true;
+                    }
+                },
+                initOnReadyComponents: function() {
+                    console.log('Elementor called Frontend.initOnReadyComponents - preventing error');
+                    return true;
+                },
+                init: function() {
+                    console.log('Elementor called Frontend.init - preventing error');
+                    return true;
+                }
+            };
+            
+            // Create Elementor-specific global objects
+            window.elementorFrontend = {
+                tools: {
+                    initOnReadyComponents: function() {
+                        console.log('Elementor called elementorFrontend.tools.initOnReadyComponents - preventing error');
+                        return true;
+                    }
+                },
+                initOnReadyComponents: function() {
+                    console.log('Elementor called elementorFrontend.initOnReadyComponents - preventing error');
+                    return true;
+                },
+                init: function() {
+                    console.log('Elementor called elementorFrontend.init - preventing error');
+                    return true;
+                }
+            };
+            
+            // Create a generic tools object
+            window.tools = {
+                initOnReadyComponents: function() {
+                    console.log('Elementor called tools.initOnReadyComponents - preventing error');
+                    return true;
+                }
+            };
+            
+            // Also ensure it's available when DOM is ready
+            if (typeof document !== 'undefined') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    if (!window.cb_frontend.tools) {
+                        window.cb_frontend.tools = {};
+                    }
+                });
+            }
+        })();
+        </script>
+        <?php
+    }
+    
+    /**
+     * Disable Elementor frontend script on pages with our booking widget
+     */
+    public function disable_elementor_conflicts() {
+        // Only disable on pages with our shortcode
+        global $post;
+        if (!is_a($post, 'WP_Post') || !has_shortcode($post->post_content, 'cb_widget')) {
+            return;
+        }
+        
+        // Dequeue Elementor frontend script to prevent conflicts
+        wp_dequeue_script('elementor-frontend');
+        wp_deregister_script('elementor-frontend');
+        
+        // Also try to dequeue any Elementor-related scripts
+        wp_dequeue_script('elementor-frontend-min');
+        wp_deregister_script('elementor-frontend-min');
+        
+        wp_dequeue_script('elementor-frontend-min-js');
+        wp_deregister_script('elementor-frontend-min-js');
+        
+        wp_dequeue_script('elementor-frontend-js');
+        wp_deregister_script('elementor-frontend-js');  
     }
     
     public function enqueue_scripts() {
         // Only load on pages with the shortcode
         global $post;
         if (is_a($post, 'WP_Post') && has_shortcode($post->post_content, 'cb_widget')) {
-            wp_enqueue_script('cb-frontend', CB_PLUGIN_URL . 'assets/js/frontend.js', array('jquery'), CB_VERSION, true);
+            // Load early initialization script FIRST (no dependencies, loads immediately)
+            wp_enqueue_script('cb-frontend-init', CB_PLUGIN_URL . 'assets/js/cb-frontend-init.js', array(), CB_VERSION, false);
+            
+            // Load our main script early with high priority to prevent Elementor conflicts
+            wp_enqueue_script('cb-frontend', CB_PLUGIN_URL . 'assets/js/frontend.js', array('jquery'), CB_VERSION, false);
             wp_enqueue_style('cb-frontend', CB_PLUGIN_URL . 'assets/css/frontend.css', array(), CB_VERSION);
+            
+            // Set high priority and ensure it loads before other scripts
+            wp_script_add_data('cb-frontend-init', 'priority', 1);
+            wp_script_add_data('cb-frontend', 'priority', 2);
             
             wp_localize_script('cb-frontend', 'cb_frontend', array(
                 'ajax_url' => admin_url('admin-ajax.php'),
@@ -112,10 +272,15 @@ class CB_Frontend {
     }
     
     public function ajax_create_booking() {
+        try {
         // Require nonce for booking creation (has side effects)
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'cb_frontend_nonce')) {
             wp_send_json_error(array('message' => __('Security ticket expired. Please refresh the page.', 'cleaning-booking')));
         }
+            
+            // Debug logging
+            error_log('CB Debug - Creating booking with data: ' . print_r($_POST, true));
+            error_log('CB Debug - Extras received: ' . print_r($_POST['extras'], true));
         
         $data = array(
             'customer_name' => sanitize_text_field($_POST['customer_name']),
@@ -127,8 +292,9 @@ class CB_Frontend {
             'square_meters' => intval($_POST['square_meters']),
             'booking_date' => sanitize_text_field($_POST['booking_date']),
             'booking_time' => sanitize_text_field($_POST['booking_time']),
-            'extras' => array_map('intval', $_POST['extras']),
-            'notes' => sanitize_textarea_field($_POST['notes'])
+            'extras' => isset($_POST['extras']) ? array_map('intval', $_POST['extras']) : array(),
+            'notes' => sanitize_textarea_field($_POST['notes']),
+            'payment_method' => sanitize_text_field($_POST['payment_method'])
         );
         
         // Validate required fields
@@ -160,6 +326,13 @@ class CB_Frontend {
             wp_send_json_error(array('message' => __('Please select a time slot.', 'cleaning-booking')));
         }
         
+        // Calculate final price and duration
+        $total_price = CB_Pricing::calculate_booking_price($data['service_id'], $data['square_meters'], $data['extras'], $data['zip_code']);
+        $total_duration = CB_Pricing::calculate_booking_duration($data['service_id'], $data['square_meters'], $data['extras']);
+        
+        $data['total_price'] = $total_price;
+        $data['total_duration'] = $total_duration;
+        
         // Create booking
         $booking_id = CB_Database::create_booking($data);
         
@@ -169,6 +342,19 @@ class CB_Frontend {
             // Create WooCommerce order
             $woocommerce = new CB_WooCommerce();
             $order_url = $woocommerce->create_booking_order($booking);
+                
+                // Debug logging
+                error_log('CB Debug - Booking created with ID: ' . $booking_id);
+                error_log('CB Debug - Checkout URL: ' . $order_url);
+                
+                // If WooCommerce is not available, provide a fallback
+                if (!$order_url) {
+                    error_log('CB Debug - WooCommerce not available, using fallback');
+                    $order_url = add_query_arg(array(
+                        'booking_id' => $booking_id,
+                        'booking_reference' => $booking->booking_reference
+                    ), home_url('/booking-confirmation/'));
+                }
             
             wp_send_json_success(array(
                 'booking_id' => $booking_id,
@@ -179,6 +365,11 @@ class CB_Frontend {
         }
         
         wp_send_json_error(array('message' => __('Failed to create booking. Please try again.', 'cleaning-booking')));
+            
+        } catch (Exception $e) {
+            error_log('CB Debug - Booking creation error: ' . $e->getMessage());
+            wp_send_json_error(array('message' => __('An error occurred while creating the booking. Please try again.', 'cleaning-booking')));
+        }
     }
     
     public function ajax_check_zip_availability() {
@@ -267,6 +458,10 @@ class CB_Frontend {
         // Get active extras for the selected service
         $extras = CB_Database::get_service_extras($service_id, true);
         
+        // Debug logging
+        error_log('CB Debug - ajax_get_extras called for service_id: ' . $service_id);
+        error_log('CB Debug - extras found: ' . print_r($extras, true));
+        
         wp_send_json_success(array('extras' => $extras));
     }
     
@@ -306,14 +501,59 @@ class CB_Frontend {
     private function get_translations() {
         // Load translation file based on current language
         $language = $this->get_current_language();
-        $translation_file = CB_PLUGIN_DIR . "languages/cleaning-booking-{$language}.json";
+        return $this->get_translations_for_language($language);
+    }
+    
+    private function get_translations_for_language($language) {
+        // Map language codes to actual filenames
+        $file_mapping = array(
+            'en' => 'cleaning-booking-en.json',
+            'el' => 'cleaning-booking-el_GR.json'
+        );
+        
+        $filename = isset($file_mapping[$language]) ? $file_mapping[$language] : "cleaning-booking-{$language}.json";
+        $translation_file = CB_PLUGIN_DIR . "languages/{$filename}";
         
         if (file_exists($translation_file)) {
-            return json_decode(file_get_contents($translation_file), true);
+            $translations = json_decode(file_get_contents($translation_file), true);
+            return $translations ?: array();
         }
         
         // Return empty array if no translations found
         return array();
+    }
+    
+    private function get_translated_services($language) {
+        // Get original services from database
+        $services = CB_Database::get_services(true);
+        
+        if (!$services) {
+            return array();
+        }
+        
+        // Load service translations
+        $translations = $this->get_translations_for_language($language);
+        $service_translations = isset($translations['services']) ? $translations['services'] : array();
+        
+        // Translate service names and descriptions
+        $translated_services = array();
+        foreach ($services as $service) {
+            $translated_service = (array) $service; // Convert object to array
+            
+            // Translate service name
+            if (isset($service_translations[$service->name])) {
+                $translated_service['name'] = $service_translations[$service->name];
+            }
+            
+            // Translate service description
+            if (isset($service_translations[$service->description])) {
+                $translated_service['description'] = $service_translations[$service->description];
+            }
+            
+            $translated_services[] = (object) $translated_service;
+        }
+        
+        return $translated_services;
     }
     
     public function ajax_switch_language() {
@@ -325,14 +565,18 @@ class CB_Frontend {
             $language = 'en';
         }
         
-        // Set WordPress locale
-        switch_to_locale($language . '_US' . ($language === 'el' ? '_GR' : ''));
+        // Load translations directly from JSON files
+        $translations = $this->get_translations_for_language($language);
+        
+        // Get translated services data
+        $translated_services = $this->get_translated_services($language);
         
         // Return updated translations
         wp_send_json_success(array(
             'language' => $language,
-            'translations' => $this->get_translations(),
-            'message' => __('Language switched successfully', 'cleaning-booking')
+            'translations' => $translations,
+            'services' => $translated_services,
+            'message' => $translations['Language switched successfully'] ?? 'Language switched successfully'
         ));
     }
     
@@ -380,6 +624,50 @@ class CB_Frontend {
         }
     }
     
+    public function ajax_calculate_price() {
+        try {
+            // Require nonce for price calculation
+            if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'cb_frontend_nonce')) {
+                wp_send_json_error(array('message' => __('Security ticket expired. Please refresh the page.', 'cleaning-booking')));
+            }
+            
+            $service_id = intval($_POST['service_id']);
+            $square_meters = intval($_POST['square_meters']);
+            $extras = isset($_POST['extras']) ? array_map('intval', $_POST['extras']) : array();
+            $zip_code = sanitize_text_field($_POST['zip_code']);
+            
+            // Debug logging
+            error_log('CB Debug - Price calculation request: service_id=' . $service_id . ', sqm=' . $square_meters . ', extras=' . print_r($extras, true) . ', zip=' . $zip_code);
+            
+            // Validate required fields
+            if (empty($service_id) || empty($square_meters)) {
+                wp_send_json_error(array('message' => __('Service and square meters are required for price calculation.', 'cleaning-booking')));
+            }
+            
+            // Check if CB_Pricing class exists
+            if (!class_exists('CB_Pricing')) {
+                error_log('CB Debug - CB_Pricing class not found!');
+                wp_send_json_error(array('message' => __('Pricing system not available.', 'cleaning-booking')));
+            }
+            
+            // Calculate pricing breakdown
+            $pricing = CB_Pricing::get_pricing_breakdown($service_id, $square_meters, $extras, $zip_code);
+            
+            error_log('CB Debug - Price calculation result: ' . print_r($pricing, true));
+            
+            wp_send_json_success(array(
+                'pricing' => $pricing,
+                'formatted_price' => CB_Pricing::format_price($pricing['total_price']),
+                'formatted_duration' => CB_Pricing::format_duration($pricing['total_duration'])
+            ));
+            
+        } catch (Exception $e) {
+            error_log('CB Debug - Price calculation error: ' . $e->getMessage());
+            error_log('CB Debug - Price calculation stack trace: ' . $e->getTraceAsString());
+            wp_send_json_error(array('message' => __('Unable to calculate price. Please try again.', 'cleaning-booking')));
+        }
+    }
+    
     public function rest_get_extras($request) {
         try {
             $service_id = $request->get_param('service_id');
@@ -392,5 +680,13 @@ class CB_Frontend {
         } catch (Exception $e) {
             return new WP_Error('error', 'Unable to retrieve extras', array('status' => 500));
         }
+    }
+    
+    private function run_database_migrations() {
+        // Include database class
+        require_once CB_PLUGIN_DIR . 'includes/class-cb-database.php';
+        
+        // Run migrations
+        CB_Database::run_migrations();
     }
 }

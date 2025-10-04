@@ -18,6 +18,9 @@ class CB_Database {
         
         $charset_collate = $wpdb->get_charset_collate();
         
+        // Run migrations first for existing installations
+        self::run_migrations();
+        
         // Services table
         $services_table = $wpdb->prefix . 'cb_services';
         $services_sql = "CREATE TABLE $services_table (
@@ -88,6 +91,7 @@ class CB_Database {
             woocommerce_order_id int(11) DEFAULT NULL,
             extras_data text,
             notes text,
+            payment_method varchar(50) DEFAULT 'cash',
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
             updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
@@ -137,11 +141,14 @@ class CB_Database {
         dbDelta($booking_extras_sql);
         dbDelta($slot_holds_sql);
         
-        // Ensure service_extras table exists for existing installations
-        self::check_service_extras_table();
-        
         // Insert default data
         self::insert_default_data();
+    }
+    
+    public static function run_migrations() {
+        // Run all migration checks
+        self::check_service_extras_table();
+        self::check_payment_method_column();
     }
     
     private static function check_service_extras_table() {
@@ -215,6 +222,20 @@ class CB_Database {
         
         // Drop the old extras table after migration
         $wpdb->query("DROP TABLE IF EXISTS $old_extras_table");
+    }
+    
+    private static function check_payment_method_column() {
+        global $wpdb;
+        
+        $bookings_table = $wpdb->prefix . 'cb_bookings';
+        
+        // Check if payment_method column exists
+        $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $bookings_table LIKE 'payment_method'");
+        
+        if (empty($column_exists)) {
+            // Add payment_method column
+            $wpdb->query("ALTER TABLE $bookings_table ADD COLUMN payment_method varchar(50) DEFAULT 'cash' AFTER notes");
+        }
     }
     
     private static function insert_default_data() {
@@ -387,7 +408,8 @@ class CB_Database {
             'booking_time' => sanitize_text_field($data['booking_time']),
             'status' => 'pending',
             'extras_data' => json_encode($data['extras']),
-            'notes' => sanitize_textarea_field($data['notes'])
+            'notes' => sanitize_textarea_field($data['notes']),
+            'payment_method' => sanitize_text_field($data['payment_method'])
         );
         
         $result = $wpdb->insert($table, $booking_data);
@@ -411,12 +433,28 @@ class CB_Database {
         $table = $wpdb->prefix . 'cb_booking_extras';
         
         foreach ($extras as $extra) {
-            $wpdb->insert($table, array(
-                'booking_id' => $booking_id,
-                'extra_id' => $extra['id'],
-                'quantity' => $extra['quantity'],
-                'price' => $extra['price']
-            ));
+            // Handle both formats: array of IDs or array of objects
+            if (is_numeric($extra)) {
+                // Simple ID format: [2, 3, 4]
+                $extra_id = intval($extra);
+                $quantity = 1; // Default quantity
+                $price = 0; // Will be calculated later
+            } else {
+                // Object format: [{'id': 2, 'quantity': 1, 'price': 25.00}]
+                $extra_id = intval($extra['id']);
+                $quantity = intval($extra['quantity']);
+                $price = floatval($extra['price']);
+            }
+            
+            // Only insert if extra_id is valid
+            if ($extra_id > 0) {
+                $wpdb->insert($table, array(
+                    'booking_id' => $booking_id,
+                    'extra_id' => $extra_id,
+                    'quantity' => $quantity,
+                    'price' => $price
+                ));
+            }
         }
     }
     

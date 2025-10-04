@@ -67,5 +67,14 @@
   "Booking saved successfully!": "Η κράτηση αποθηκεύτηκε επιτυχώς!",
   "Processing...": "Επεξεργασία...",
   "Security ticket expired. Please refresh the page.": "Το εισιτήριο ασφαλείας έληξε. Παρακαλούμε ανανεώστε τη σελίδα.",
-  "Failed to create booking. Please try again.": "Αποτυχία δημιουργίας κράτησης. Παρακαλούμε προσπαθήστε ξανά."
+  "Failed to create booking. Please try again.": "Αποτυχία δημιουργίας κράτησης. Παρακαλούμε προσπαθήστε ξανά.",
+  "Language switched successfully": "Η γλώσσα άλλαξε επιτυχώς",
+  "services": {
+    "House Cleaning": "Καθαρισμός Σπιτιού",
+    "Apartment Cleaning": "Καθαρισμός Διαμερίσματος", 
+    "Office Cleaning": "Καθαρισμός Γραφείου",
+    "Complete house cleaning service": "Πλήρης υπηρεσία καθαρισμού σπιτιού",
+    "Apartment cleaning service": "Υπηρεσία καθαρισμού διαμερίσματος",
+    "Office and workspace cleaning": "Καθαρισμός γραφείου και χώρου εργασίας"
+  }
 }

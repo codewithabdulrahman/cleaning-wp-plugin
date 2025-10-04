@@ -212,6 +212,17 @@
     width: 200px;
 }
 
+/* Equal width for all form inputs */
+.cb-form .form-table input[type="text"],
+.cb-form .form-table input[type="email"],
+.cb-form .form-table input[type="number"],
+.cb-form .form-table input[type="datetime-local"],
+.cb-form .form-table select,
+.cb-form .form-table textarea {
+    width: 300px !important;
+    max-width: 300px !important;
+}
+
 /* Text utilities */
 .text-center {
     text-align: center;

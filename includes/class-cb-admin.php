@@ -39,6 +39,16 @@ class CB_Admin {
             30
         );
         
+        // Hide the default submenu item by overriding it with null
+        add_submenu_page(
+            'cleaning-booking',
+            null,
+            null,
+            'manage_options',
+            'cleaning-booking',
+            array($this, 'bookings_page')
+        );
+        
         add_submenu_page(
             'cleaning-booking',
             __('All Bookings', 'cleaning-booking'),
