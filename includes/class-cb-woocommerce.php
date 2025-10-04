@@ -28,10 +28,29 @@ class CB_WooCommerce {
         
         // Handle booking checkout redirect
         add_action('template_redirect', array($this, 'handle_booking_checkout_redirect'));
+        
+        // Ensure payment gateways are enabled
+        add_action('init', array($this, 'ensure_payment_gateways_enabled'));
+        
+        // Add admin notice for payment gateway issues
+        add_action('admin_notices', array($this, 'admin_payment_gateway_notice'));
     }
     
     public function create_booking_order($booking) {
         if (!$booking) {
+            error_log('CB Debug - No booking provided to create_booking_order');
+            return false;
+        }
+        
+        // Check if WooCommerce is active
+        if (!class_exists('WooCommerce')) {
+            error_log('CB Debug - WooCommerce is not active');
+            return false;
+        }
+        
+        // Check if WooCommerce functions are available
+        if (!function_exists('wc_get_checkout_url')) {
+            error_log('CB Debug - WooCommerce functions not available');
             return false;
         }
         
@@ -39,8 +58,11 @@ class CB_WooCommerce {
         $product_id = $this->create_booking_product($booking);
         
         if (!$product_id) {
+            error_log('CB Debug - Failed to create booking product');
             return false;
         }
+        
+        error_log('CB Debug - Created product ID: ' . $product_id);
         
         // Create checkout URL with booking data
         $checkout_url = add_query_arg(array(
@@ -49,6 +71,8 @@ class CB_WooCommerce {
             'add-to-cart' => $product_id,
             'quantity' => 1
         ), wc_get_checkout_url());
+        
+        error_log('CB Debug - Generated checkout URL: ' . $checkout_url);
         
         return $checkout_url;
     }
@@ -152,6 +176,25 @@ class CB_WooCommerce {
             $booking = CB_Database::get_booking($booking_id);
             
             if ($booking && $booking->booking_reference === $booking_reference) {
+                // Check if payment gateways are available
+                $available_gateways = WC()->payment_gateways()->get_available_payment_gateways();
+                
+                if (empty($available_gateways)) {
+                    // Try to enable payment gateways
+                    $this->ensure_payment_gateways_enabled();
+                    
+                    // Check again after enabling
+                    $available_gateways = WC()->payment_gateways()->get_available_payment_gateways();
+                    
+                    if (empty($available_gateways)) {
+                        // Show error message if still no gateways
+                        wc_add_notice(
+                            __('No payment methods are currently available. Please contact us to complete your booking.', 'cleaning-booking'),
+                            'error'
+                        );
+                    }
+                }
+                
                 // Hold the slot during checkout
                 $this->hold_booking_slot($booking);
                 
@@ -366,5 +409,66 @@ class CB_WooCommerce {
         
         echo '</table>';
         echo '</div>';
+    }
+    
+    public function ensure_payment_gateways_enabled() {
+        // Only run if WooCommerce is active
+        if (!class_exists('WooCommerce')) {
+            return;
+        }
+        
+        // Check if any payment gateways are enabled
+        $available_gateways = WC()->payment_gateways()->get_available_payment_gateways();
+        
+        if (empty($available_gateways)) {
+            // Enable Cash on Delivery if available
+            $gateways = WC()->payment_gateways()->payment_gateways();
+            
+            if (isset($gateways['cod'])) {
+                // Enable Cash on Delivery
+                $gateway_settings = get_option('woocommerce_cod_settings', array());
+                $gateway_settings['enabled'] = 'yes';
+                $gateway_settings['title'] = __('Cash on Delivery', 'cleaning-booking');
+                $gateway_settings['description'] = __('Pay when service is completed', 'cleaning-booking');
+                update_option('woocommerce_cod_settings', $gateway_settings);
+                
+                error_log('CB Debug - Enabled Cash on Delivery payment gateway');
+            }
+            
+            // Also try to enable Bank Transfer if available
+            if (isset($gateways['bacs'])) {
+                $gateway_settings = get_option('woocommerce_bacs_settings', array());
+                $gateway_settings['enabled'] = 'yes';
+                $gateway_settings['title'] = __('Bank Transfer', 'cleaning-booking');
+                update_option('woocommerce_bacs_settings', $gateway_settings);
+                
+                error_log('CB Debug - Enabled Bank Transfer payment gateway');
+            }
+        }
+    }
+    
+    public function admin_payment_gateway_notice() {
+        // Only show on admin pages
+        if (!is_admin()) {
+            return;
+        }
+        
+        // Only show if WooCommerce is active
+        if (!class_exists('WooCommerce')) {
+            return;
+        }
+        
+        // Check if any payment gateways are enabled
+        $available_gateways = WC()->payment_gateways()->get_available_payment_gateways();
+        
+        if (empty($available_gateways)) {
+            echo '<div class="notice notice-warning is-dismissible">';
+            echo '<p><strong>' . __('Cleaning Booking Plugin', 'cleaning-booking') . ':</strong> ';
+            echo __('No WooCommerce payment gateways are enabled. Please enable at least one payment method in ', 'cleaning-booking');
+            echo '<a href="' . admin_url('admin.php?page=wc-settings&tab=checkout') . '">';
+            echo __('WooCommerce → Settings → Payments', 'cleaning-booking');
+            echo '</a> to allow customers to complete bookings.</p>';
+            echo '</div>';
+        }
     }
 }

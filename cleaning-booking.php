@@ -28,6 +28,14 @@ define('CB_VERSION', '1.0.0');
 // WooCommerce integration is optional
 // The plugin can work standalone or with WooCommerce for payment processing
 
+/**
+ * Load plugin translations
+ */
+function cb_load_textdomain() {
+    load_plugin_textdomain('cleaning-booking', false, dirname(plugin_basename(__FILE__)) . '/languages');
+}
+add_action('plugins_loaded', 'cb_load_textdomain');
+
 // Main plugin class
 class CleaningBooking {
     
@@ -50,6 +58,7 @@ class CleaningBooking {
     
     private function includes() {
         require_once CB_PLUGIN_DIR . 'includes/class-cb-database.php';
+        require_once CB_PLUGIN_DIR . 'includes/class-cb-pricing.php';
         require_once CB_PLUGIN_DIR . 'includes/class-cb-admin.php';
         require_once CB_PLUGIN_DIR . 'includes/class-cb-rest-api.php';
         require_once CB_PLUGIN_DIR . 'includes/class-cb-frontend.php';
@@ -77,6 +86,18 @@ class CleaningBooking {
         
         // Initialize slot manager
         new CB_Slot_Manager();
+        
+        // Add Gravatar fallback to prevent connection errors
+        add_filter('get_avatar_url', array($this, 'gravatar_fallback'), 10, 3);
+    }
+    
+    public function gravatar_fallback($url, $id_or_email, $args) {
+        // If Gravatar URL fails, use a data URI for a simple default avatar
+        if (strpos($url, 'gravatar.com') !== false) {
+            // Return a simple data URI for a default avatar (gray circle)
+            return 'data:image/svg+xml;base64,' . base64_encode('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="32" fill="#ccc"/><circle cx="32" cy="24" r="8" fill="#999"/><path d="M16 48c0-8.8 7.2-16 16-16s16 7.2 16 16" fill="#999"/></svg>');
+        }
+        return $url;
     }
     
     public function activate() {

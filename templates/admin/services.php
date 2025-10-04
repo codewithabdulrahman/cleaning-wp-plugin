@@ -140,6 +140,9 @@ if (!defined('ABSPATH')) {
                                     <button type="button" class="button button-small cb-edit-service" data-service='<?php echo json_encode($service); ?>'>
                                         <?php _e('Edit', 'cleaning-booking'); ?>
                                     </button>
+                                    <button type="button" class="button button-small cb-manage-extras" data-service-id="<?php echo esc_attr($service->id); ?>" data-service-name="<?php echo esc_attr($service->name); ?>">
+                                        <?php _e('Extras', 'cleaning-booking'); ?>
+                                    </button>
                                     <button type="button" class="button button-small cb-delete-service" data-id="<?php echo esc_attr($service->id); ?>">
                                         <?php _e('Delete', 'cleaning-booking'); ?>
                                     </button>
@@ -150,6 +153,99 @@ if (!defined('ABSPATH')) {
                 </tbody>
             </table>
         </div>
+    </div>
+    
+    <div class="cb-admin-section" id="cb-service-extras-section" style="display: none;">
+        <h2><?php _e('Service Extras', 'cleaning-booking'); ?></h2>
+        <p><?php _e('Manage extras that are available for the selected service:', 'cleaning-booking'); ?> <strong id="selected-service-name"></strong></p>
+        
+        <!-- Create New Extra -->
+        <div class="cb-create-extra-section" style="margin-bottom: 30px; padding: 20px; background: #f9f9f9; border: 1px solid #ddd;">
+            <h3><?php _e('Create New Extra', 'cleaning-booking'); ?></h3>
+            <form id="cb-create-extra-form" class="cb-form" style="display: none;">
+                <input type="hidden" name="id" id="create-extra-id">
+                <input type="hidden" name="action" value="cb_save_extra">
+                <input type="hidden" name="nonce" value="<?php echo wp_create_nonce('cb_admin_nonce'); ?>">
+                
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">
+                            <label for="create-extra-name"><?php _e('Extra Name', 'cleaning-booking'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text" id="create-extra-name" name="name" class="regular-text" required>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="create-extra-description"><?php _e('Description', 'cleaning-booking'); ?></label>
+                        </th>
+                        <td>
+                            <textarea id="create-extra-description" name="description" rows="2" class="large-text"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="create-extra-price"><?php _e('Price', 'cleaning-booking'); ?></label>
+                        </th>
+                        <td>
+                            <input type="number" id="create-extra-price" name="price" step="0.01" min="0" class="small-text" required>
+                            <span class="description"><?php _e('Price in USD', 'cleaning-booking'); ?></span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="create-extra-duration"><?php _e('Duration', 'cleaning-booking'); ?></label>
+                        </th>
+                        <td>
+                            <input type="number" id="create-extra-duration" name="duration" min="0" class="small-text" required>
+                            <span class="description"><?php _e('Additional duration in minutes', 'cleaning-booking'); ?></span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php _e('Status', 'cleaning-booking'); ?></th>
+                        <td>
+                            <label>
+                                <input type="checkbox" id="create-extra-is-active" name="is_active" checked>
+                                <?php _e('Active', 'cleaning-booking'); ?>
+                            </label>
+                        </td>
+                    </tr>
+                </table>
+                
+                <p class="submit">
+                    <input type="submit" class="button-primary" value="<?php _e('Save Extra', 'cleaning-booking'); ?>">
+                    <button type="button" id="cb-cancel-create" class="button" style="display: none;"><?php _e('Cancel', 'cleaning-booking'); ?></button>
+                </p>
+            </form>
+            <button type="button" id="cb-show-create-form" class="button">
+                <?php _e('+ Create New Extra for This Service', 'cleaning-booking'); ?>
+            </button>
+        </div>
+        
+        
+        <div id="cb-service-extras-list">
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th><?php _e('Extra Name', 'cleaning-booking'); ?></th>
+                        <th><?php _e('Price', 'cleaning-booking'); ?></th>
+                        <th><?php _e('Duration', 'cleaning-booking'); ?></th>
+                        <th><?php _e('Status', 'cleaning-booking'); ?></th>
+                        <th><?php _e('Actions', 'cleaning-booking'); ?></th>
+                    </tr>
+                </thead>
+                <tbody id="service-extras-tbody">
+                    <!-- Service extras will be loaded here via JavaScript -->
+                </tbody>
+            </table>
+        </div>
+        
+        <p>
+            <button type="button" id="cb-back-to-services" class="button">
+                <?php _e('← Back to Services', 'cleaning-booking'); ?>
+            </button>
+        </p>
     </div>
 </div>
 
