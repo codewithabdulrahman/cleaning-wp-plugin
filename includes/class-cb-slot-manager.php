@@ -41,14 +41,14 @@ class CB_Slot_Manager {
             
             // Check if slot fits within business hours
             if (strtotime($date . ' ' . $slot_end_time) <= $end_timestamp) {
-                // Check if slot is available
-                if ($this->is_slot_available($date, $slot_time, $duration)) {
-                    $slots[] = array(
-                        'time' => $slot_time,
-                        'formatted_time' => date('g:i A', $current_time),
-                        'available' => true
-                    );
-                }
+                // Always add the slot, but mark availability
+                $is_available = $this->is_slot_available($date, $slot_time, $duration);
+                $slots[] = array(
+                    'time' => $slot_time,
+                    'formatted_time' => date('g:i A', $current_time),
+                    'available' => $is_available,
+                    'disabled' => !$is_available
+                );
             }
             
             $current_time += ($slot_duration * 60);
@@ -61,37 +61,57 @@ class CB_Slot_Manager {
         global $wpdb;
         
         $bookings_table = $wpdb->prefix . 'cb_bookings';
-        $slot_holds_table = $wpdb->prefix . 'cb_slot_holds';
+        $trucks_table = $wpdb->prefix . 'cb_trucks';
         
-        // Check for existing bookings
-        $existing_bookings = $wpdb->get_results($wpdb->prepare(
-            "SELECT booking_time, total_duration FROM $bookings_table 
-             WHERE booking_date = %s 
-             AND status IN ('pending', 'confirmed', 'paid')",
-            $date
-        ));
+        // Count total active trucks (one truck = one slot)
+        $total_trucks = $wpdb->get_var(
+            "SELECT COUNT(*) FROM $trucks_table WHERE is_active = 1"
+        );
         
-        foreach ($existing_bookings as $booking) {
-            if ($this->slots_overlap($time, $duration, $booking->booking_time, $booking->total_duration)) {
-                return false;
-            }
+        // If trucks table doesn't exist or no trucks, fall back to old logic
+        if ($total_trucks === null || $total_trucks <= 0) {
+            // Fallback: check for any existing bookings (old behavior)
+            $existing_bookings_count = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM $bookings_table 
+                 WHERE booking_date = %s 
+                 AND status IN ('pending', 'confirmed', 'paid', 'on-hold')
+                 AND (
+                     (booking_time <= %s AND ADDTIME(booking_time, SEC_TO_TIME(total_duration * 60)) > %s) OR
+                     (booking_time < ADDTIME(%s, SEC_TO_TIME(%d * 60)) AND ADDTIME(booking_time, SEC_TO_TIME(total_duration * 60)) >= ADDTIME(%s, SEC_TO_TIME(%d * 60)))
+                 )",
+                $date,
+                $time,
+                $time,
+                $time,
+                $duration,
+                $time,
+                $duration
+            ));
+            
+            // If no trucks configured, allow unlimited bookings (old behavior)
+            return true;
         }
         
-        // Check for active slot holds
-        $active_holds = $wpdb->get_results($wpdb->prepare(
-            "SELECT booking_time, duration FROM $slot_holds_table 
+        // Count existing bookings for this time slot (pending, confirmed, paid, on-hold)
+        $existing_bookings_count = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM $bookings_table 
              WHERE booking_date = %s 
-             AND expires_at > NOW()",
-            $date
+             AND status IN ('pending', 'confirmed', 'paid', 'on-hold')
+             AND (
+                 (booking_time <= %s AND ADDTIME(booking_time, SEC_TO_TIME(total_duration * 60)) > %s) OR
+                 (booking_time < ADDTIME(%s, SEC_TO_TIME(%d * 60)) AND ADDTIME(booking_time, SEC_TO_TIME(total_duration * 60)) >= ADDTIME(%s, SEC_TO_TIME(%d * 60)))
+             )",
+            $date,
+            $time,
+            $time,
+            $time,
+            $duration,
+            $time,
+            $duration
         ));
         
-        foreach ($active_holds as $hold) {
-            if ($this->slots_overlap($time, $duration, $hold->booking_time, $hold->duration)) {
-                return false;
-            }
-        }
-        
-        return true;
+        // One truck = one slot, so slot available if bookings < total trucks
+        return $existing_bookings_count < $total_trucks;
     }
     
     private function slots_overlap($time1, $duration1, $time2, $duration2) {

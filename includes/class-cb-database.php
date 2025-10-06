@@ -31,6 +31,7 @@ class CB_Database {
             base_duration int(11) NOT NULL DEFAULT 60,
             sqm_multiplier decimal(10,4) NOT NULL DEFAULT 0.0000,
             sqm_duration_multiplier decimal(10,4) NOT NULL DEFAULT 0.0000,
+            default_area int(11) NOT NULL DEFAULT 0,
             is_active tinyint(1) NOT NULL DEFAULT 1,
             sort_order int(11) NOT NULL DEFAULT 0,
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
@@ -87,7 +88,8 @@ class CB_Database {
             total_duration int(11) NOT NULL,
             booking_date date NOT NULL,
             booking_time time NOT NULL,
-            status enum('pending','confirmed','paid','cancelled','completed') NOT NULL DEFAULT 'pending',
+            status enum('pending','confirmed','paid','cancelled','completed','on-hold') NOT NULL DEFAULT 'pending',
+            truck_id mediumint(9) DEFAULT NULL,
             woocommerce_order_id int(11) DEFAULT NULL,
             extras_data text,
             notes text,
@@ -97,6 +99,7 @@ class CB_Database {
             PRIMARY KEY (id),
             UNIQUE KEY booking_reference (booking_reference),
             KEY service_id (service_id),
+            KEY truck_id (truck_id),
             KEY booking_date (booking_date),
             KEY status (status),
             KEY woocommerce_order_id (woocommerce_order_id)
@@ -132,6 +135,21 @@ class CB_Database {
             KEY expires_at (expires_at)
         ) $charset_collate;";
         
+        // Trucks table
+        $trucks_table = $wpdb->prefix . 'cb_trucks';
+        $trucks_sql = "CREATE TABLE $trucks_table (
+            id mediumint(9) NOT NULL AUTO_INCREMENT,
+            truck_name varchar(255) NOT NULL,
+            truck_number varchar(50),
+            is_active tinyint(1) NOT NULL DEFAULT 1,
+            sort_order int(11) NOT NULL DEFAULT 0,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY is_active (is_active),
+            KEY sort_order (sort_order)
+        ) $charset_collate;";
+        
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         
         dbDelta($services_sql);
@@ -140,6 +158,7 @@ class CB_Database {
         dbDelta($bookings_sql);
         dbDelta($booking_extras_sql);
         dbDelta($slot_holds_sql);
+        dbDelta($trucks_sql);
         
         // Insert default data
         self::insert_default_data();
@@ -149,6 +168,7 @@ class CB_Database {
         // Run all migration checks
         self::check_service_extras_table();
         self::check_payment_method_column();
+        self::check_default_area_column();
     }
     
     private static function check_service_extras_table() {
@@ -235,6 +255,18 @@ class CB_Database {
         if (empty($column_exists)) {
             // Add payment_method column
             $wpdb->query("ALTER TABLE $bookings_table ADD COLUMN payment_method varchar(50) DEFAULT 'cash' AFTER notes");
+        }
+    }
+    
+    private static function check_default_area_column() {
+        global $wpdb;
+        
+        $services_table = $wpdb->prefix . 'cb_services';
+        $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $services_table LIKE 'default_area'");
+        
+        if (empty($column_exists)) {
+            $wpdb->query("ALTER TABLE $services_table ADD COLUMN default_area int(11) NOT NULL DEFAULT 0 AFTER sqm_duration_multiplier");
+            error_log("CB Debug - Added default_area column to services table");
         }
     }
     
@@ -345,6 +377,12 @@ class CB_Database {
         return $wpdb->get_results("SELECT * FROM $table $where ORDER BY sort_order, name");
     }
     
+    public static function get_service($service_id) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_services';
+        return $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE id = %d", $service_id));
+    }
+    
     
     public static function get_zip_codes($active_only = true) {
         global $wpdb;
@@ -407,6 +445,7 @@ class CB_Database {
             'booking_date' => sanitize_text_field($data['booking_date']),
             'booking_time' => sanitize_text_field($data['booking_time']),
             'status' => 'pending',
+            'truck_id' => isset($data['truck_id']) ? intval($data['truck_id']) : null,
             'extras_data' => json_encode($data['extras']),
             'notes' => sanitize_textarea_field($data['notes']),
             'payment_method' => sanitize_text_field($data['payment_method'])
@@ -470,13 +509,16 @@ class CB_Database {
         return $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE booking_reference = %s", $reference));
     }
     
-    public static function update_booking_status($booking_id, $status, $woocommerce_order_id = null) {
+    public static function update_booking_status($booking_id, $status, $woocommerce_order_id = null, $payment_method = null) {
         global $wpdb;
         $table = $wpdb->prefix . 'cb_bookings';
         
         $data = array('status' => $status);
         if ($woocommerce_order_id) {
             $data['woocommerce_order_id'] = $woocommerce_order_id;
+        }
+        if ($payment_method) {
+            $data['payment_method'] = sanitize_text_field($payment_method);
         }
         
         return $wpdb->update($table, $data, array('id' => $booking_id));
@@ -603,5 +645,125 @@ class CB_Database {
             $wpdb->query('ROLLBACK');
             return false;
         }
+    }
+    
+    // Truck management methods
+    public static function get_trucks() {
+        global $wpdb;
+        $trucks_table = $wpdb->prefix . 'cb_trucks';
+        
+        return $wpdb->get_results(
+            "SELECT * FROM $trucks_table 
+             WHERE is_active = 1 
+             ORDER BY sort_order ASC, id ASC"
+        );
+    }
+    
+    public static function get_all_trucks() {
+        global $wpdb;
+        $trucks_table = $wpdb->prefix . 'cb_trucks';
+        
+        return $wpdb->get_results(
+            "SELECT * FROM $trucks_table 
+             ORDER BY sort_order ASC, id ASC"
+        );
+    }
+    
+    public static function get_truck($truck_id) {
+        global $wpdb;
+        $trucks_table = $wpdb->prefix . 'cb_trucks';
+        
+        return $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $trucks_table WHERE id = %d",
+            $truck_id
+        ));
+    }
+    
+    public static function create_truck($truck_name, $truck_number = '', $is_active = 1) {
+        global $wpdb;
+        $trucks_table = $wpdb->prefix . 'cb_trucks';
+        
+        $result = $wpdb->insert(
+            $trucks_table,
+            array(
+                'truck_name' => sanitize_text_field($truck_name),
+                'truck_number' => sanitize_text_field($truck_number),
+                'is_active' => intval($is_active),
+                'sort_order' => 0
+            ),
+            array('%s', '%s', '%d', '%d')
+        );
+        
+        return $result ? $wpdb->insert_id : false;
+    }
+    
+    public static function update_truck($truck_id, $truck_name, $truck_number = '', $is_active = 1) {
+        global $wpdb;
+        $trucks_table = $wpdb->prefix . 'cb_trucks';
+        
+        return $wpdb->update(
+            $trucks_table,
+            array(
+                'truck_name' => sanitize_text_field($truck_name),
+                'truck_number' => sanitize_text_field($truck_number),
+                'is_active' => intval($is_active)
+            ),
+            array('id' => intval($truck_id)),
+            array('%s', '%s', '%d'),
+            array('%d')
+        );
+    }
+    
+    public static function delete_truck($truck_id) {
+        global $wpdb;
+        $trucks_table = $wpdb->prefix . 'cb_trucks';
+        
+        return $wpdb->delete(
+            $trucks_table,
+            array('id' => intval($truck_id)),
+            array('%d')
+        );
+    }
+    
+    public static function get_available_truck($booking_date, $booking_time, $duration) {
+        global $wpdb;
+        $trucks_table = $wpdb->prefix . 'cb_trucks';
+        $bookings_table = $wpdb->prefix . 'cb_bookings';
+        
+        // Get all active trucks
+        $trucks = $wpdb->get_results(
+            "SELECT * FROM $trucks_table 
+             WHERE is_active = 1 
+             ORDER BY sort_order ASC, id ASC"
+        );
+        
+        foreach ($trucks as $truck) {
+            // Check if this truck is available for the requested time slot
+            // One truck = one slot, so we just check if truck has any conflicting bookings
+            $conflicting_bookings = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM $bookings_table 
+                 WHERE truck_id = %d 
+                 AND booking_date = %s 
+                 AND status IN ('pending', 'confirmed', 'paid', 'on-hold')
+                 AND (
+                     (booking_time <= %s AND ADDTIME(booking_time, SEC_TO_TIME(total_duration * 60)) > %s) OR
+                     (booking_time < ADDTIME(%s, SEC_TO_TIME(%d * 60)) AND ADDTIME(booking_time, SEC_TO_TIME(total_duration * 60)) >= ADDTIME(%s, SEC_TO_TIME(%d * 60)))
+                 )",
+                $truck->id,
+                $booking_date,
+                $booking_time,
+                $booking_time,
+                $booking_time,
+                $duration,
+                $booking_time,
+                $duration
+            ));
+            
+            if ($conflicting_bookings == 0) {
+                return $truck;
+            }
+        }
+        
+        return null; // No available truck
     }
 }

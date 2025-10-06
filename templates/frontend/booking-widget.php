@@ -9,17 +9,19 @@ if (!defined('ABSPATH')) {
 ?>
 
 <div class="cb-widget-container">
-    <div id="cb-booking-widget" class="cb-widget cb-theme-<?php echo esc_attr($atts['theme']); ?>">
+    <div id="cb-booking-widget" class="cb-widget">
         <div class="cb-container">
         <div class="cb-header">
             <div class="cb-header-top">
                 <h1 class="cb-title"><?php echo esc_html($atts['title']); ?></h1>
-                        <div class="cb-language-widget">
-                            <select class="cb-language-selector">
-                                <option value="en">English</option>
-                                <option value="el">Ελληνικά</option>
-                            </select>
-                        </div>
+        <div class="cb-header-controls">
+            <div class="cb-language-widget">
+                <select class="cb-language-selector">
+                    <option value="en">English</option>
+                    <option value="el">Ελληνικά</option>
+                </select>
+            </div>
+        </div>
             </div>
             <?php if ($atts['show_steps']): ?>
                 <div class="cb-steps">
@@ -99,8 +101,21 @@ if (!defined('ABSPATH')) {
                         </div>
                         
                         <div class="cb-form-group">
-                            <label for="cb-square-meters"><?php _e('Square Meters', 'cleaning-booking'); ?></label>
-                            <input type="number" id="cb-square-meters" name="square_meters" class="cb-input" min="1" max="1000" placeholder="50" required>
+                            <label for="cb-square-meters"><?php _e('Additional Space (m²)', 'cleaning-booking'); ?></label>
+                            <input type="number" id="cb-square-meters" name="square_meters" class="cb-input" min="0" max="1000" placeholder="0" required>
+                            <div class="cb-field-hint" id="cb-sqm-hint" style="display: none;">
+                                <small><?php _e('Enter additional space beyond the default area, or leave as 0 to skip', 'cleaning-booking'); ?></small>
+                            </div>
+                            <div class="cb-base-area-info" id="cb-base-area-info" style="display: none;">
+                                <div class="cb-base-info-card">
+                                    <h4><?php _e('Base Service Included', 'cleaning-booking'); ?></h4>
+                                    <p id="cb-base-area-message"></p>
+                                    <div class="cb-base-pricing">
+                                        <span id="cb-base-price-display"></span>
+                                        <span id="cb-base-duration-display"></span>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="cb-error-message" id="cb-sqm-error"></div>
                         </div>
                         
@@ -213,8 +228,26 @@ if (!defined('ABSPATH')) {
                             </div>
                             
                             <div class="cb-form-group">
-                                <label for="cb-customer-address"><?php _e('Address', 'cleaning-booking'); ?></label>
-                                <textarea id="cb-customer-address" name="address" class="cb-input" rows="3" placeholder="<?php _e('Street address, apartment, etc.', 'cleaning-booking'); ?>"></textarea>
+                                <label for="cb-customer-company"><?php _e('Company Name', 'cleaning-booking'); ?></label>
+                                <input type="text" id="cb-customer-company" name="customer_company" class="cb-input" placeholder="<?php _e('Optional', 'cleaning-booking'); ?>">
+                            </div>
+                        </div>
+                        
+                        <div class="cb-form-group">
+                            <label for="cb-customer-address"><?php _e('Full Address', 'cleaning-booking'); ?> *</label>
+                            <textarea id="cb-customer-address" name="address" class="cb-input" rows="3" placeholder="<?php _e('Street address, apartment, city, state, etc.', 'cleaning-booking'); ?>" required></textarea>
+                            <div class="cb-error-message" id="cb-address-error"></div>
+                        </div>
+                        
+                        <div class="cb-form-row">
+                            <div class="cb-form-group">
+                                <label for="cb-customer-city"><?php _e('City', 'cleaning-booking'); ?></label>
+                                <input type="text" id="cb-customer-city" name="customer_city" class="cb-input" placeholder="<?php _e('Auto-filled from address', 'cleaning-booking'); ?>">
+                            </div>
+                            
+                            <div class="cb-form-group">
+                                <label for="cb-customer-state"><?php _e('State/Province', 'cleaning-booking'); ?></label>
+                                <input type="text" id="cb-customer-state" name="customer_state" class="cb-input" placeholder="<?php _e('Auto-filled from address', 'cleaning-booking'); ?>">
                             </div>
                         </div>
                         
@@ -225,7 +258,7 @@ if (!defined('ABSPATH')) {
                         
                         <!-- Payment Method Selection -->
                         <div class="cb-form-group">
-                            <label><?php _e('Select Payment Method', 'cleaning-booking'); ?></label>
+                            <label><?php _e('Select Payment Method', 'cleaning-booking'); ?> *</label>
                             <div class="cb-payment-methods">
                                 <div class="cb-payment-option" data-payment="cash">
                                     <div class="cb-payment-icon">
@@ -241,7 +274,7 @@ if (!defined('ABSPATH')) {
                                     </div>
                                 </div>
                                 
-                                <div class="cb-payment-option" data-payment="online">
+                                <div class="cb-payment-option" data-payment="card">
                                     <div class="cb-payment-icon">
                                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                             <rect x="1" y="4" width="22" height="16" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
@@ -249,11 +282,38 @@ if (!defined('ABSPATH')) {
                                         </svg>
                                     </div>
                                     <div class="cb-payment-info">
-                                        <h4><?php _e('Online Payment', 'cleaning-booking'); ?></h4>
-                                        <p><?php _e('Card / Apple Pay / Google Pay', 'cleaning-booking'); ?></p>
+                                        <h4><?php _e('Credit/Debit Card', 'cleaning-booking'); ?></h4>
+                                        <p><?php _e('Visa, Mastercard, American Express', 'cleaning-booking'); ?></p>
+                                    </div>
+                                </div>
+                                
+                                <div class="cb-payment-option" data-payment="paypal">
+                                    <div class="cb-payment-icon">
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 0 0-.105-.725c-1.33-5.452-5.83-7.203-10.34-7.203H3.28a1.28 1.28 0 0 0-1.27 1.48L4.49 20.117a1.28 1.28 0 0 0 1.27 1.48h2.19c.524 0 .968-.382 1.05-.9l1.12-7.106h2.19c.524 0 .968-.382 1.05-.9l1.12-7.106h2.19c.524 0 .968-.382 1.05-.9l1.12-7.106z" fill="currentColor"/>
+                                        </svg>
+                                    </div>
+                                    <div class="cb-payment-info">
+                                        <h4><?php _e('PayPal', 'cleaning-booking'); ?></h4>
+                                        <p><?php _e('Pay with PayPal account', 'cleaning-booking'); ?></p>
+                                    </div>
+                                </div>
+                                
+                                <div class="cb-payment-option" data-payment="bank_transfer">
+                                    <div class="cb-payment-icon">
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="2"/>
+                                            <path d="M2 10h20" stroke="currentColor" stroke-width="2"/>
+                                            <path d="M6 16h4" stroke="currentColor" stroke-width="2"/>
+                                        </svg>
+                                    </div>
+                                    <div class="cb-payment-info">
+                                        <h4><?php _e('Bank Transfer', 'cleaning-booking'); ?></h4>
+                                        <p><?php _e('Direct bank transfer', 'cleaning-booking'); ?></p>
                                     </div>
                                 </div>
                             </div>
+                            <div class="cb-error-message" id="cb-payment-error"></div>
                         </div>
                         
                         <div class="cb-booking-summary">
@@ -284,9 +344,7 @@ if (!defined('ABSPATH')) {
                             <button type="button" class="cb-btn cb-btn-secondary cb-prev-step" data-prev="4">
                                 <?php _e('Back', 'cleaning-booking'); ?>
                             </button>
-                            <button type="submit" class="cb-btn cb-btn-primary cb-btn-checkout">
-                                <?php _e('Proceed to Checkout', 'cleaning-booking'); ?>
-                            </button>
+                            <!-- Checkout button removed from form as requested -->
                         </div>
                     </div>
                 </form>

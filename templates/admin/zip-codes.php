@@ -66,6 +66,14 @@ if (!defined('ABSPATH')) {
     
     <div class="cb-admin-section">
         <h2><?php _e('Existing ZIP Codes', 'cleaning-booking'); ?></h2>
+        
+        <!-- Search Bar -->
+        <div class="cb-search-section">
+            <input type="text" id="cb-zip-codes-search" placeholder="<?php _e('Search ZIP codes by code, city, or state...', 'cleaning-booking'); ?>" class="cb-search-input">
+            <button type="button" id="cb-search-zip-codes" class="button button-primary"><?php _e('Search', 'cleaning-booking'); ?></button>
+            <button type="button" id="cb-clear-zip-codes-search" class="button"><?php _e('Clear', 'cleaning-booking'); ?></button>
+        </div>
+        
         <div id="cb-zip-codes-list">
             <table class="wp-list-table widefat fixed striped">
                 <thead>

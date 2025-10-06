@@ -79,6 +79,15 @@ class CB_Admin {
         
         add_submenu_page(
             'cleaning-booking',
+            __('Trucks', 'cleaning-booking'),
+            __('Trucks', 'cleaning-booking'),
+            'manage_options',
+            'cb-trucks',
+            array($this, 'trucks_page')
+        );
+        
+        add_submenu_page(
+            'cleaning-booking',
             __('Settings', 'cleaning-booking'),
             __('Settings', 'cleaning-booking'),
             'manage_options',
@@ -92,8 +101,7 @@ class CB_Admin {
             return;
         }
         
-        wp_enqueue_script('jquery');
-        wp_enqueue_script('cb-admin', CB_PLUGIN_URL . 'assets/js/admin.js', array('jquery'), CB_VERSION, true);
+        wp_enqueue_script('cb-admin', CB_PLUGIN_URL . 'assets/js/admin.js', array(), CB_VERSION, true);
         wp_enqueue_style('cb-admin', CB_PLUGIN_URL . 'assets/css/admin.css', array(), CB_VERSION);
         
         wp_localize_script('cb-admin', 'cb_admin', array(
@@ -180,6 +188,21 @@ class CB_Admin {
             }
             
             update_option('cb_business_hours', $business_hours);
+            
+            // Handle color settings
+            $color_settings = array(
+                'cb_primary_color' => sanitize_hex_color($_POST['primary_color']),
+                'cb_secondary_color' => sanitize_hex_color($_POST['secondary_color']),
+                'cb_background_color' => sanitize_hex_color($_POST['background_color']),
+                'cb_text_color' => sanitize_hex_color($_POST['text_color']),
+                'cb_border_color' => sanitize_hex_color($_POST['border_color']),
+                'cb_success_color' => sanitize_hex_color($_POST['success_color']),
+                'cb_error_color' => sanitize_hex_color($_POST['error_color'])
+            );
+            
+            foreach ($color_settings as $key => $value) {
+                update_option($key, $value);
+            }
             
             echo '<div class="notice notice-success"><p>' . __('Settings saved!', 'cleaning-booking') . '</p></div>';
         }
@@ -600,6 +623,117 @@ class CB_Admin {
             } else {
                 wp_send_json_error(array('message' => __('Error creating booking', 'cleaning-booking')));
             }
+        }
+    }
+    
+    public function trucks_page() {
+        // Handle truck actions
+        if (isset($_POST['action'])) {
+            $this->handle_truck_action();
+        }
+        
+        $trucks = CB_Database::get_all_trucks();
+        
+        include CB_PLUGIN_DIR . 'templates/admin/trucks.php';
+    }
+    
+    private function handle_truck_action() {
+        $action = sanitize_text_field($_POST['action']);
+        
+        switch ($action) {
+            case 'create_truck':
+                $truck_name = sanitize_text_field($_POST['truck_name']);
+                $truck_number = sanitize_text_field($_POST['truck_number']);
+                $is_active = isset($_POST['is_active']) ? 1 : 0;
+                
+                if (empty($truck_name)) {
+                    add_action('admin_notices', function() {
+                        echo '<div class="notice notice-error"><p>' . __('Truck name is required.', 'cleaning-booking') . '</p></div>';
+                    });
+                    return;
+                }
+                
+                $truck_id = CB_Database::create_truck($truck_name, $truck_number, $is_active);
+                
+                if ($truck_id) {
+                    add_action('admin_notices', function() {
+                        echo '<div class="notice notice-success"><p>' . __('Truck created successfully!', 'cleaning-booking') . '</p></div>';
+                    });
+                } else {
+                    add_action('admin_notices', function() {
+                        echo '<div class="notice notice-error"><p>' . __('Error creating truck.', 'cleaning-booking') . '</p></div>';
+                    });
+                }
+                break;
+                
+            case 'update_truck':
+                $truck_id = intval($_POST['truck_id']);
+                $truck_name = sanitize_text_field($_POST['truck_name']);
+                $truck_number = sanitize_text_field($_POST['truck_number']);
+                $is_active = isset($_POST['is_active']) ? 1 : 0;
+                
+                if (empty($truck_name)) {
+                    add_action('admin_notices', function() {
+                        echo '<div class="notice notice-error"><p>' . __('Truck name is required.', 'cleaning-booking') . '</p></div>';
+                    });
+                    return;
+                }
+                
+                $result = CB_Database::update_truck($truck_id, $truck_name, $truck_number, $is_active);
+                
+                if ($result !== false) {
+                    add_action('admin_notices', function() {
+                        echo '<div class="notice notice-success"><p>' . __('Truck updated successfully!', 'cleaning-booking') . '</p></div>';
+                    });
+                } else {
+                    add_action('admin_notices', function() {
+                        echo '<div class="notice notice-error"><p>' . __('Error updating truck.', 'cleaning-booking') . '</p></div>';
+                    });
+                }
+                break;
+                
+            case 'delete_truck':
+                $truck_id = intval($_POST['truck_id']);
+                
+                $result = CB_Database::delete_truck($truck_id);
+                
+                if ($result) {
+                    add_action('admin_notices', function() {
+                        echo '<div class="notice notice-success"><p>' . __('Truck deleted successfully!', 'cleaning-booking') . '</p></div>';
+                    });
+                } else {
+                    add_action('admin_notices', function() {
+                        echo '<div class="notice notice-error"><p>' . __('Error deleting truck.', 'cleaning-booking') . '</p></div>';
+                    });
+                }
+                break;
+                
+            case 'toggle_truck_status':
+                $truck_id = intval($_POST['truck_id']);
+                $current_status = intval($_POST['current_status']);
+                $new_status = $current_status ? 0 : 1; // Toggle status
+                
+                $truck = CB_Database::get_truck($truck_id);
+                if (!$truck) {
+                    add_action('admin_notices', function() {
+                        echo '<div class="notice notice-error"><p>' . __('Truck not found.', 'cleaning-booking') . '</p></div>';
+                    });
+                    return;
+                }
+                
+                $result = CB_Database::update_truck($truck_id, $truck->truck_name, $truck->truck_number, $new_status);
+                
+                if ($result !== false) {
+                    $status_text = $new_status ? __('activated', 'cleaning-booking') : __('deactivated', 'cleaning-booking');
+                    add_action('admin_notices', function() use ($status_text) {
+                        echo '<div class="notice notice-success"><p>' . sprintf(__('Truck %s successfully!', 'cleaning-booking'), $status_text) . '</p></div>';
+                    });
+                } else {
+                    add_action('admin_notices', function() {
+                        echo '<div class="notice notice-error"><p>' . __('Error updating truck status.', 'cleaning-booking') . '</p></div>';
+                    });
+                }
+                break;
         }
     }
     
