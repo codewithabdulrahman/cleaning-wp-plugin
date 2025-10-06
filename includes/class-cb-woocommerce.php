@@ -17,7 +17,15 @@ class CB_WooCommerce {
         
         add_action('woocommerce_checkout_process', array($this, 'process_booking_checkout'));
         add_action('woocommerce_checkout_order_processed', array($this, 'link_booking_to_order'));
+        add_action('woocommerce_new_order', array($this, 'link_booking_to_order'));
+        add_action('woocommerce_thankyou', array($this, 'link_booking_to_order_thankyou'));
         add_action('woocommerce_order_status_changed', array($this, 'update_booking_status'));
+        
+        // Specific hooks for payment completion
+        add_action('woocommerce_order_status_processing', array($this, 'update_booking_status'));
+        add_action('woocommerce_order_status_completed', array($this, 'update_booking_status'));
+        add_action('woocommerce_payment_complete', array($this, 'handle_payment_complete'));
+        
         add_action('woocommerce_order_status_cancelled', array($this, 'handle_order_cancellation'));
         add_action('woocommerce_order_status_refunded', array($this, 'handle_order_cancellation'));
         add_action('woocommerce_order_status_failed', array($this, 'handle_order_cancellation'));
@@ -28,6 +36,9 @@ class CB_WooCommerce {
         
         // Handle booking checkout redirect
         add_action('template_redirect', array($this, 'handle_booking_checkout_redirect'));
+        
+        // Pre-fill checkout fields
+        add_action('woocommerce_checkout_init', array($this, 'prefill_checkout_fields_from_session'));
         
         // Ensure payment gateways are enabled
         add_action('init', array($this, 'ensure_payment_gateways_enabled'));
@@ -72,9 +83,307 @@ class CB_WooCommerce {
             'quantity' => 1
         ), wc_get_checkout_url());
         
+        // Pre-fill WooCommerce checkout fields with customer details
+        $this->prefill_checkout_fields($booking);
+        
         error_log('CB Debug - Generated checkout URL: ' . $checkout_url);
         
         return $checkout_url;
+    }
+    
+    /**
+     * Pre-fill WooCommerce checkout fields with customer details from booking
+     */
+    private function prefill_checkout_fields($booking) {
+        if (!WC()->session) {
+            return;
+        }
+        
+        // Clear existing session data first to prevent old data from persisting
+        $this->clear_checkout_session_data();
+        
+        // Split customer name into first and last name
+        $name_parts = explode(' ', $booking->customer_name, 2);
+        $first_name = $name_parts[0];
+        $last_name = isset($name_parts[1]) ? $name_parts[1] : '';
+        
+        // Set customer details in WooCommerce session
+        WC()->session->set('billing_first_name', $first_name);
+        WC()->session->set('billing_last_name', $last_name);
+        WC()->session->set('billing_company', $booking->customer_company ?? '');
+        WC()->session->set('billing_email', $booking->customer_email);
+        WC()->session->set('billing_phone', $booking->customer_phone);
+        WC()->session->set('billing_address_1', $booking->address);
+        WC()->session->set('billing_city', $booking->customer_city ?? '');
+        WC()->session->set('billing_state', $booking->customer_state ?? '');
+        WC()->session->set('billing_postcode', $booking->zip_code);
+        WC()->session->set('billing_country', 'US'); // Default country
+        
+        // Set shipping same as billing
+        WC()->session->set('shipping_first_name', $first_name);
+        WC()->session->set('shipping_last_name', $last_name);
+        WC()->session->set('shipping_company', $booking->customer_company ?? '');
+        WC()->session->set('shipping_address_1', $booking->address);
+        WC()->session->set('shipping_city', $booking->customer_city ?? '');
+        WC()->session->set('shipping_state', $booking->customer_state ?? '');
+        WC()->session->set('shipping_postcode', $booking->zip_code);
+        WC()->session->set('shipping_country', 'US');
+        
+        // Set order notes
+        if (!empty($booking->notes)) {
+            WC()->session->set('order_comments', $booking->notes);
+        }
+        
+        // Set preferred payment method
+        if (!empty($booking->payment_method)) {
+            WC()->session->set('chosen_payment_method', $this->map_payment_method($booking->payment_method));
+        }
+        
+        // Set customer data for WooCommerce
+        WC()->session->set('customer_data', array(
+            'first_name' => $first_name,
+            'last_name' => $last_name,
+            'company' => $booking->customer_company ?? '',
+            'email' => $booking->customer_email,
+            'phone' => $booking->customer_phone,
+            'address' => $booking->address,
+            'city' => $booking->customer_city ?? '',
+            'state' => $booking->customer_state ?? '',
+            'postcode' => $booking->zip_code,
+            'country' => 'US',
+            'payment_method' => $booking->payment_method ?? 'cash'
+        ));
+        
+        // Also set WooCommerce customer data directly
+        $this->set_woocommerce_customer_data($booking);
+        
+        error_log("CB Debug - Session data updated for booking: " . $booking->customer_name . " (" . $booking->customer_email . ")");
+    }
+    
+    /**
+     * Set WooCommerce customer data directly
+     */
+    private function set_woocommerce_customer_data($booking) {
+        if (!WC()->customer) {
+            return;
+        }
+        
+        // Split customer name into first and last name
+        $name_parts = explode(' ', $booking->customer_name, 2);
+        $first_name = $name_parts[0];
+        $last_name = isset($name_parts[1]) ? $name_parts[1] : '';
+        
+        // Set customer data directly
+        WC()->customer->set_billing_first_name($first_name);
+        WC()->customer->set_billing_last_name($last_name);
+        WC()->customer->set_billing_company($booking->customer_company ?? '');
+        WC()->customer->set_billing_email($booking->customer_email);
+        WC()->customer->set_billing_phone($booking->customer_phone);
+        WC()->customer->set_billing_address_1($booking->address);
+        WC()->customer->set_billing_city($booking->customer_city ?? '');
+        WC()->customer->set_billing_state($booking->customer_state ?? '');
+        WC()->customer->set_billing_postcode($booking->zip_code);
+        WC()->customer->set_billing_country('US');
+        
+        // Set shipping same as billing
+        WC()->customer->set_shipping_first_name($first_name);
+        WC()->customer->set_shipping_last_name($last_name);
+        WC()->customer->set_shipping_company($booking->customer_company ?? '');
+        WC()->customer->set_shipping_address_1($booking->address);
+        WC()->customer->set_shipping_city($booking->customer_city ?? '');
+        WC()->customer->set_shipping_state($booking->customer_state ?? '');
+        WC()->customer->set_shipping_postcode($booking->zip_code);
+        WC()->customer->set_shipping_country('US');
+        
+        // Save customer data
+        WC()->customer->save();
+        
+        error_log("CB Debug - WooCommerce customer data set directly for: " . $booking->customer_name);
+    }
+    
+    /**
+     * Clear existing WooCommerce checkout session data
+     */
+    private function clear_checkout_session_data() {
+        if (!WC()->session) {
+            return;
+        }
+        
+        // Clear billing fields
+        WC()->session->set('billing_first_name', '');
+        WC()->session->set('billing_last_name', '');
+        WC()->session->set('billing_company', '');
+        WC()->session->set('billing_email', '');
+        WC()->session->set('billing_phone', '');
+        WC()->session->set('billing_address_1', '');
+        WC()->session->set('billing_city', '');
+        WC()->session->set('billing_state', '');
+        WC()->session->set('billing_postcode', '');
+        WC()->session->set('billing_country', '');
+        
+        // Clear shipping fields
+        WC()->session->set('shipping_first_name', '');
+        WC()->session->set('shipping_last_name', '');
+        WC()->session->set('shipping_company', '');
+        WC()->session->set('shipping_address_1', '');
+        WC()->session->set('shipping_city', '');
+        WC()->session->set('shipping_state', '');
+        WC()->session->set('shipping_postcode', '');
+        WC()->session->set('shipping_country', '');
+        
+        // Clear other fields
+        WC()->session->set('order_comments', '');
+        WC()->session->set('chosen_payment_method', '');
+        WC()->session->set('customer_data', array());
+        
+        error_log("CB Debug - Cleared existing checkout session data");
+    }
+    
+    /**
+     * Map booking payment method to WooCommerce payment gateway
+     */
+    private function map_payment_method($booking_payment_method) {
+        $payment_mapping = array(
+            'cash' => 'cod', // Cash on Delivery
+            'card' => 'stripe', // Credit/Debit Card (Stripe)
+            'paypal' => 'ppec_paypal', // PayPal
+            'bank_transfer' => 'bacs' // Bank Transfer
+        );
+        
+        return isset($payment_mapping[$booking_payment_method]) ? $payment_mapping[$booking_payment_method] : 'cod';
+    }
+    
+    /**
+     * Pre-fill checkout fields from WooCommerce session data
+     */
+    public function prefill_checkout_fields_from_session() {
+        if (!WC()->session) {
+            return;
+        }
+        
+        // Get customer details from session
+        $first_name = WC()->session->get('billing_first_name');
+        $email = WC()->session->get('billing_email');
+        $phone = WC()->session->get('billing_phone');
+        $address = WC()->session->get('billing_address_1');
+        $postcode = WC()->session->get('billing_postcode');
+        $notes = WC()->session->get('order_comments');
+        
+        if ($first_name || $email || $phone || $address) {
+            // Pre-fill checkout fields using JavaScript
+            add_action('wp_footer', array($this, 'add_checkout_prefill_script'));
+        }
+    }
+    
+    /**
+     * Add JavaScript to pre-fill checkout fields
+     */
+    public function add_checkout_prefill_script() {
+        if (!WC()->session) {
+            return;
+        }
+        
+        $first_name = WC()->session->get('billing_first_name');
+        $last_name = WC()->session->get('billing_last_name');
+        $company = WC()->session->get('billing_company');
+        $email = WC()->session->get('billing_email');
+        $phone = WC()->session->get('billing_phone');
+        $address = WC()->session->get('billing_address_1');
+        $city = WC()->session->get('billing_city');
+        $state = WC()->session->get('billing_state');
+        $postcode = WC()->session->get('billing_postcode');
+        $country = WC()->session->get('billing_country');
+        $notes = WC()->session->get('order_comments');
+        $payment_method = WC()->session->get('chosen_payment_method');
+        
+        if ($first_name || $email || $phone || $address) {
+            ?>
+            <script type="text/javascript">
+            jQuery(document).ready(function($) {
+                // Function to force set field values
+                function forceSetField(selector, value) {
+                    if (value && value.trim() !== '') {
+                        $(selector).val(value).trigger('change').trigger('input');
+                        // Also try to trigger WooCommerce specific events
+                        $(selector).trigger('woocommerce_update_checkout');
+                        $(selector).trigger('update_checkout');
+                    }
+                }
+                
+                // Clear existing values first
+                $('#billing_first_name, #billing_last_name, #billing_email, #billing_phone, #billing_address_1, #billing_city, #billing_state, #billing_postcode').val('');
+                $('#shipping_first_name, #shipping_last_name, #shipping_address_1, #shipping_city, #shipping_state, #shipping_postcode').val('');
+                
+                // Wait a moment for fields to be cleared
+                setTimeout(function() {
+                    // Pre-fill billing fields
+                    <?php if ($first_name): ?>
+                    forceSetField('#billing_first_name', '<?php echo esc_js($first_name); ?>');
+                    forceSetField('#shipping_first_name', '<?php echo esc_js($first_name); ?>');
+                    <?php endif; ?>
+                    
+                    <?php if ($last_name): ?>
+                    forceSetField('#billing_last_name', '<?php echo esc_js($last_name); ?>');
+                    forceSetField('#shipping_last_name', '<?php echo esc_js($last_name); ?>');
+                    <?php endif; ?>
+                    
+                    <?php if ($company): ?>
+                    forceSetField('#billing_company', '<?php echo esc_js($company); ?>');
+                    forceSetField('#shipping_company', '<?php echo esc_js($company); ?>');
+                    <?php endif; ?>
+                    
+                    <?php if ($email): ?>
+                    forceSetField('#billing_email', '<?php echo esc_js($email); ?>');
+                    <?php endif; ?>
+                    
+                    <?php if ($phone): ?>
+                    forceSetField('#billing_phone', '<?php echo esc_js($phone); ?>');
+                    <?php endif; ?>
+                    
+                    <?php if ($address): ?>
+                    forceSetField('#billing_address_1', '<?php echo esc_js($address); ?>');
+                    forceSetField('#shipping_address_1', '<?php echo esc_js($address); ?>');
+                    <?php endif; ?>
+                    
+                    <?php if ($city): ?>
+                    forceSetField('#billing_city', '<?php echo esc_js($city); ?>');
+                    forceSetField('#shipping_city', '<?php echo esc_js($city); ?>');
+                    <?php endif; ?>
+                    
+                    <?php if ($state): ?>
+                    forceSetField('#billing_state', '<?php echo esc_js($state); ?>');
+                    forceSetField('#shipping_state', '<?php echo esc_js($state); ?>');
+                    <?php endif; ?>
+                    
+                    <?php if ($postcode): ?>
+                    forceSetField('#billing_postcode', '<?php echo esc_js($postcode); ?>');
+                    forceSetField('#shipping_postcode', '<?php echo esc_js($postcode); ?>');
+                    <?php endif; ?>
+                    
+                    <?php if ($country): ?>
+                    forceSetField('#billing_country', '<?php echo esc_js($country); ?>');
+                    forceSetField('#shipping_country', '<?php echo esc_js($country); ?>');
+                    <?php endif; ?>
+                    
+                    <?php if ($notes): ?>
+                    forceSetField('#order_comments', '<?php echo esc_js($notes); ?>');
+                    <?php endif; ?>
+                    
+                    // Pre-select payment method
+                    <?php if ($payment_method): ?>
+                    $('input[name="payment_method"][value="<?php echo esc_js($payment_method); ?>"]').prop('checked', true).trigger('change');
+                    <?php endif; ?>
+                    
+                    // Force update checkout
+                    $('body').trigger('update_checkout');
+                    $('body').trigger('woocommerce_update_checkout');
+                    
+                    console.log('CB Debug - Checkout fields pre-filled with booking data');
+                }, 500);
+            });
+            </script>
+            <?php
+        }
     }
     
     private function create_booking_product($booking) {
@@ -176,6 +485,7 @@ class CB_WooCommerce {
             $booking = CB_Database::get_booking($booking_id);
             
             if ($booking && $booking->booking_reference === $booking_reference) {
+                
                 // Check if payment gateways are available
                 $available_gateways = WC()->payment_gateways()->get_available_payment_gateways();
                 
@@ -201,6 +511,9 @@ class CB_WooCommerce {
                 // Add booking data to session
                 WC()->session->set('cb_booking_id', $booking_id);
                 WC()->session->set('cb_booking_reference', $booking_reference);
+                error_log("CB Debug - Session data set: booking_id=$booking_id, booking_reference=$booking_reference");
+            } else {
+                error_log("CB Debug - Booking not found or reference mismatch");
             }
         }
     }
@@ -244,11 +557,23 @@ class CB_WooCommerce {
     }
     
     public function link_booking_to_order($order_id) {
+        error_log("CB Debug - link_booking_to_order called for order $order_id");
         $booking_id = WC()->session->get('cb_booking_id');
+        error_log("CB Debug - booking_id from session: " . ($booking_id ? $booking_id : 'null'));
         
         if ($booking_id) {
-            // Update booking with order ID
-            CB_Database::update_booking_status($booking_id, 'paid', $order_id);
+            // Get the order to extract payment method
+            $order = wc_get_order($order_id);
+            $payment_method = $order ? $order->get_payment_method() : null;
+            
+            // Update booking with order ID but keep status as 'pending' until payment
+            $result = CB_Database::update_booking_status($booking_id, 'pending', $order_id, $payment_method);
+            
+            if ($result) {
+                error_log("CB Debug - Successfully linked booking $booking_id to order $order_id with pending status and payment method: " . ($payment_method ?: 'none'));
+            } else {
+                error_log("CB Debug - Failed to link booking $booking_id to order $order_id");
+            }
             
             // Clear session data
             WC()->session->set('cb_booking_id', null);
@@ -256,11 +581,46 @@ class CB_WooCommerce {
             
             // Remove slot hold
             $this->release_slot_hold($booking_id);
+        } else {
+            error_log("CB Debug - No booking_id found in session for order $order_id");
         }
     }
     
-    public function update_booking_status($order_id, $old_status, $new_status) {
+    /**
+     * Handle linking booking to order from thankyou page
+     */
+    public function link_booking_to_order_thankyou($order_id) {
+        error_log("CB Debug - link_booking_to_order_thankyou called for order $order_id");
+        $this->link_booking_to_order($order_id);
+    }
+    
+    public function update_booking_status($order_id, $old_status = null, $new_status = null) {
         global $wpdb;
+        
+        // Handle different hook signatures
+        if (func_num_args() == 1) {
+            // If only one argument is passed, get the order and determine status
+            $order = wc_get_order($order_id);
+            if (!$order) {
+                return;
+            }
+            $new_status = $order->get_status();
+            $old_status = 'unknown'; // We don't have the old status
+        }
+        
+        // Get the order to extract payment method
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            error_log("CB Debug - Order $order_id not found");
+            return;
+        }
+        
+        // Get payment method from the order
+        $payment_method = $order->get_payment_method();
+        error_log("CB Debug - Payment method for order $order_id: $payment_method");
+        
+        // Log the status update
+        error_log("CB Debug - Updating booking status for order $order_id: $old_status -> $new_status");
         
         $booking = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM {$wpdb->prefix}cb_bookings WHERE woocommerce_order_id = %d",
@@ -269,7 +629,44 @@ class CB_WooCommerce {
         
         if ($booking) {
             $booking_status = $this->map_order_status_to_booking_status($new_status);
-            CB_Database::update_booking_status($booking->id, $booking_status, $order_id);
+            error_log("CB Debug - Mapping order status '$new_status' to booking status '$booking_status' for booking ID {$booking->id}");
+            
+            // Update booking status with payment method
+            $result = CB_Database::update_booking_status($booking->id, $booking_status, $order_id, $payment_method);
+            
+            if ($result) {
+                error_log("CB Debug - Successfully updated booking {$booking->id} status to '$booking_status' with payment method '$payment_method'");
+            } else {
+                error_log("CB Debug - Failed to update booking {$booking->id} status");
+            }
+        } else {
+            error_log("CB Debug - No booking found for order $order_id");
+        }
+    }
+    
+    /**
+     * Handle payment completion - update booking status to paid
+     */
+    public function handle_payment_complete($order_id) {
+        global $wpdb;
+        
+        error_log("CB Debug - Payment completed for order $order_id");
+        
+        $booking = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM {$wpdb->prefix}cb_bookings WHERE woocommerce_order_id = %d",
+            $order_id
+        ));
+        
+        if ($booking) {
+            $result = CB_Database::update_booking_status($booking->id, 'paid', $order_id);
+            
+            if ($result) {
+                error_log("CB Debug - Successfully updated booking {$booking->id} status to 'paid' after payment completion");
+            } else {
+                error_log("CB Debug - Failed to update booking {$booking->id} status after payment completion");
+            }
+        } else {
+            error_log("CB Debug - No booking found for order $order_id during payment completion");
         }
     }
     
@@ -290,12 +687,51 @@ class CB_WooCommerce {
         }
     }
     
+    /**
+     * Utility method to sync all booking statuses with their WooCommerce orders
+     * This can be called manually or via admin action
+     */
+    public function sync_all_booking_statuses() {
+        global $wpdb;
+        
+        $bookings = $wpdb->get_results("
+            SELECT b.id, b.woocommerce_order_id, b.status as booking_status
+            FROM {$wpdb->prefix}cb_bookings b
+            WHERE b.woocommerce_order_id IS NOT NULL 
+            AND b.woocommerce_order_id > 0
+        ");
+        
+        $updated_count = 0;
+        
+        foreach ($bookings as $booking) {
+            $order = wc_get_order($booking->woocommerce_order_id);
+            
+            if ($order) {
+                $order_status = $order->get_status();
+                $expected_booking_status = $this->map_order_status_to_booking_status($order_status);
+                
+                if ($booking->booking_status !== $expected_booking_status) {
+                    error_log("CB Debug - Syncing booking {$booking->id}: {$booking->booking_status} -> $expected_booking_status (order status: $order_status)");
+                    
+                    $result = CB_Database::update_booking_status($booking->id, $expected_booking_status, $booking->woocommerce_order_id);
+                    
+                    if ($result) {
+                        $updated_count++;
+                    }
+                }
+            }
+        }
+        
+        error_log("CB Debug - Synced $updated_count booking statuses");
+        return $updated_count;
+    }
+    
     private function map_order_status_to_booking_status($order_status) {
         $status_map = array(
             'pending' => 'pending',
-            'processing' => 'confirmed',
-            'on-hold' => 'pending',
-            'completed' => 'confirmed',
+            'processing' => 'paid',        // Payment received, booking confirmed
+            'on-hold' => 'on-hold',       // Payment on hold - new status
+            'completed' => 'paid',         // Order completed, booking paid
             'cancelled' => 'cancelled',
             'refunded' => 'cancelled',
             'failed' => 'cancelled'

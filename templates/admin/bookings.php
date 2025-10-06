@@ -74,11 +74,11 @@ if (!defined('ABSPATH')) {
                 </tr>
                 <tr>
                     <th scope="row">
-                        <label for="create-booking-square-meters"><?php _e('Square Meters', 'cleaning-booking'); ?></label>
+                        <label for="create-booking-square-meters"><?php _e('Space in Square Meters', 'cleaning-booking'); ?></label>
                     </th>
                     <td>
                         <input type="number" id="create-booking-square-meters" name="square_meters" min="1" class="small-text" required>
-                        <span class="description"><?php _e('Property size in square meters', 'cleaning-booking'); ?></span>
+                        <span class="description"><?php _e('Enter the total space area in square meters', 'cleaning-booking'); ?></span>
                     </td>
                 </tr>
                 <tr>
@@ -124,6 +124,13 @@ if (!defined('ABSPATH')) {
     <div class="cb-admin-section">
         <h2><?php _e('Existing Bookings', 'cleaning-booking'); ?></h2>
         
+        <!-- Search Bar -->
+        <div class="cb-search-section">
+            <input type="text" id="cb-bookings-search" placeholder="<?php _e('Search bookings by reference, customer name, email, or phone...', 'cleaning-booking'); ?>" class="cb-search-input">
+            <button type="button" id="cb-search-bookings" class="button button-primary"><?php _e('Search', 'cleaning-booking'); ?></button>
+            <button type="button" id="cb-clear-bookings-search" class="button"><?php _e('Clear', 'cleaning-booking'); ?></button>
+        </div>
+        
         <div id="cb-bookings-list">
             <table class="wp-list-table widefat fixed striped">
                 <thead>
@@ -131,6 +138,7 @@ if (!defined('ABSPATH')) {
                         <th><?php _e('Reference', 'cleaning-booking'); ?></th>
                         <th><?php _e('Customer', 'cleaning-booking'); ?></th>
                         <th><?php _e('Service', 'cleaning-booking'); ?></th>
+                        <th><?php _e('Truck', 'cleaning-booking'); ?></th>
                         <th><?php _e('Date & Time', 'cleaning-booking'); ?></th>
                         <th><?php _e('Duration', 'cleaning-booking'); ?></th>
                         <th><?php _e('Price', 'cleaning-booking'); ?></th>
@@ -141,7 +149,7 @@ if (!defined('ABSPATH')) {
                 <tbody>
                     <?php if (empty($bookings)): ?>
                         <tr>
-                            <td colspan="8" class="text-center"><?php _e('No bookings found', 'cleaning-booking'); ?></td>
+                            <td colspan="9" class="text-center"><?php _e('No bookings found', 'cleaning-booking'); ?></td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($bookings as $booking): ?>
@@ -159,6 +167,16 @@ if (!defined('ABSPATH')) {
                                 <td>
                                     <?php echo esc_html($booking->service_name); ?><br>
                                     <small><?php echo esc_html($booking->square_meters); ?> m²</small>
+                                </td>
+                                <td>
+                                    <?php if ($booking->truck_id): ?>
+                                        <?php 
+                                        $truck = CB_Database::get_truck($booking->truck_id);
+                                        echo $truck ? esc_html($truck->truck_name) : __('Unknown Truck', 'cleaning-booking');
+                                        ?>
+                                    <?php else: ?>
+                                        <span class="cb-status cb-status-pending"><?php _e('Not Assigned', 'cleaning-booking'); ?></span>
+                                    <?php endif; ?>
                                 </td>
                                 <td>
                                     <?php echo esc_html(date('M j, Y', strtotime($booking->booking_date))); ?><br>

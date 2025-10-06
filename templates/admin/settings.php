@@ -56,9 +56,126 @@ $days = array(
                     </td>
                 </tr>
             </table>
-        </div>
+    </div>
+    
+    <!-- Color Customization Section -->
+    <div class="cb-admin-section">
+        <h2><?php _e('Frontend Color Customization', 'cleaning-booking'); ?></h2>
+        <p class="description"><?php _e('Customize the colors of your booking widget frontend. Changes will be applied immediately.', 'cleaning-booking'); ?></p>
         
-        <div class="cb-admin-section">
+        <table class="form-table">
+            <tr>
+                <th scope="row">
+                    <label for="primary-color"><?php _e('Primary Color', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                    <input type="color" id="primary-color" name="primary_color" value="<?php echo esc_attr(get_option('cb_primary_color', '#0073aa')); ?>" class="cb-color-picker">
+                    <span class="description"><?php _e('Main brand color for buttons and highlights', 'cleaning-booking'); ?></span>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">
+                    <label for="secondary-color"><?php _e('Secondary Color', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                    <input type="color" id="secondary-color" name="secondary_color" value="<?php echo esc_attr(get_option('cb_secondary_color', '#00a0d2')); ?>" class="cb-color-picker">
+                    <span class="description"><?php _e('Secondary color for accents and hover states', 'cleaning-booking'); ?></span>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">
+                    <label for="background-color"><?php _e('Background Color', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                    <input type="color" id="background-color" name="background_color" value="<?php echo esc_attr(get_option('cb_background_color', '#ffffff')); ?>" class="cb-color-picker">
+                    <span class="description"><?php _e('Main background color of the booking widget', 'cleaning-booking'); ?></span>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">
+                    <label for="text-color"><?php _e('Text Color', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                    <input type="color" id="text-color" name="text_color" value="<?php echo esc_attr(get_option('cb_text_color', '#333333')); ?>" class="cb-color-picker">
+                    <span class="description"><?php _e('Main text color for content', 'cleaning-booking'); ?></span>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">
+                    <label for="border-color"><?php _e('Border Color', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                    <input type="color" id="border-color" name="border_color" value="<?php echo esc_attr(get_option('cb_border_color', '#dddddd')); ?>" class="cb-color-picker">
+                    <span class="description"><?php _e('Border color for form elements and cards', 'cleaning-booking'); ?></span>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">
+                    <label for="success-color"><?php _e('Success Color', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                    <input type="color" id="success-color" name="success_color" value="<?php echo esc_attr(get_option('cb_success_color', '#46b450')); ?>" class="cb-color-picker">
+                    <span class="description"><?php _e('Color for success messages and confirmations', 'cleaning-booking'); ?></span>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">
+                    <label for="error-color"><?php _e('Error Color', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                    <input type="color" id="error-color" name="error_color" value="<?php echo esc_attr(get_option('cb_error_color', '#dc3232')); ?>" class="cb-color-picker">
+                    <span class="description"><?php _e('Color for error messages and warnings', 'cleaning-booking'); ?></span>
+                </td>
+            </tr>
+        </table>
+        
+        <!-- Color Preview -->
+        <div class="cb-color-preview">
+            <h3><?php _e('Color Preview', 'cleaning-booking'); ?></h3>
+            <div class="cb-preview-widget">
+                <div class="cb-preview-header" style="background: linear-gradient(135deg, var(--cb-primary-color, #0073aa) 0%, var(--cb-secondary-color, #00a0d2) 100%);">
+                    <span style="color: white;"><?php _e('Booking Widget Preview', 'cleaning-booking'); ?></span>
+                    <div style="margin-top: 15px; display: flex; gap: 0; background: rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 4px;">
+                        <div style="flex: 1; display: flex; align-items: center; padding: 8px 12px; background: white; color: var(--cb-primary-color, #0073aa); border-radius: 4px; font-weight: 600;">
+                            <div style="width: 20px; height: 20px; border-radius: 50%; background: var(--cb-primary-color, #0073aa); color: white; display: flex; align-items: center; justify-content: center; font-size: 10px; margin-right: 8px;">1</div>
+                            <span style="font-size: 12px;">Location</span>
+                        </div>
+                        <div style="flex: 1; display: flex; align-items: center; padding: 8px 12px; opacity: 0.6;">
+                            <div style="width: 20px; height: 20px; border-radius: 50%; background: rgba(255, 255, 255, 0.3); color: white; display: flex; align-items: center; justify-content: center; font-size: 10px; margin-right: 8px;">2</div>
+                            <span style="font-size: 12px; color: white;">Service</span>
+                        </div>
+                        <div style="flex: 1; display: flex; align-items: center; padding: 8px 12px; opacity: 0.6;">
+                            <div style="width: 20px; height: 20px; border-radius: 50%; background: rgba(255, 255, 255, 0.3); color: white; display: flex; align-items: center; justify-content: center; font-size: 10px; margin-right: 8px;">3</div>
+                            <span style="font-size: 12px; color: white;">Details</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="cb-preview-layout" style="display: grid; grid-template-columns: 2fr 1fr; min-height: 200px; background: var(--cb-background-color, #ffffff);">
+                    <div class="cb-preview-main" style="background-color: var(--cb-background-color, #ffffff); color: var(--cb-text-color, #333333); border-right: 1px solid var(--cb-border-color, #dddddd); padding: 20px;">
+                        <h4 style="color: var(--cb-text-color, #333333); margin-top: 0;"><?php _e('Main Content Area', 'cleaning-booking'); ?></h4>
+                        <div class="cb-preview-button" style="background-color: var(--cb-primary-color, #0073aa); color: white; padding: 10px 20px; border-radius: 4px; display: inline-block; margin: 10px 0;">
+                            <?php _e('Sample Button', 'cleaning-booking'); ?>
+                        </div>
+                        <div class="cb-preview-success" style="color: var(--cb-success-color, #46b450); margin: 10px 0;">
+                            <?php _e('Success message', 'cleaning-booking'); ?>
+                        </div>
+                        <div class="cb-preview-error" style="color: var(--cb-error-color, #dc3232); margin: 10px 0;">
+                            <?php _e('Error message', 'cleaning-booking'); ?>
+                        </div>
+                    </div>
+                    <div class="cb-preview-sidebar" style="background-color: var(--cb-background-color, #ffffff); color: var(--cb-text-color, #333333); padding: 20px;">
+                        <h4 style="color: var(--cb-text-color, #333333); margin-top: 0;"><?php _e('Sidebar', 'cleaning-booking'); ?></h4>
+                        <p style="color: var(--cb-text-color, #333333); opacity: 0.8;"><?php _e('Service information and pricing', 'cleaning-booking'); ?></p>
+                        <div style="background-color: var(--cb-primary-color, #0073aa); color: white; padding: 15px; border-radius: 4px; margin: 10px 0;">
+                            <?php _e('Checkout Button', 'cleaning-booking'); ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="cb-admin-section">
             <h2><?php _e('Business Hours', 'cleaning-booking'); ?></h2>
             
             <table class="form-table">

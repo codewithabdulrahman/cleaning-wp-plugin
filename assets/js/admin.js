@@ -1,201 +1,292 @@
 /**
- * Admin JavaScript for Cleaning Booking plugin
+ * Admin JavaScript for Cleaning Booking plugin (Vanilla JS)
  */
 
-jQuery(document).ready(function($) {
+document.addEventListener('DOMContentLoaded', function() {
     
     // Services form handling
-    $('#cb-service-form').on('submit', function(e) {
+    const serviceForm = document.getElementById('cb-service-form');
+    if (serviceForm) {
+        serviceForm.addEventListener('submit', function(e) {
         e.preventDefault();
         
-        var $form = $(this);
-        var $submitBtn = $form.find('input[type="submit"]');
-        var originalText = $submitBtn.val();
-        
-        $submitBtn.val(cb_admin.strings.saving).prop('disabled', true);
-        
-        $.ajax({
-            url: cb_admin.ajax_url,
-            type: 'POST',
-            data: $form.serialize(),
-            success: function(response) {
+            const form = e.target;
+            const submitBtn = form.querySelector('input[type="submit"]');
+            const originalText = submitBtn.value;
+            
+            submitBtn.value = cb_admin.strings.saving;
+            submitBtn.disabled = true;
+            
+            const formData = new FormData(form);
+            
+            fetch(cb_admin.ajax_url, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(response => {
                 if (response.success) {
                     showNotice(response.data.message, 'success');
-                    $form[0].reset();
-                    $('#service-id').val('');
-                    $('#cb-cancel-edit').hide();
+                    form.reset();
+                    const serviceIdInput = document.getElementById('service-id');
+                    if (serviceIdInput) serviceIdInput.value = '';
+                    const cancelEditBtn = document.getElementById('cb-cancel-edit');
+                    if (cancelEditBtn) cancelEditBtn.style.display = 'none';
                     loadServices();
                 } else {
                     showNotice(response.data.message || cb_admin.strings.error, 'error');
                 }
-            },
-            error: function() {
+            })
+            .catch(error => {
+                console.error('Service form error:', error);
                 showNotice(cb_admin.strings.error, 'error');
-            },
-            complete: function() {
-                $submitBtn.val(originalText).prop('disabled', false);
-            }
+            })
+            .finally(() => {
+                submitBtn.value = originalText;
+                submitBtn.disabled = false;
         });
     });
+    }
     
     // Edit service
-    $(document).on('click', '.cb-edit-service', function() {
-        var service = $(this).data('service');
-        
-        $('#service-id').val(service.id);
-        $('#service-name').val(service.name);
-        $('#service-description').val(service.description);
-        $('#service-base-price').val(service.base_price);
-        $('#service-base-duration').val(service.base_duration);
-        $('#service-sqm-multiplier').val(service.sqm_multiplier);
-        $('#service-sqm-duration-multiplier').val(service.sqm_duration_multiplier);
-        $('#service-sort-order').val(service.sort_order);
-        $('#service-is-active').prop('checked', service.is_active == 1);
-        
-        $('#cb-cancel-edit').show();
-        $('html, body').animate({ scrollTop: 0 }, 500);
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.cb-edit-service')) {
+            const editBtn = e.target.closest('.cb-edit-service');
+            const service = JSON.parse(editBtn.dataset.service);
+            
+            const serviceIdInput = document.getElementById('service-id');
+            const serviceNameInput = document.getElementById('service-name');
+            const serviceDescriptionInput = document.getElementById('service-description');
+            const serviceBasePriceInput = document.getElementById('service-base-price');
+            const serviceBaseDurationInput = document.getElementById('service-base-duration');
+            const serviceSqmMultiplierInput = document.getElementById('service-sqm-multiplier');
+            const serviceSqmDurationMultiplierInput = document.getElementById('service-sqm-duration-multiplier');
+            const serviceDefaultAreaInput = document.getElementById('service-default-area');
+            const serviceSortOrderInput = document.getElementById('service-sort-order');
+            const serviceIsActiveInput = document.getElementById('service-is-active');
+            
+            if (serviceIdInput) serviceIdInput.value = service.id;
+            if (serviceNameInput) serviceNameInput.value = service.name;
+            if (serviceDescriptionInput) serviceDescriptionInput.value = service.description;
+            if (serviceBasePriceInput) serviceBasePriceInput.value = service.base_price;
+            if (serviceBaseDurationInput) serviceBaseDurationInput.value = service.base_duration;
+            if (serviceSqmMultiplierInput) serviceSqmMultiplierInput.value = service.sqm_multiplier;
+            if (serviceSqmDurationMultiplierInput) serviceSqmDurationMultiplierInput.value = service.sqm_duration_multiplier;
+            if (serviceDefaultAreaInput) serviceDefaultAreaInput.value = service.default_area || 0;
+            if (serviceSortOrderInput) serviceSortOrderInput.value = service.sort_order;
+            if (serviceIsActiveInput) serviceIsActiveInput.checked = service.is_active == 1;
+            
+            const cancelEditBtn = document.getElementById('cb-cancel-edit');
+            if (cancelEditBtn) cancelEditBtn.style.display = 'block';
+            
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
     });
     
     // Cancel edit service
-    $('#cb-cancel-edit').on('click', function() {
-        $('#cb-service-form')[0].reset();
-        $('#service-id').val('');
-        $(this).hide();
-    });
+    const cancelEditBtn = document.getElementById('cb-cancel-edit');
+    if (cancelEditBtn) {
+        cancelEditBtn.addEventListener('click', function() {
+            const serviceForm = document.getElementById('cb-service-form');
+            if (serviceForm) serviceForm.reset();
+            const serviceIdInput = document.getElementById('service-id');
+            if (serviceIdInput) serviceIdInput.value = '';
+            this.style.display = 'none';
+        });
+    }
     
     // Delete service
-    $(document).on('click', '.cb-delete-service', function() {
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.cb-delete-service')) {
+            const deleteBtn = e.target.closest('.cb-delete-service');
+            
         if (!confirm(cb_admin.strings.confirm_delete)) {
             return;
         }
         
-        var serviceId = $(this).data('id');
-        var $row = $(this).closest('tr');
-        
-        $.ajax({
-            url: cb_admin.ajax_url,
-            type: 'POST',
-            data: {
-                action: 'cb_delete_service',
-                nonce: cb_admin.nonce,
-                id: serviceId
-            },
-            success: function(response) {
+            const serviceId = deleteBtn.dataset.id;
+            const row = deleteBtn.closest('tr');
+            
+            const formData = new FormData();
+            formData.append('action', 'cb_delete_service');
+            formData.append('nonce', cb_admin.nonce);
+            formData.append('id', serviceId);
+            
+            fetch(cb_admin.ajax_url, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(response => {
                 if (response.success) {
                     showNotice(response.data.message, 'success');
-                    $row.fadeOut(300, function() {
-                        $(this).remove();
-                    });
+                    if (row) {
+                        row.style.opacity = '0';
+                        row.style.transition = 'opacity 0.3s ease';
+                        setTimeout(() => {
+                            if (row.parentNode) {
+                                row.remove();
+                            }
+                        }, 300);
+                    }
                 } else {
                     showNotice(response.data.message || cb_admin.strings.error, 'error');
                 }
-            },
-            error: function() {
+            })
+            .catch(error => {
+                console.error('Delete service error:', error);
                 showNotice(cb_admin.strings.error, 'error');
+            });
             }
-        });
     });
     
     
     // ZIP Codes form handling
-    $('#cb-zip-code-form').on('submit', function(e) {
+    const zipCodeForm = document.getElementById('cb-zip-code-form');
+    if (zipCodeForm) {
+        zipCodeForm.addEventListener('submit', function(e) {
         e.preventDefault();
         
-        var $form = $(this);
-        var $submitBtn = $form.find('input[type="submit"]');
-        var originalText = $submitBtn.val();
-        
-        $submitBtn.val(cb_admin.strings.saving).prop('disabled', true);
-        
-        $.ajax({
-            url: cb_admin.ajax_url,
-            type: 'POST',
-            data: $form.serialize(),
-            success: function(response) {
+            const form = e.target;
+            const submitBtn = form.querySelector('input[type="submit"]');
+            const originalText = submitBtn.value;
+            
+            submitBtn.value = cb_admin.strings.saving;
+            submitBtn.disabled = true;
+            
+            const formData = new FormData(form);
+            
+            fetch(cb_admin.ajax_url, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(response => {
                 if (response.success) {
                     showNotice(response.data.message, 'success');
-                    $form[0].reset();
-                    $('#zip-code-id').val('');
-                    $('#cb-cancel-edit-zip').hide();
+                    form.reset();
+                    const zipCodeIdInput = document.getElementById('zip-code-id');
+                    if (zipCodeIdInput) zipCodeIdInput.value = '';
+                    const cancelEditZipBtn = document.getElementById('cb-cancel-edit-zip');
+                    if (cancelEditZipBtn) cancelEditZipBtn.style.display = 'none';
                     loadZipCodes();
                 } else {
                     showNotice(response.data.message || cb_admin.strings.error, 'error');
                 }
-            },
-            error: function() {
+            })
+            .catch(error => {
+                console.error('ZIP code form error:', error);
                 showNotice(cb_admin.strings.error, 'error');
-            },
-            complete: function() {
-                $submitBtn.val(originalText).prop('disabled', false);
-            }
+            })
+            .finally(() => {
+                submitBtn.value = originalText;
+                submitBtn.disabled = false;
         });
     });
+    }
     
     // Edit ZIP code
-    $(document).on('click', '.cb-edit-zip-code', function() {
-        var zip = $(this).data('zip');
-        
-        $('#zip-code-id').val(zip.id);
-        $('#zip-code').val(zip.zip_code);
-        $('#zip-city').val(zip.city);
-        $('#zip-surcharge').val(zip.surcharge);
-        $('#zip-is-active').prop('checked', zip.is_active == 1);
-        
-        $('#cb-cancel-edit-zip').show();
-        $('html, body').animate({ scrollTop: 0 }, 500);
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.cb-edit-zip-code')) {
+            const editBtn = e.target.closest('.cb-edit-zip-code');
+            const zip = JSON.parse(editBtn.dataset.zip);
+            
+            const zipCodeIdInput = document.getElementById('zip-code-id');
+            const zipCodeInput = document.getElementById('zip-code');
+            const zipCityInput = document.getElementById('zip-city');
+            const zipSurchargeInput = document.getElementById('zip-surcharge');
+            const zipIsActiveInput = document.getElementById('zip-is-active');
+            
+            if (zipCodeIdInput) zipCodeIdInput.value = zip.id;
+            if (zipCodeInput) zipCodeInput.value = zip.zip_code;
+            if (zipCityInput) zipCityInput.value = zip.city;
+            if (zipSurchargeInput) zipSurchargeInput.value = zip.surcharge;
+            if (zipIsActiveInput) zipIsActiveInput.checked = zip.is_active == 1;
+            
+            const cancelEditZipBtn = document.getElementById('cb-cancel-edit-zip');
+            if (cancelEditZipBtn) cancelEditZipBtn.style.display = 'block';
+            
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
     });
     
     // Cancel edit ZIP code
-    $('#cb-cancel-edit-zip').on('click', function() {
-        $('#cb-zip-code-form')[0].reset();
-        $('#zip-code-id').val('');
-        $(this).hide();
-    });
+    const cancelEditZipBtn = document.getElementById('cb-cancel-edit-zip');
+    if (cancelEditZipBtn) {
+        cancelEditZipBtn.addEventListener('click', function() {
+            const zipCodeForm = document.getElementById('cb-zip-code-form');
+            if (zipCodeForm) zipCodeForm.reset();
+            const zipCodeIdInput = document.getElementById('zip-code-id');
+            if (zipCodeIdInput) zipCodeIdInput.value = '';
+            this.style.display = 'none';
+        });
+    }
     
     // Delete ZIP code
-    $(document).on('click', '.cb-delete-zip-code', function() {
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.cb-delete-zip-code')) {
+            const deleteBtn = e.target.closest('.cb-delete-zip-code');
+            
         if (!confirm(cb_admin.strings.confirm_delete)) {
             return;
         }
         
-        var zipId = $(this).data('id');
-        var $row = $(this).closest('tr');
-        
-        $.ajax({
-            url: cb_admin.ajax_url,
-            type: 'POST',
-            data: {
-                action: 'cb_delete_zip_code',
-                nonce: cb_admin.nonce,
-                id: zipId
-            },
-            success: function(response) {
+            const zipId = deleteBtn.dataset.id;
+            const row = deleteBtn.closest('tr');
+            
+            const formData = new FormData();
+            formData.append('action', 'cb_delete_zip_code');
+            formData.append('nonce', cb_admin.nonce);
+            formData.append('id', zipId);
+            
+            fetch(cb_admin.ajax_url, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(response => {
                 if (response.success) {
                     showNotice(response.data.message, 'success');
-                    $row.fadeOut(300, function() {
-                        $(this).remove();
-                    });
+                    if (row) {
+                        row.style.opacity = '0';
+                        row.style.transition = 'opacity 0.3s ease';
+                        setTimeout(() => {
+                            if (row.parentNode) {
+                                row.remove();
+                            }
+                        }, 300);
+                    }
                 } else {
                     showNotice(response.data.message || cb_admin.strings.error, 'error');
                 }
-            },
-            error: function() {
+            })
+            .catch(error => {
+                console.error('Delete ZIP code error:', error);
                 showNotice(cb_admin.strings.error, 'error');
+            });
             }
-        });
     });
     
     // Helper functions
     function showNotice(message, type) {
-        var noticeClass = type === 'success' ? 'notice-success' : 'notice-error';
-        var $notice = $('<div class="notice ' + noticeClass + ' is-dismissible"><p>' + message + '</p></div>');
+        const noticeClass = type === 'success' ? 'notice-success' : 'notice-error';
+        const notice = document.createElement('div');
+        notice.className = `notice ${noticeClass} is-dismissible`;
+        notice.innerHTML = `<p>${message}</p>`;
         
-        $('.wrap h1').after($notice);
+        const wrapH1 = document.querySelector('.wrap h1');
+        if (wrapH1 && wrapH1.parentNode) {
+            wrapH1.parentNode.insertBefore(notice, wrapH1.nextSibling);
+        }
         
         setTimeout(function() {
-            $notice.fadeOut(300, function() {
-                $(this).remove();
-            });
+            notice.style.opacity = '0';
+            notice.style.transition = 'opacity 0.3s ease';
+            setTimeout(() => {
+                if (notice.parentNode) {
+                    notice.remove();
+                }
+            }, 300);
         }, 3000);
     }
     
@@ -204,114 +295,168 @@ jQuery(document).ready(function($) {
         location.reload();
     }
     
-    
     function loadZipCodes() {
         // Reload the page to refresh the ZIP codes list
         location.reload();
     }
     
     // Service extras management
-    var currentServiceId = null;
-    var currentServiceName = null;
+    let currentServiceId = null;
+    let currentServiceName = null;
     
     // Manage extras button from services page
-    $(document).on('click', '.cb-manage-extras', function() {
-        currentServiceId = $(this).data('service-id');
-        currentServiceName = $(this).data('service-name');
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.cb-manage-extras')) {
+            const manageBtn = e.target.closest('.cb-manage-extras');
+            currentServiceId = manageBtn.dataset.serviceId;
+            currentServiceName = manageBtn.dataset.serviceName;
         
         // Hide services section
-        $('.cb-admin-section').not('#cb-service-extras-section').hide();
+            const adminSections = document.querySelectorAll('.cb-admin-section');
+            adminSections.forEach(section => {
+                if (section.id !== 'cb-service-extras-section') {
+                    section.style.display = 'none';
+                }
+            });
         
         // Show extras section
-        $('#cb-service-extras-section').show();
-        $('#selected-service-name').text(currentServiceName);
+            const extrasSection = document.getElementById('cb-service-extras-section');
+            if (extrasSection) extrasSection.style.display = 'block';
+            
+            const selectedServiceName = document.getElementById('selected-service-name');
+            if (selectedServiceName) selectedServiceName.textContent = currentServiceName;
         
         // Load service extras
         loadServiceExtras(currentServiceId);
+        }
     });
     
     // Back to services button
-    $('#cb-back-to-services').on('click', function() {
-        $('#cb-service-extras-section').hide();
-        $('.cb-admin-section').not('#cb-service-extras-section').show();
+    const backToServicesBtn = document.getElementById('cb-back-to-services');
+    if (backToServicesBtn) {
+        backToServicesBtn.addEventListener('click', function() {
+            const extrasSection = document.getElementById('cb-service-extras-section');
+            if (extrasSection) extrasSection.style.display = 'none';
+            
+            const adminSections = document.querySelectorAll('.cb-admin-section');
+            adminSections.forEach(section => {
+                if (section.id !== 'cb-service-extras-section') {
+                    section.style.display = 'block';
+                }
+            });
+            
         currentServiceId = null;
         currentServiceName = null;
     });
+    }
     
     
     // Remove service extra
-    $(document).on('click', '.cb-remove-service-extra', function() {
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.cb-remove-service-extra')) {
+            const removeBtn = e.target.closest('.cb-remove-service-extra');
+            
         if (!confirm('Are you sure you want to remove this extra from the service?')) {
             return;
         }
         
-        var extraId = $(this).data('extra-id');
-        var $row = $(this).closest('tr');
-        
-        $.ajax({
-            url: cb_admin.ajax_url,
-            type: 'POST',
-            data: {
-                action: 'cb_remove_service_extra',
-                nonce: cb_admin.nonce,
-                service_id: currentServiceId,
-                extra_id: extraId
-            },
-            success: function(response) {
+            const extraId = removeBtn.dataset.extraId;
+            const row = removeBtn.closest('tr');
+            
+            const formData = new FormData();
+            formData.append('action', 'cb_remove_service_extra');
+            formData.append('nonce', cb_admin.nonce);
+            formData.append('service_id', currentServiceId);
+            formData.append('extra_id', extraId);
+            
+            fetch(cb_admin.ajax_url, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(response => {
                 if (response.success) {
                     showNotice(response.data.message, 'success');
-                    $row.fadeOut(300, function() {
-                        $(this).remove();
-                    });
+                    if (row) {
+                        row.style.opacity = '0';
+                        row.style.transition = 'opacity 0.3s ease';
+                        setTimeout(() => {
+                            if (row.parentNode) {
+                                row.remove();
+                            }
+                        }, 300);
+                    }
                     loadAvailableExtras(currentServiceId);
                 } else {
                     showNotice(response.data.message || cb_admin.strings.error, 'error');
                 }
-            },
-            error: function() {
+            })
+            .catch(error => {
+                console.error('Remove service extra error:', error);
                 showNotice(cb_admin.strings.error, 'error');
+            });
             }
         });
-    });
-    
     
     // Show create extra form
-    $('#cb-show-create-form').on('click', function() {
-        $(this).hide();
-        $('#cb-create-extra-form').show();
-        $('#cb-cancel-create').show();
-    });
+    const showCreateFormBtn = document.getElementById('cb-show-create-form');
+    if (showCreateFormBtn) {
+        showCreateFormBtn.addEventListener('click', function() {
+            this.style.display = 'none';
+            const createForm = document.getElementById('cb-create-extra-form');
+            if (createForm) createForm.style.display = 'block';
+            const cancelCreateBtn = document.getElementById('cb-cancel-create');
+            if (cancelCreateBtn) cancelCreateBtn.style.display = 'block';
+        });
+    }
     
     // Hide create extra form
-    $('#cb-cancel-create').on('click', function() {
-        $('#cb-create-extra-form').hide();
-        $('#cb-show-create-form').show();
-        $(this).hide();
-        $('#cb-create-extra-form')[0].reset();
-        $('#create-extra-id').val('');
-    });
+    const cancelCreateBtn = document.getElementById('cb-cancel-create');
+    if (cancelCreateBtn) {
+        cancelCreateBtn.addEventListener('click', function() {
+            const createForm = document.getElementById('cb-create-extra-form');
+            if (createForm) createForm.style.display = 'none';
+            const showCreateFormBtn = document.getElementById('cb-show-create-form');
+            if (showCreateFormBtn) showCreateFormBtn.style.display = 'block';
+            this.style.display = 'none';
+            const createFormReset = document.getElementById('cb-create-extra-form');
+            if (createFormReset) createFormReset.reset();
+            const createExtraIdInput = document.getElementById('create-extra-id');
+            if (createExtraIdInput) createExtraIdInput.value = '';
+        });
+    }
     
     // Create extra form submission
-    $('#cb-create-extra-form').on('submit', function(e) {
+    const createExtraForm = document.getElementById('cb-create-extra-form');
+    if (createExtraForm) {
+        createExtraForm.addEventListener('submit', function(e) {
         e.preventDefault();
         
-        var $form = $(this);
-        var $submitBtn = $form.find('input[type="submit"]');
-        var originalText = $submitBtn.val();
-        
-        $submitBtn.val(cb_admin.strings.saving).prop('disabled', true);
-        
-        $.ajax({
-            url: cb_admin.ajax_url,
-            type: 'POST',
-            data: $form.serialize() + '&service_id=' + currentServiceId,
-            success: function(response) {
+            const form = e.target;
+            const submitBtn = form.querySelector('input[type="submit"]');
+            const originalText = submitBtn.value;
+            
+            submitBtn.value = cb_admin.strings.saving;
+            submitBtn.disabled = true;
+            
+            const formData = new FormData(form);
+            formData.append('service_id', currentServiceId);
+            
+            fetch(cb_admin.ajax_url, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(response => {
                 if (response.success) {
                     showNotice(response.data.message, 'success');
                     
-                    $form[0].reset();
-                    $('#create-extra-id').val('');
-                    $('#cb-cancel-create').click(); // Hide form and show button
+                    form.reset();
+                    const createExtraIdInput = document.getElementById('create-extra-id');
+                    if (createExtraIdInput) createExtraIdInput.value = '';
+                    
+                    const cancelCreateBtn = document.getElementById('cb-cancel-create');
+                    if (cancelCreateBtn) cancelCreateBtn.click(); // Hide form and show button
                     
                     // Reload service extras to show the new extra
                     setTimeout(function() {
@@ -320,100 +465,134 @@ jQuery(document).ready(function($) {
                 } else {
                     showNotice(response.data.message || cb_admin.strings.error, 'error');
                 }
-            },
-            error: function() {
+            })
+            .catch(error => {
+                console.error('Create extra form error:', error);
                 showNotice(cb_admin.strings.error, 'error');
-            },
-            complete: function() {
-                $submitBtn.val(originalText).prop('disabled', false);
-            }
+            })
+            .finally(() => {
+                submitBtn.value = originalText;
+                submitBtn.disabled = false;
         });
     });
+    }
     
     // Edit extra inline
-    $(document).on('click', '.cb-edit-extra-inline', function() {
-        var extra = $(this).data('extra');
-        
-        $('#create-extra-id').val(extra.id);
-        $('#create-extra-name').val(extra.name);
-        $('#create-extra-description').val(extra.description);
-        $('#create-extra-price').val(extra.price);
-        $('#create-extra-duration').val(extra.duration);
-        $('#create-extra-is-active').prop('checked', parseInt(extra.is_active) === 1);
-        
-        $('#cb-show-create-form').hide();
-        $('#cb-create-extra-form').show();
-        $('#cb-cancel-create').show();
-        $('html, body').animate({ scrollTop: $('#cb-create-extra-section').offset().top - 100 }, 500);
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.cb-edit-extra-inline')) {
+            const editBtn = e.target.closest('.cb-edit-extra-inline');
+            const extra = JSON.parse(editBtn.dataset.extra);
+            
+            const createExtraIdInput = document.getElementById('create-extra-id');
+            const createExtraNameInput = document.getElementById('create-extra-name');
+            const createExtraDescriptionInput = document.getElementById('create-extra-description');
+            const createExtraPriceInput = document.getElementById('create-extra-price');
+            const createExtraDurationInput = document.getElementById('create-extra-duration');
+            const createExtraIsActiveInput = document.getElementById('create-extra-is-active');
+            
+            if (createExtraIdInput) createExtraIdInput.value = extra.id;
+            if (createExtraNameInput) createExtraNameInput.value = extra.name;
+            if (createExtraDescriptionInput) createExtraDescriptionInput.value = extra.description;
+            if (createExtraPriceInput) createExtraPriceInput.value = extra.price;
+            if (createExtraDurationInput) createExtraDurationInput.value = extra.duration;
+            if (createExtraIsActiveInput) createExtraIsActiveInput.checked = parseInt(extra.is_active) === 1;
+            
+            const showCreateFormBtn = document.getElementById('cb-show-create-form');
+            if (showCreateFormBtn) showCreateFormBtn.style.display = 'none';
+            const createForm = document.getElementById('cb-create-extra-form');
+            if (createForm) createForm.style.display = 'block';
+            const cancelCreateBtn = document.getElementById('cb-cancel-create');
+            if (cancelCreateBtn) cancelCreateBtn.style.display = 'block';
+            
+            const createExtraSection = document.getElementById('cb-create-extra-section');
+            if (createExtraSection) {
+                const offsetTop = createExtraSection.offsetTop - 100;
+                window.scrollTo({ top: offsetTop, behavior: 'smooth' });
+            }
+        }
     });
     
     // Toggle extra status (active/inactive)
-    $(document).on('change', '.cb-toggle-extra-status', function() {
-        var extraId = $(this).data('extra-id');
-        var isActive = $(this).is(':checked') ? 1 : 0;
-        var $statusText = $(this).siblings('.cb-status-text');
-        
-        $.ajax({
-            url: cb_admin.ajax_url,
-            type: 'POST',
-            data: {
-                action: 'cb_update_extra_status',
-                nonce: cb_admin.nonce,
-                extra_id: extraId,
-                is_active: isActive
-            },
-            success: function(response) {
+    document.addEventListener('change', function(e) {
+        if (e.target.classList.contains('cb-toggle-extra-status')) {
+            const checkbox = e.target;
+            const extraId = checkbox.dataset.extraId;
+            const isActive = checkbox.checked ? 1 : 0;
+            const statusText = checkbox.parentNode.querySelector('.cb-status-text');
+            
+            const formData = new FormData();
+            formData.append('action', 'cb_update_extra_status');
+            formData.append('nonce', cb_admin.nonce);
+            formData.append('extra_id', extraId);
+            formData.append('is_active', isActive);
+            
+            fetch(cb_admin.ajax_url, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(response => {
                 if (response.success) {
                     if (isActive) {
-                        $statusText.removeClass('cb-status-inactive').addClass('cb-status-active').text('Active');
+                        statusText.classList.remove('cb-status-inactive');
+                        statusText.classList.add('cb-status-active');
+                        statusText.textContent = 'Active';
                     } else {
-                        $statusText.removeClass('cb-status-active').addClass('cb-status-inactive').text('Inactive');
+                        statusText.classList.remove('cb-status-active');
+                        statusText.classList.add('cb-status-inactive');
+                        statusText.textContent = 'Inactive';
                     }
                 } else {
                     // Revert checkbox if error
-                    $(this).prop('checked', !isActive);
+                    checkbox.checked = !isActive;
                     showNotice(response.data.message || cb_admin.strings.error, 'error');
                 }
-            },
-            error: function() {
+            })
+            .catch(error => {
+                console.error('Toggle extra status error:', error);
                 // Revert checkbox if error
-                $(this).prop('checked', !isActive);
+                checkbox.checked = !isActive;
                 showNotice(cb_admin.strings.error, 'error');
-            }.bind(this)
         });
+        }
     });
     
     function loadServiceExtras(serviceId) {
-        $.ajax({
-            url: cb_admin.ajax_url,
-            type: 'POST',
-            data: {
-                action: 'cb_get_service_extras',
-                nonce: cb_admin.nonce,
-                service_id: serviceId
-            },
-            success: function(response) {
+        const formData = new FormData();
+        formData.append('action', 'cb_get_service_extras');
+        formData.append('nonce', cb_admin.nonce);
+        formData.append('service_id', serviceId);
+        
+        fetch(cb_admin.ajax_url, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(response => {
                 if (response.success) {
                     displayServiceExtras(response.data.extras);
                 }
-            }
+        })
+        .catch(error => {
+            console.error('Load service extras error:', error);
         });
     }
     
-    
-    
-    
     function displayServiceExtras(extras) {
-        var tbody = $('#service-extras-tbody');
-        tbody.empty();
+        const tbody = document.getElementById('service-extras-tbody');
+        if (!tbody) return;
+        
+        tbody.innerHTML = '';
         
         if (extras.length === 0) {
-            tbody.html('<tr><td colspan="5" class="text-center">No extras assigned to this service</td></tr>');
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">No extras assigned to this service</td></tr>';
             return;
         }
         
         extras.forEach(function(extra) {
-            var row = '<tr data-extra-id="' + extra.id + '">' +
+            const row = document.createElement('tr');
+            row.dataset.extraId = extra.id;
+            row.innerHTML = 
                 '<td><strong>' + extra.name + '</strong>' +
                 (extra.description ? '<br><small>' + extra.description + '</small>' : '') + '</td>' +
                 '<td>$' + parseFloat(extra.price).toFixed(2) + '</td>' +
@@ -429,39 +608,45 @@ jQuery(document).ready(function($) {
                 '<td>' +
                     '<button type="button" class="button button-small cb-edit-extra-inline" data-extra=\'' + JSON.stringify(extra) + '\'>Edit</button>' +
                     '<button type="button" class="button button-small cb-remove-service-extra" data-extra-id="' + extra.id + '" style="margin-left: 5px;">Remove</button>' +
-                '</td>' +
-            '</tr>';
-            tbody.append(row);
+                '</td>';
+            tbody.appendChild(row);
         });
     }
     
     // Booking management functionality
     
     // Create/Edit Booking Form
-    $('#cb-create-booking-form').on('submit', function(e) {
+    const createBookingForm = document.getElementById('cb-create-booking-form');
+    if (createBookingForm) {
+        createBookingForm.addEventListener('submit', function(e) {
         e.preventDefault();
         
-        var formData = $(this).serialize();
-        var $submitBtn = $(this).find('input[type="submit"]');
-        var originalText = $submitBtn.val();
-        var bookingId = $('#create-booking-id').val();
-        var isEdit = bookingId && bookingId !== '';
-        
-        $submitBtn.val(isEdit ? 'Updating...' : 'Converting...').prop('disabled', true);
-        
-        $.ajax({
-            url: cb_admin.ajax_url,
-            type: 'POST',
-            data: formData,
-            success: function(response) {
+            const form = e.target;
+            const formData = new FormData(form);
+            const submitBtn = form.querySelector('input[type="submit"]');
+            const originalText = submitBtn.value;
+            const bookingId = document.getElementById('create-booking-id').value;
+            const isEdit = bookingId && bookingId !== '';
+            
+            submitBtn.value = isEdit ? 'Updating...' : 'Converting...';
+            submitBtn.disabled = true;
+            
+            fetch(cb_admin.ajax_url, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(response => {
                 if (response.success) {
                     showNotice(response.data.message, 'success');
                     
                     if (isEdit) {
                         // Hide cancel button and reset form for new booking
-                        $('#cb-cancel-booking-edit').hide();
-                        $('#cb-create-booking-form')[0].reset();
-                        $('#create-booking-date').valueAsDate = new Date();
+                        const cancelBookingEditBtn = document.getElementById('cb-cancel-booking-edit');
+                        if (cancelBookingEditBtn) cancelBookingEditBtn.style.display = 'none';
+                        form.reset();
+                        const createBookingDateInput = document.getElementById('create-booking-date');
+                        if (createBookingDateInput) createBookingDateInput.valueAsDate = new Date();
                         
                         // Reload to show updated data
                         setTimeout(function() {
@@ -469,8 +654,9 @@ jQuery(document).ready(function($) {
                         }, 1500);
                     } else {
                         // Reset form for new booking
-                        $('#cb-create-booking-form')[0].reset();
-                        $('#create-booking-date').valueAsDate = new Date();
+                        form.reset();
+                        const createBookingDateInput = document.getElementById('create-booking-date');
+                        if (createBookingDateInput) createBookingDateInput.valueAsDate = new Date();
                         
                         // Reload to show new booking
                         setTimeout(function() {
@@ -480,109 +666,511 @@ jQuery(document).ready(function($) {
                 } else {
                     showNotice(response.data.message || 'Error saving booking', 'error');
                 }
-            },
-            error: function() {
+            })
+            .catch(error => {
+                console.error('Create booking form error:', error);
                 showNotice('Error saving booking', 'error');
-            },
-            complete: function() {
-                $submitBtn.val(isEdit ? 'Update Booking' : 'Save Booking').prop('disabled', false);
-            }
+            })
+            .finally(() => {
+                submitBtn.value = isEdit ? 'Update Booking' : 'Save Booking';
+                submitBtn.disabled = false;
         });
     });
+    }
     
     // Set default datetime to current date/time
-    if (document.getElementById('create-booking-datetime')) {
-        var now = new Date();
+    const createBookingDatetimeInput = document.getElementById('create-booking-datetime');
+    if (createBookingDatetimeInput) {
+        const now = new Date();
         // Format for datetime-local input (YYYY-MM-DDTHH:MM)
-        var month = String(now.getMonth() + 1).padStart(2, '0');
-        var day = String(now.getDate()).padStart(2, '0');
-        var year = now.getFullYear();
-        var hours = String(now.getHours()).padStart(2, '0');
-        var minutes = String(now.getMinutes()).padStart(2, '0');
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const year = now.getFullYear();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
         
-        var datetimeValue = year + '-' + month + '-' + day + 'T' + hours + ':' + minutes;
-        document.getElementById('create-booking-datetime').value = datetimeValue;
+        const datetimeValue = year + '-' + month + '-' + day + 'T' + hours + ':' + minutes;
+        createBookingDatetimeInput.value = datetimeValue;
     }
     
     // Edit booking inline (fill upper form like services)
-    $(document).on('click', '.cb-edit-booking-inline', function() {
-        var booking = $(this).data('booking');
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.cb-edit-booking-inline')) {
+            const editBtn = e.target.closest('.cb-edit-booking-inline');
+            const booking = JSON.parse(editBtn.dataset.booking);
         
         // Fill the form with booking data
-        $('#create-booking-id').val(booking.id);
-        $('#create-booking-customer-name').val(booking.customer_name);
-        $('#create-booking-customer-email').val(booking.customer_email);
-        $('#create-booking-customer-phone').val(booking.customer_phone || '');
-        $('#create-booking-address').val(booking.address || '');
-        $('#create-booking-service').val(booking.service_id);
-        $('#create-booking-square-meters').val(booking.square_meters);
+            const createBookingIdInput = document.getElementById('create-booking-id');
+            const createBookingCustomerNameInput = document.getElementById('create-booking-customer-name');
+            const createBookingCustomerEmailInput = document.getElementById('create-booking-customer-email');
+            const createBookingCustomerPhoneInput = document.getElementById('create-booking-customer-phone');
+            const createBookingAddressInput = document.getElementById('create-booking-address');
+            const createBookingServiceInput = document.getElementById('create-booking-service');
+            const createBookingSquareMetersInput = document.getElementById('create-booking-square-meters');
+            const createBookingDatetimeInput = document.getElementById('create-booking-datetime');
+            const createBookingNotesInput = document.getElementById('create-booking-notes');
+            
+            if (createBookingIdInput) createBookingIdInput.value = booking.id;
+            if (createBookingCustomerNameInput) createBookingCustomerNameInput.value = booking.customer_name;
+            if (createBookingCustomerEmailInput) createBookingCustomerEmailInput.value = booking.customer_email;
+            if (createBookingCustomerPhoneInput) createBookingCustomerPhoneInput.value = booking.customer_phone || '';
+            if (createBookingAddressInput) createBookingAddressInput.value = booking.address || '';
+            if (createBookingServiceInput) createBookingServiceInput.value = booking.service_id;
+            if (createBookingSquareMetersInput) createBookingSquareMetersInput.value = booking.square_meters;
         
         // Combine date and time for datetime-local input
-        var dateStr = booking.booking_date; // Format: YYYY-MM-DD
-        var timeStr = booking.booking_time; // Format: HH:MM
-        $('#create-booking-datetime').val(dateStr + 'T' + timeStr);
-        
-        $('#create-booking-notes').val(booking.notes || '');
-        $('#create-booking-id').siblings('form').find('select[name="status"]').val(booking.status);
+            const dateStr = booking.booking_date; // Format: YYYY-MM-DD
+            const timeStr = booking.booking_time; // Format: HH:MM
+            if (createBookingDatetimeInput) createBookingDatetimeInput.value = dateStr + 'T' + timeStr;
+            
+            if (createBookingNotesInput) createBookingNotesInput.value = booking.notes || '';
+            
+            const statusSelect = createBookingIdInput.parentNode.querySelector('select[name="status"]');
+            if (statusSelect) statusSelect.value = booking.status;
         
         // Show cancel button and scroll to form
-        $('#cb-cancel-booking-edit').show();
-        $('html, body').animate({ scrollTop: $('.cb-create-booking-section').offset().top - 100 }, 500);
+            const cancelBookingEditBtn = document.getElementById('cb-cancel-booking-edit');
+            if (cancelBookingEditBtn) cancelBookingEditBtn.style.display = 'block';
+            
+            const createBookingSection = document.querySelector('.cb-create-booking-section');
+            if (createBookingSection) {
+                const offsetTop = createBookingSection.offsetTop - 100;
+                window.scrollTo({ top: offsetTop, behavior: 'smooth' });
+            }
         
         // Change submit button text
-        $('#cb-create-booking-form input[type="submit"]').val('Update Booking');
-    });
-    
-    // Cancel booking edit
-    $(document).on('click', '#cb-cancel-booking-edit', function() {
-        $('#cb-create-booking-form')[0].reset();
-        $('#create-booking-id').val('');
-        
-        // Set default datetime to current date/time
-        var now = new Date();
-        var month = String(now.getMonth() + 1).padStart(2, '0');
-        var day = String(now.getDate()).padStart(2, '0');
-        var year = now.getFullYear();
-        var hours = String(now.getHours()).padStart(2, '0');
-        var minutes = String(now.getMinutes()).padStart(2, '0');
-        
-        var datetimeValue = year + '-' + month + '-' + day + 'T' + hours + ':' + minutes;
-        $('#create-booking-datetime').val(datetimeValue);
-        
-        $(this).hide();
-        $('#cb-create-booking-form input[type="submit"]').val('Save Booking');
-    });
-    
-    // Delete booking
-    $(document).on('click', '.cb-delete-booking', function() {
-        var bookingId = $(this).data('booking-id');
-        var bookingRef = $(this).closest('tr').find('td:first strong').text();
-        
-        if (confirm('Are you sure you want to delete booking ' + bookingRef + '? This action cannot be undone.')) {
-            $.ajax({
-                url: cb_admin.ajax_url,
-                type: 'POST',
-                data: {
-                    action: 'cb_delete_booking',
-                    nonce: cb_admin.nonce,
-                    booking_id: bookingId
-                },
-                success: function(response) {
-                    if (response.success) {
-                        showNotice('Booking deleted successfully!', 'success');
-                        // Remove the row from table
-                        $('tr[data-booking-id="' + bookingId + '"]').fadeOut(function() {
-                            $(this).remove();
-                        });
-                    } else {
-                        showNotice(response.data.message || 'Error deleting booking', 'error');
-                    }
-                },
-                error: function() {
-                    showNotice('Error deleting booking', 'error');
-                }
-            });
+            const submitBtn = document.querySelector('#cb-create-booking-form input[type="submit"]');
+            if (submitBtn) submitBtn.value = 'Update Booking';
         }
     });
     
+    // Cancel booking edit
+    const cancelBookingEditBtn = document.getElementById('cb-cancel-booking-edit');
+    if (cancelBookingEditBtn) {
+        cancelBookingEditBtn.addEventListener('click', function() {
+            const createBookingForm = document.getElementById('cb-create-booking-form');
+            if (createBookingForm) createBookingForm.reset();
+            const createBookingIdInput = document.getElementById('create-booking-id');
+            if (createBookingIdInput) createBookingIdInput.value = '';
+        
+        // Set default datetime to current date/time
+            const now = new Date();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const year = now.getFullYear();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            
+            const datetimeValue = year + '-' + month + '-' + day + 'T' + hours + ':' + minutes;
+            const createBookingDatetimeInput = document.getElementById('create-booking-datetime');
+            if (createBookingDatetimeInput) createBookingDatetimeInput.value = datetimeValue;
+            
+            this.style.display = 'none';
+            const submitBtn = document.querySelector('#cb-create-booking-form input[type="submit"]');
+            if (submitBtn) submitBtn.value = 'Save Booking';
+        });
+    }
+    
+    // Delete booking
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.cb-delete-booking')) {
+            const deleteBtn = e.target.closest('.cb-delete-booking');
+            const bookingId = deleteBtn.dataset.bookingId;
+            const bookingRef = deleteBtn.closest('tr').querySelector('td:first-child strong').textContent;
+        
+        if (confirm('Are you sure you want to delete booking ' + bookingRef + '? This action cannot be undone.')) {
+                const formData = new FormData();
+                formData.append('action', 'cb_delete_booking');
+                formData.append('nonce', cb_admin.nonce);
+                formData.append('booking_id', bookingId);
+                
+                fetch(cb_admin.ajax_url, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(response => {
+                    if (response.success) {
+                        showNotice('Booking deleted successfully!', 'success');
+                        // Remove the row from table
+                        const bookingRow = document.querySelector('tr[data-booking-id="' + bookingId + '"]');
+                        if (bookingRow) {
+                            bookingRow.style.opacity = '0';
+                            bookingRow.style.transition = 'opacity 0.3s ease';
+                            setTimeout(() => {
+                                if (bookingRow.parentNode) {
+                                    bookingRow.remove();
+                                }
+                            }, 300);
+                        }
+                    } else {
+                        showNotice(response.data.message || 'Error deleting booking', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Delete booking error:', error);
+                    showNotice('Error deleting booking', 'error');
+            });
+            }
+        }
+    });
+    
+    // Search functionality for all admin pages
+    initializeSearchFunctionality();
+    
+    // Color customization functionality
+    initializeColorCustomization();
+    
+    // Close the document ready function
 });
+
+// Search functionality functions
+function initializeSearchFunctionality() {
+    // Bookings search
+    const bookingsSearch = document.getElementById('cb-bookings-search');
+    const searchBookingsBtn = document.getElementById('cb-search-bookings');
+    const clearBookingsSearch = document.getElementById('cb-clear-bookings-search');
+    
+    if (bookingsSearch && clearBookingsSearch) {
+        // Real-time search as you type
+        bookingsSearch.addEventListener('input', function() {
+            searchBookings(this.value);
+        });
+        
+        // Search button
+        if (searchBookingsBtn) {
+            searchBookingsBtn.addEventListener('click', function() {
+                searchBookings(bookingsSearch.value);
+            });
+        }
+        
+        // Clear button
+        clearBookingsSearch.addEventListener('click', function() {
+            bookingsSearch.value = '';
+            searchBookings('');
+        });
+        
+        // Enter key to search
+        bookingsSearch.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchBookings(this.value);
+            }
+        });
+    }
+    
+    // Services search
+    const servicesSearch = document.getElementById('cb-services-search');
+    const searchServicesBtn = document.getElementById('cb-search-services');
+    const clearServicesSearch = document.getElementById('cb-clear-services-search');
+    
+    if (servicesSearch && clearServicesSearch) {
+        // Real-time search as you type
+        servicesSearch.addEventListener('input', function() {
+            searchServices(this.value);
+        });
+        
+        // Search button
+        if (searchServicesBtn) {
+            searchServicesBtn.addEventListener('click', function() {
+                searchServices(servicesSearch.value);
+            });
+        }
+        
+        // Clear button
+        clearServicesSearch.addEventListener('click', function() {
+            servicesSearch.value = '';
+            searchServices('');
+        });
+        
+        // Enter key to search
+        servicesSearch.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchServices(this.value);
+            }
+        });
+    }
+    
+    // ZIP codes search
+    const zipCodesSearch = document.getElementById('cb-zip-codes-search');
+    const searchZipCodesBtn = document.getElementById('cb-search-zip-codes');
+    const clearZipCodesSearch = document.getElementById('cb-clear-zip-codes-search');
+    
+    if (zipCodesSearch && clearZipCodesSearch) {
+        // Real-time search as you type
+        zipCodesSearch.addEventListener('input', function() {
+            searchZipCodes(this.value);
+        });
+        
+        // Search button
+        if (searchZipCodesBtn) {
+            searchZipCodesBtn.addEventListener('click', function() {
+                searchZipCodes(zipCodesSearch.value);
+            });
+        }
+        
+        // Clear button
+        clearZipCodesSearch.addEventListener('click', function() {
+            zipCodesSearch.value = '';
+            searchZipCodes('');
+        });
+        
+        // Enter key to search
+        zipCodesSearch.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchZipCodes(this.value);
+            }
+        });
+    }
+    
+    // Trucks search
+    const trucksSearch = document.getElementById('cb-trucks-search');
+    const searchTrucksBtn = document.getElementById('cb-search-trucks');
+    const clearTrucksSearch = document.getElementById('cb-clear-trucks-search');
+    
+    if (trucksSearch && clearTrucksSearch) {
+        // Real-time search as you type
+        trucksSearch.addEventListener('input', function() {
+            searchTrucks(this.value);
+        });
+        
+        // Search button
+        if (searchTrucksBtn) {
+            searchTrucksBtn.addEventListener('click', function() {
+                searchTrucks(trucksSearch.value);
+            });
+        }
+        
+        // Clear button
+        clearTrucksSearch.addEventListener('click', function() {
+            trucksSearch.value = '';
+            searchTrucks('');
+        });
+        
+        // Enter key to search
+        trucksSearch.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchTrucks(this.value);
+            }
+        });
+    }
+}
+
+function searchBookings(searchTerm) {
+    const table = document.querySelector('#cb-bookings-list table');
+    if (!table) return;
+    
+    const rows = table.querySelectorAll('tbody tr');
+    const searchLower = searchTerm.toLowerCase();
+    
+    rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        let found = false;
+        
+        cells.forEach(cell => {
+            if (cell.textContent.toLowerCase().includes(searchLower)) {
+                found = true;
+            }
+        });
+        
+        row.style.display = found ? '' : 'none';
+    });
+}
+
+// Color customization functionality
+function initializeColorCustomization() {
+    const colorInputs = document.querySelectorAll('.cb-color-picker');
+    
+    colorInputs.forEach(input => {
+        input.addEventListener('input', function() {
+            updateColorPreview();
+        });
+    });
+    
+    // Initial preview update
+    updateColorPreview();
+}
+
+function updateColorPreview() {
+    const primaryColor = document.getElementById('primary-color')?.value || '#0073aa';
+    const secondaryColor = document.getElementById('secondary-color')?.value || '#00a0d2';
+    const backgroundColor = document.getElementById('background-color')?.value || '#ffffff';
+    const textColor = document.getElementById('text-color')?.value || '#333333';
+    const borderColor = document.getElementById('border-color')?.value || '#dddddd';
+    const successColor = document.getElementById('success-color')?.value || '#46b450';
+    const errorColor = document.getElementById('error-color')?.value || '#dc3232';
+    
+    // Update CSS variables for preview
+    const root = document.documentElement;
+    root.style.setProperty('--cb-primary-color', primaryColor);
+    root.style.setProperty('--cb-secondary-color', secondaryColor);
+    root.style.setProperty('--cb-background-color', backgroundColor);
+    root.style.setProperty('--cb-text-color', textColor);
+    root.style.setProperty('--cb-border-color', borderColor);
+    root.style.setProperty('--cb-success-color', successColor);
+    root.style.setProperty('--cb-error-color', errorColor);
+}
+
+function searchServices(searchTerm) {
+    const table = document.querySelector('#cb-services-list table');
+    if (!table) return;
+    
+    const rows = table.querySelectorAll('tbody tr');
+    const searchLower = searchTerm.toLowerCase();
+    
+    rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        let found = false;
+        
+        cells.forEach(cell => {
+            if (cell.textContent.toLowerCase().includes(searchLower)) {
+                found = true;
+            }
+        });
+        
+        row.style.display = found ? '' : 'none';
+    });
+}
+
+// Color customization functionality
+function initializeColorCustomization() {
+    const colorInputs = document.querySelectorAll('.cb-color-picker');
+    
+    colorInputs.forEach(input => {
+        input.addEventListener('input', function() {
+            updateColorPreview();
+        });
+    });
+    
+    // Initial preview update
+    updateColorPreview();
+}
+
+function updateColorPreview() {
+    const primaryColor = document.getElementById('primary-color')?.value || '#0073aa';
+    const secondaryColor = document.getElementById('secondary-color')?.value || '#00a0d2';
+    const backgroundColor = document.getElementById('background-color')?.value || '#ffffff';
+    const textColor = document.getElementById('text-color')?.value || '#333333';
+    const borderColor = document.getElementById('border-color')?.value || '#dddddd';
+    const successColor = document.getElementById('success-color')?.value || '#46b450';
+    const errorColor = document.getElementById('error-color')?.value || '#dc3232';
+    
+    // Update CSS variables for preview
+    const root = document.documentElement;
+    root.style.setProperty('--cb-primary-color', primaryColor);
+    root.style.setProperty('--cb-secondary-color', secondaryColor);
+    root.style.setProperty('--cb-background-color', backgroundColor);
+    root.style.setProperty('--cb-text-color', textColor);
+    root.style.setProperty('--cb-border-color', borderColor);
+    root.style.setProperty('--cb-success-color', successColor);
+    root.style.setProperty('--cb-error-color', errorColor);
+}
+
+function searchZipCodes(searchTerm) {
+    const table = document.querySelector('#cb-zip-codes-list table');
+    if (!table) return;
+    
+    const rows = table.querySelectorAll('tbody tr');
+    const searchLower = searchTerm.toLowerCase();
+    
+    rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        let found = false;
+        
+        cells.forEach(cell => {
+            if (cell.textContent.toLowerCase().includes(searchLower)) {
+                found = true;
+            }
+        });
+        
+        row.style.display = found ? '' : 'none';
+    });
+}
+
+// Color customization functionality
+function initializeColorCustomization() {
+    const colorInputs = document.querySelectorAll('.cb-color-picker');
+    
+    colorInputs.forEach(input => {
+        input.addEventListener('input', function() {
+            updateColorPreview();
+        });
+    });
+    
+    // Initial preview update
+    updateColorPreview();
+}
+
+function updateColorPreview() {
+    const primaryColor = document.getElementById('primary-color')?.value || '#0073aa';
+    const secondaryColor = document.getElementById('secondary-color')?.value || '#00a0d2';
+    const backgroundColor = document.getElementById('background-color')?.value || '#ffffff';
+    const textColor = document.getElementById('text-color')?.value || '#333333';
+    const borderColor = document.getElementById('border-color')?.value || '#dddddd';
+    const successColor = document.getElementById('success-color')?.value || '#46b450';
+    const errorColor = document.getElementById('error-color')?.value || '#dc3232';
+    
+    // Update CSS variables for preview
+    const root = document.documentElement;
+    root.style.setProperty('--cb-primary-color', primaryColor);
+    root.style.setProperty('--cb-secondary-color', secondaryColor);
+    root.style.setProperty('--cb-background-color', backgroundColor);
+    root.style.setProperty('--cb-text-color', textColor);
+    root.style.setProperty('--cb-border-color', borderColor);
+    root.style.setProperty('--cb-success-color', successColor);
+    root.style.setProperty('--cb-error-color', errorColor);
+}
+
+function searchTrucks(searchTerm) {
+    const table = document.querySelector('#cb-trucks-search').closest('.cb-admin-section').querySelector('table');
+    if (!table) return;
+    
+    const rows = table.querySelectorAll('tbody tr');
+    const searchLower = searchTerm.toLowerCase();
+    
+    rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        let found = false;
+        
+        cells.forEach(cell => {
+            if (cell.textContent.toLowerCase().includes(searchLower)) {
+                found = true;
+            }
+        });
+        
+        row.style.display = found ? '' : 'none';
+    });
+}
+
+// Color customization functionality
+function initializeColorCustomization() {
+    const colorInputs = document.querySelectorAll('.cb-color-picker');
+    
+    colorInputs.forEach(input => {
+        input.addEventListener('input', function() {
+            updateColorPreview();
+        });
+    });
+    
+    // Initial preview update
+    updateColorPreview();
+}
+
+function updateColorPreview() {
+    const primaryColor = document.getElementById('primary-color')?.value || '#0073aa';
+    const secondaryColor = document.getElementById('secondary-color')?.value || '#00a0d2';
+    const backgroundColor = document.getElementById('background-color')?.value || '#ffffff';
+    const textColor = document.getElementById('text-color')?.value || '#333333';
+    const borderColor = document.getElementById('border-color')?.value || '#dddddd';
+    const successColor = document.getElementById('success-color')?.value || '#46b450';
+    const errorColor = document.getElementById('error-color')?.value || '#dc3232';
+    
+    // Update CSS variables for preview
+    const root = document.documentElement;
+    root.style.setProperty('--cb-primary-color', primaryColor);
+    root.style.setProperty('--cb-secondary-color', secondaryColor);
+    root.style.setProperty('--cb-background-color', backgroundColor);
+    root.style.setProperty('--cb-text-color', textColor);
+    root.style.setProperty('--cb-border-color', borderColor);
+    root.style.setProperty('--cb-success-color', successColor);
+    root.style.setProperty('--cb-error-color', errorColor);
+}

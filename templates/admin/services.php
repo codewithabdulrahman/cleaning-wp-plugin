@@ -73,6 +73,15 @@ if (!defined('ABSPATH')) {
                 </tr>
                 <tr>
                     <th scope="row">
+                        <label for="service-default-area"><?php _e('Default Area (m²)', 'cleaning-booking'); ?></label>
+                    </th>
+                    <td>
+                        <input type="number" id="service-default-area" name="default_area" min="0" class="small-text" value="0">
+                        <span class="description"><?php _e('Default area in square meters (0 = no default)', 'cleaning-booking'); ?></span>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">
                         <label for="service-sort-order"><?php _e('Sort Order', 'cleaning-booking'); ?></label>
                     </th>
                     <td>
@@ -100,6 +109,14 @@ if (!defined('ABSPATH')) {
     
     <div class="cb-admin-section">
         <h2><?php _e('Existing Services', 'cleaning-booking'); ?></h2>
+        
+        <!-- Search Bar -->
+        <div class="cb-search-section">
+            <input type="text" id="cb-services-search" placeholder="<?php _e('Search services by name or description...', 'cleaning-booking'); ?>" class="cb-search-input">
+            <button type="button" id="cb-search-services" class="button button-primary"><?php _e('Search', 'cleaning-booking'); ?></button>
+            <button type="button" id="cb-clear-services-search" class="button"><?php _e('Clear', 'cleaning-booking'); ?></button>
+        </div>
+        
         <div id="cb-services-list">
             <table class="wp-list-table widefat fixed striped">
                 <thead>
@@ -109,6 +126,7 @@ if (!defined('ABSPATH')) {
                         <th><?php _e('Base Duration', 'cleaning-booking'); ?></th>
                         <th><?php _e('Price/m²', 'cleaning-booking'); ?></th>
                         <th><?php _e('Duration/m²', 'cleaning-booking'); ?></th>
+                        <th><?php _e('Default Area', 'cleaning-booking'); ?></th>
                         <th><?php _e('Status', 'cleaning-booking'); ?></th>
                         <th><?php _e('Actions', 'cleaning-booking'); ?></th>
                     </tr>
@@ -116,7 +134,7 @@ if (!defined('ABSPATH')) {
                 <tbody>
                     <?php if (empty($services)): ?>
                         <tr>
-                            <td colspan="7" class="text-center"><?php _e('No services found', 'cleaning-booking'); ?></td>
+                            <td colspan="8" class="text-center"><?php _e('No services found', 'cleaning-booking'); ?></td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($services as $service): ?>
@@ -131,6 +149,7 @@ if (!defined('ABSPATH')) {
                                 <td><?php echo esc_html($service->base_duration); ?> min</td>
                                 <td>$<?php echo esc_html(number_format($service->sqm_multiplier, 4)); ?></td>
                                 <td><?php echo esc_html(number_format($service->sqm_duration_multiplier, 4)); ?> min</td>
+                                <td><?php echo esc_html($service->default_area ?? 0); ?> m²</td>
                                 <td>
                                     <span class="cb-status cb-status-<?php echo $service->is_active ? 'active' : 'inactive'; ?>">
                                         <?php echo $service->is_active ? __('Active', 'cleaning-booking') : __('Inactive', 'cleaning-booking'); ?>

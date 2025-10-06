@@ -27,8 +27,8 @@
     }
     
     // Also ensure it's available on document ready for any scripts that check later
-    if (typeof jQuery !== 'undefined') {
-        jQuery(document).ready(function() {
+    if (typeof document !== 'undefined') {
+        document.addEventListener('DOMContentLoaded', function() {
             if (typeof window.cb_frontend === 'undefined') {
                 window.cb_frontend = {
                     tools: {},
@@ -50,7 +50,7 @@
     }
 })();
 
-jQuery(document).ready(function($) {
+document.addEventListener('DOMContentLoaded', function() {
     
     // Safety check for cb_frontend object
     if (typeof cb_frontend === 'undefined') {
@@ -82,6 +82,11 @@ jQuery(document).ready(function($) {
     window.cb_frontend = cb_frontend;
     
     let currentStep = 1;
+    
+    // Global variables for slot management
+    let currentSlotSessionId = null;
+    let slotHoldTimeout = null;
+    
     let bookingData = {
         zip_code: '',
         service_id: null,
@@ -92,8 +97,12 @@ jQuery(document).ready(function($) {
         customer_name: '',
         customer_email: '',
         customer_phone: '',
+        customer_company: '',
         address: '',
+        customer_city: '',
+        customer_state: '',
         notes: '',
+        payment_method: 'cash',
         pricing: {
             service_price: 0,
             extras_price: 0,
@@ -102,8 +111,7 @@ jQuery(document).ready(function($) {
             service_duration: 0,
             extras_duration: 0,
             total_duration: 0
-        },
-        payment_method: 'cash'
+        }
     };
     
     // Ensure extras array is always properly initialized
@@ -161,6 +169,69 @@ jQuery(document).ready(function($) {
         initializeLanguage();
     }
     
+    // Slot management functions
+    function holdSlot(date, time, duration) {
+        const formData = new FormData();
+        formData.append('action', 'cb_hold_slot');
+        formData.append('booking_date', date);
+        formData.append('booking_time', time);
+        formData.append('duration', duration);
+        
+        fetch(cb_frontend.ajax_url, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(response => {
+            if (response.success) {
+                currentSlotSessionId = response.data.session_id;
+                console.log('Slot held successfully:', currentSlotSessionId);
+                
+                // Set up automatic release after 15 minutes
+                slotHoldTimeout = setTimeout(() => {
+                    releaseSlot();
+                }, 15 * 60 * 1000); // 15 minutes
+            } else {
+                console.error('Failed to hold slot:', response.data.message);
+                showNotification(response.data.message || 'Failed to hold slot', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Slot hold error:', error);
+        });
+    }
+    
+    function releaseSlot() {
+        if (!currentSlotSessionId) return;
+        
+        const formData = new FormData();
+        formData.append('action', 'cb_release_slot');
+        formData.append('session_id', currentSlotSessionId);
+        
+        fetch(cb_frontend.ajax_url, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(response => {
+            if (response.success) {
+                console.log('Slot released successfully');
+            } else {
+                console.error('Failed to release slot:', response.data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Slot release error:', error);
+        })
+        .finally(() => {
+            currentSlotSessionId = null;
+            if (slotHoldTimeout) {
+                clearTimeout(slotHoldTimeout);
+                slotHoldTimeout = null;
+            }
+        });
+    }
+    
     function initializeLanguage() {
         // Check for saved language preference
         const savedLanguage = localStorage.getItem('cb_language') || cb_frontend.current_language;
@@ -168,7 +239,10 @@ jQuery(document).ready(function($) {
         console.log('Initializing language. Saved:', savedLanguage, 'Current:', cb_frontend.current_language);
         
         // Set active language in selector
-        $('.cb-language-selector').val(savedLanguage);
+        const languageSelector = document.querySelector('.cb-language-selector');
+        if (languageSelector) {
+            languageSelector.value = savedLanguage;
+        }
         
         // Update UI with current translations
         if (cb_frontend.translations && Object.keys(cb_frontend.translations).length > 0) {
@@ -185,7 +259,10 @@ jQuery(document).ready(function($) {
     function initializeDatePicker() {
         // Set today's date as default
         const today = new Date().toISOString().split('T')[0];
-        $('#cb-booking-date').val(today);
+        const bookingDateInput = document.getElementById('cb-booking-date');
+        if (bookingDateInput) {
+            bookingDateInput.value = today;
+        }
         bookingData.booking_date = today;
         
         // Auto-load slots for today's date
@@ -205,8 +282,8 @@ jQuery(document).ready(function($) {
     }
     
     function updateSelectedExtras() {
-        const $selectedExtrasSection = $('#cb-selected-extras');
-        const $selectedExtrasList = $('#cb-selected-extras-list');
+        const selectedExtrasSection = document.getElementById('cb-selected-extras');
+        const selectedExtrasList = document.getElementById('cb-selected-extras-list');
         
         if (bookingData.extras && bookingData.extras.length > 0) {
             const selectedExtrasNames = bookingData.extras.map(extraId => {
@@ -215,17 +292,23 @@ jQuery(document).ready(function($) {
             });
             
             // Show the section
-            $selectedExtrasSection.show();
+            if (selectedExtrasSection) {
+                selectedExtrasSection.style.display = 'block';
+            }
             
             // Update the list
-            $selectedExtrasList.html(selectedExtrasNames.map(name => 
+            if (selectedExtrasList) {
+                selectedExtrasList.innerHTML = selectedExtrasNames.map(name => 
                 `<div class="cb-selected-extra-item">✓ ${name}</div>`
-            ).join(''));
+                ).join('');
+            }
             
             console.log('Selected extras:', selectedExtrasNames);
         } else {
             // Hide the section if no extras selected
-            $selectedExtrasSection.hide();
+            if (selectedExtrasSection) {
+                selectedExtrasSection.style.display = 'none';
+            }
         }
     }
     
@@ -240,80 +323,154 @@ jQuery(document).ready(function($) {
                 }
             }
         }
-        $('#cb-sidebar-service-title').text(title);
+        const sidebarServiceTitle = document.getElementById('cb-sidebar-service-title');
+        if (sidebarServiceTitle) {
+            sidebarServiceTitle.textContent = title;
+        }
     }
     
     function updateDuration() {
         // Use default duration since pricing is disabled
-        $('#cb-sidebar-duration').text('2 hours');
+        const sidebarDuration = document.getElementById('cb-sidebar-duration');
+        if (sidebarDuration) {
+            sidebarDuration.textContent = '2 hours';
+        }
     }
     
     function updatePricing() {
-        // Pricing disabled - show placeholder
-        $('#cb-sidebar-total').text('Price TBD');
-        $('#cb-checkout-price').text('Price TBD');
-            $('#cb-sidebar-original').hide();
+        const sidebarTotal = document.getElementById('cb-sidebar-total');
+        const checkoutPrice = document.getElementById('cb-checkout-price');
+        const sidebarOriginal = document.getElementById('cb-sidebar-original');
+        
+        if (bookingData.pricing) {
+            // Show dynamic pricing
+            if (sidebarTotal) sidebarTotal.textContent = formatPrice(bookingData.pricing.total_price);
+            if (checkoutPrice) checkoutPrice.textContent = formatPrice(bookingData.pricing.total_price);
+            
+            // Show duration in sidebar if available
+            const sidebarDuration = document.getElementById('cb-sidebar-duration');
+            if (sidebarDuration) {
+                sidebarDuration.textContent = formatDuration(bookingData.pricing.total_duration);
+            }
+        } else {
+            // Show placeholder when no pricing available
+            if (sidebarTotal) sidebarTotal.textContent = 'Price TBD';
+            if (checkoutPrice) checkoutPrice.textContent = 'Price TBD';
+            if (sidebarOriginal) sidebarOriginal.style.display = 'none';
+        }
     }
     
     function updateCheckoutButton() {
         const isValid = bookingData.service_id && bookingData.booking_date && bookingData.booking_time;
-        $('#cb-sidebar-checkout').prop('disabled', !isValid);
+        const sidebarCheckout = document.getElementById('cb-sidebar-checkout');
+        if (sidebarCheckout) {
+            sidebarCheckout.disabled = !isValid;
+        }
     }
     
     function setupEventListeners() {
         // Language switching
-        $('.cb-language-selector').on('change', handleLanguageSwitch);
+        const languageSelector = document.querySelector('.cb-language-selector');
+        if (languageSelector) {
+            languageSelector.addEventListener('change', handleLanguageSwitch);
+        }
         
         // Step navigation
-        $('.cb-next-step').on('click', handleNextStep);
-        $('.cb-prev-step').on('click', handlePrevStep);
+        const nextStepButtons = document.querySelectorAll('.cb-next-step');
+        nextStepButtons.forEach(button => {
+            button.addEventListener('click', handleNextStep);
+        });
+        
+        const prevStepButtons = document.querySelectorAll('.cb-prev-step');
+        prevStepButtons.forEach(button => {
+            button.addEventListener('click', handlePrevStep);
+        });
         
         // Form inputs
-        $('#cb-zip-code').on('input', handleZipCodeChange);
-        $('#cb-square-meters').on('input', handleSquareMetersChange);
-        $('#cb-booking-date').on('change', handleDateChange);
+        const zipCodeInput = document.getElementById('cb-zip-code');
+        if (zipCodeInput) {
+            zipCodeInput.addEventListener('input', handleZipCodeChange);
+        }
+        
+        const squareMetersInput = document.getElementById('cb-square-meters');
+        if (squareMetersInput) {
+            squareMetersInput.addEventListener('input', handleSquareMetersChange);
+        }
+        
+        const bookingDateInput = document.getElementById('cb-booking-date');
+        if (bookingDateInput) {
+            bookingDateInput.addEventListener('change', handleDateChange);
+        }
         
         // Customer details
-        $('#cb-customer-name, #cb-customer-email, #cb-customer-phone').on('input', updateCheckoutButton);
+        const customerInputs = document.querySelectorAll('#cb-customer-name, #cb-customer-email, #cb-customer-phone');
+        customerInputs.forEach(input => {
+            input.addEventListener('input', updateCheckoutButton);
+        });
         
         // Promocode
-        $('#cb-apply-promocode').on('click', handlePromocodeApply);
-        $('#cb-promocode').on('keypress', function(e) {
+        const applyPromocodeBtn = document.getElementById('cb-apply-promocode');
+        if (applyPromocodeBtn) {
+            applyPromocodeBtn.addEventListener('click', handlePromocodeApply);
+        }
+        
+        const promocodeInput = document.getElementById('cb-promocode');
+        if (promocodeInput) {
+            promocodeInput.addEventListener('keypress', function(e) {
             if (e.which === 13) {
                 handlePromocodeApply();
             }
         });
+        }
         
         // Sidebar checkout button
-        $('#cb-sidebar-checkout').on('click', proceedToCheckout);
+        const sidebarCheckout = document.getElementById('cb-sidebar-checkout');
+        if (sidebarCheckout) {
+            sidebarCheckout.addEventListener('click', proceedToCheckout);
+        }
         
         // Form submission
-        $('#cb-booking-form').on('submit', handleFormSubmit);
+        const bookingForm = document.getElementById('cb-booking-form');
+        if (bookingForm) {
+            bookingForm.addEventListener('submit', handleFormSubmit);
+        }
         
         // Service selection
-        $(document).on('click', '.cb-service-card', handleServiceSelect);
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.cb-service-card')) {
+                handleServiceSelect(e);
+            }
+        });
         
         // Extra selection
-        $(document).on('click', '.cb-extra-item', handleExtraSelect);
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.cb-extra-item')) {
+                handleExtraSelect(e);
+            }
+        });
         
         // Time slot selection
-        $(document).on('click', '.cb-time-slot', handleTimeSlotSelect);
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.cb-time-slot')) {
+                handleTimeSlotSelect(e);
+            }
+        });
     }
     
-    function handleNextStep() {
-        const $button = $(this);
-        const originalText = $button.text();
+    function handleNextStep(e) {
+        const button = e.target;
+        const originalText = button.textContent;
         
         // Show loading state with proper spinner
-        $button.prop('disabled', true)
-               .addClass('loading')
-               .text(cb_frontend.strings.processing);
+        button.disabled = true;
+        button.classList.add('loading');
+        button.textContent = cb_frontend.strings.processing;
         
         // Add timeout to prevent infinite loading
         const timeoutId = setTimeout(function() {
-            $button.prop('disabled', false)
-                   .removeClass('loading')
-                   .text(originalText);
+            button.disabled = false;
+            button.classList.remove('loading');
+            button.textContent = originalText;
         }, 5000); // 5 second timeout
         
         validateCurrentStep().then(function(isValid) {
@@ -329,28 +486,34 @@ jQuery(document).ready(function($) {
             showNotification('Validation failed. Please try again.', 'error');
         }).finally(function() {
             // Restore button state
-            $button.prop('disabled', false)
-                   .removeClass('loading')
-                   .text(originalText);
+            button.disabled = false;
+            button.classList.remove('loading');
+            button.textContent = originalText;
         });
     }
     
     function handlePrevStep() {
+        // Release slot if going back from step 4 (time selection)
+        if (currentStep === 4 && currentSlotSessionId) {
+            releaseSlot();
+        }
+        
         currentStep--;
         updateStepDisplay();
     }
     
-    function handleZipCodeChange() {
-        bookingData.zip_code = $(this).val().trim();
-    }
-    
     function checkAndCalculatePrice() {
-        // Price calculations removed - just update sidebar display
-        updateSidebarDisplay();
+        if (bookingData.service_id) {
+            calculatePrice();
+        }
     }
     
-    function handleSquareMetersChange() {
-        const squareMeters = parseInt($(this).val()) || null;
+    function handleZipCodeChange(e) {
+        bookingData.zip_code = e.target.value.trim();
+    }
+    
+    function handleSquareMetersChange(e) {
+        const squareMeters = parseInt(e.target.value, 10) || 0; // Use base 10 explicitly
         bookingData.square_meters = squareMeters;
         
         // Calculate price if service is selected
@@ -360,8 +523,8 @@ jQuery(document).ready(function($) {
         updateButtonStates();
     }
     
-    function handleDateChange() {
-        bookingData.booking_date = $(this).val();
+    function handleDateChange(e) {
+        bookingData.booking_date = e.target.value;
         bookingData.booking_time = '';
         loadAvailableSlots();
         
@@ -370,7 +533,8 @@ jQuery(document).ready(function($) {
     }
     
     function handlePromocodeApply() {
-        const promocode = $('#cb-promocode').val().trim();
+        const promocodeInput = document.getElementById('cb-promocode');
+        const promocode = promocodeInput ? promocodeInput.value.trim() : '';
         
         if (!promocode) {
             showNotification(cb_frontend.strings.enter_promocode, 'error');
@@ -384,18 +548,24 @@ jQuery(document).ready(function($) {
     function handleServiceSelect(e) {
         e.preventDefault();
         
+        const clickedCard = e.target.closest('.cb-service-card');
+        
         // Remove previous selection
-        $('.cb-service-card').removeClass('selected');
+        const serviceCards = document.querySelectorAll('.cb-service-card');
+        serviceCards.forEach(card => card.classList.remove('selected'));
         
         // Add selection to clicked card
-        $(this).addClass('selected');
+        clickedCard.classList.add('selected');
         
-        bookingData.service_id = $(this).data('service-id');
+        bookingData.service_id = clickedCard.dataset.serviceId;
         console.log('Service selected - service_id:', bookingData.service_id);
         console.log('Current bookingData:', bookingData);
         
         // Enable next button
-        $('.cb-step-2 .cb-next-step').prop('disabled', false);
+        const nextStepBtn = document.querySelector('.cb-step-2 .cb-next-step');
+        if (nextStepBtn) {
+            nextStepBtn.disabled = false;
+        }
         
         // Calculate price if square meters are available
         checkAndCalculatePrice();
@@ -407,18 +577,20 @@ jQuery(document).ready(function($) {
     function handleExtraSelect(e) {
         e.preventDefault();
         
+        const clickedItem = e.target.closest('.cb-extra-item');
+        
         // Prevent double-clicking
-        if ($(this).hasClass('cb-processing')) {
+        if (clickedItem.classList.contains('cb-processing')) {
             console.log('Extra item is being processed, ignoring click');
             return;
         }
         
-        $(this).addClass('cb-processing');
+        clickedItem.classList.add('cb-processing');
         
-        const extraId = parseInt($(this).data('extra-id')); // Convert to number immediately
-        const extraPrice = parseFloat($(this).data('extra-price'));
+        const extraId = parseInt(clickedItem.dataset.extraId, 10); // Convert to number immediately
+        const extraPrice = parseFloat(clickedItem.dataset.extraPrice);
         
-        console.log('Extra item clicked:', $(this), 'extraId:', extraId, 'type:', typeof extraId);
+        console.log('Extra item clicked:', clickedItem, 'extraId:', extraId, 'type:', typeof extraId);
         
         // Ensure extras array exists
         if (!Array.isArray(bookingData.extras)) {
@@ -427,25 +599,25 @@ jQuery(document).ready(function($) {
         
         console.log('Current extras array:', bookingData.extras, 'Looking for ID:', extraId);
         
-        if ($(this).hasClass('selected')) {
+        if (clickedItem.classList.contains('selected')) {
             // Remove extra
             console.log('Removing extra:', extraId);
-            console.log('Element classes before removal:', $(this).attr('class'));
-            $(this).removeClass('selected');
-            console.log('Element classes after removal:', $(this).attr('class'));
-            bookingData.extras = bookingData.extras.filter(id => parseInt(id) !== extraId);
+            console.log('Element classes before removal:', clickedItem.className);
+            clickedItem.classList.remove('selected');
+            console.log('Element classes after removal:', clickedItem.className);
+            bookingData.extras = bookingData.extras.filter(id => parseInt(id, 10) !== extraId);
         } else {
             // Add extra
             console.log('Adding extra:', extraId);
-            console.log('Element classes before adding:', $(this).attr('class'));
-            $(this).addClass('selected');
-            console.log('Element classes after adding:', $(this).attr('class'));
+            console.log('Element classes before adding:', clickedItem.className);
+            clickedItem.classList.add('selected');
+            console.log('Element classes after adding:', clickedItem.className);
             bookingData.extras.push(extraId);
             
             // Debug: Check if class was actually added
             setTimeout(() => {
-                console.log('Element has selected class after adding:', $(this).hasClass('selected'));
-                console.log('Element classes:', $(this).attr('class'));
+                console.log('Element has selected class after adding:', clickedItem.classList.contains('selected'));
+                console.log('Element classes:', clickedItem.className);
             }, 100);
         }
         
@@ -456,27 +628,41 @@ jQuery(document).ready(function($) {
         
         // Remove processing class after a short delay
         setTimeout(() => {
-            $(this).removeClass('cb-processing');
+            clickedItem.classList.remove('cb-processing');
         }, 300);
     }
     
     function handleTimeSlotSelect(e) {
         e.preventDefault();
         
-        if ($(this).hasClass('unavailable')) {
+        const clickedSlot = e.target.closest('.cb-time-slot');
+        
+        if (clickedSlot.classList.contains('unavailable')) {
+            // Show a tooltip or message that this slot is booked
+            showNotification('This time slot is already booked. Please select another time.', 'warning');
             return;
         }
         
         // Remove previous selection
-        $('.cb-time-slot').removeClass('selected');
+        const timeSlots = document.querySelectorAll('.cb-time-slot');
+        timeSlots.forEach(slot => slot.classList.remove('selected'));
         
         // Add selection to clicked slot
-        $(this).addClass('selected');
+        clickedSlot.classList.add('selected');
         
-        bookingData.booking_time = $(this).data('time');
+        bookingData.booking_time = clickedSlot.dataset.time;
+        
+        // Hold the slot to prevent double-booking
+        if (bookingData.booking_date && bookingData.booking_time) {
+            const duration = bookingData.pricing ? bookingData.pricing.total_duration : 120; // Default 2 hours
+            holdSlot(bookingData.booking_date, bookingData.booking_time, duration);
+        }
         
         // Enable next button
-        $('.cb-step-4 .cb-next-step').prop('disabled', false);
+        const nextStepBtn = document.querySelector('.cb-step-4 .cb-next-step');
+        if (nextStepBtn) {
+            nextStepBtn.disabled = false;
+        }
         
         // Update checkout button state
         updateCheckoutButton();
@@ -493,7 +679,7 @@ jQuery(document).ready(function($) {
     function handleLanguageSwitch(e) {
         e.preventDefault();
         
-        const targetLanguage = $(this).val();
+        const targetLanguage = e.target.value;
         
         if (targetLanguage === cb_frontend.current_language) {
             return; // Already in this language
@@ -504,18 +690,23 @@ jQuery(document).ready(function($) {
     
     function switchLanguage(targetLanguage) {
         // Show loading state
-        $('.cb-language-selector').prop('disabled', true);
+        const languageSelector = document.querySelector('.cb-language-selector');
+        if (languageSelector) {
+            languageSelector.disabled = true;
+        }
         
         console.log('Switching to language:', targetLanguage);
         
-        $.ajax({
-            url: cb_frontend.ajax_url,
-            type: 'POST',
-            data: {
-                action: 'cb_switch_language',
-                language: targetLanguage
-            },
-            success: function(response) {
+        const formData = new FormData();
+        formData.append('action', 'cb_switch_language');
+        formData.append('language', targetLanguage);
+        
+        fetch(cb_frontend.ajax_url, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(response => {
                 console.log('Language switch response:', response);
                 
                 if (response.success) {
@@ -549,13 +740,14 @@ jQuery(document).ready(function($) {
                     console.error('Language switch failed:', response);
                     showNotification('Failed to switch language', 'error');
                 }
-            },
-            error: function(xhr, status, error) {
-                console.error('Language switch AJAX error:', {xhr, status, error});
-                showNotification('Error switching language: ' + error, 'error');
-            },
-            complete: function() {
-                $('.cb-language-selector').prop('disabled', false);
+        })
+        .catch(error => {
+            console.error('Language switch fetch error:', error);
+            showNotification('Error switching language: ' + error.message, 'error');
+        })
+        .finally(() => {
+            if (languageSelector) {
+                languageSelector.disabled = false;
             }
         });
     }
@@ -571,107 +763,317 @@ jQuery(document).ready(function($) {
         }
         
         // Update step labels
-        if (translations['Location']) $('.cb-step[data-step="1"] .cb-step-label').text(translations['Location']);
-        if (translations['Service']) $('.cb-step[data-step="2"] .cb-step-label').text(translations['Service']);
-        if (translations['Details']) $('.cb-step[data-step="3"] .cb-step-label').text(translations['Details']);
-        if (translations['Date & Time']) $('.cb-step[data-step="4"] .cb-step-label').text(translations['Date & Time']);
-        if (translations['Checkout']) $('.cb-step[data-step="5"] .cb-step-label').text(translations['Checkout']);
+        if (translations['Location']) {
+            const step1Label = document.querySelector('.cb-step[data-step="1"] .cb-step-label');
+            if (step1Label) step1Label.textContent = translations['Location'];
+        }
+        if (translations['Service']) {
+            const step2Label = document.querySelector('.cb-step[data-step="2"] .cb-step-label');
+            if (step2Label) step2Label.textContent = translations['Service'];
+        }
+        if (translations['Details']) {
+            const step3Label = document.querySelector('.cb-step[data-step="3"] .cb-step-label');
+            if (step3Label) step3Label.textContent = translations['Details'];
+        }
+        if (translations['Date & Time']) {
+            const step4Label = document.querySelector('.cb-step[data-step="4"] .cb-step-label');
+            if (step4Label) step4Label.textContent = translations['Date & Time'];
+        }
+        if (translations['Checkout']) {
+            const step5Label = document.querySelector('.cb-step[data-step="5"] .cb-step-label');
+            if (step5Label) step5Label.textContent = translations['Checkout'];
+        }
         
         // Update step headers
-        if (translations['Enter Your ZIP Code']) $('.cb-step-1 .cb-step-header h2').text(translations['Enter Your ZIP Code']);
-        if (translations['Let us know your location to check availability']) $('.cb-step-1 .cb-step-header p').text(translations['Let us know your location to check availability']);
-        if (translations['Select Your Service']) $('.cb-step-2 .cb-step-header h2').text(translations['Select Your Service']);
-        if (translations['Choose the type of cleaning service you need']) $('.cb-step-2 .cb-step-header p').text(translations['Choose the type of cleaning service you need']);
-        if (translations['Service Details']) $('.cb-step-3 .cb-step-header h2').text(translations['Service Details']);
-        if (translations['Tell us about your space and any additional services']) $('.cb-step-3 .cb-step-header p').text(translations['Tell us about your space and any additional services']);
-        if (translations['Select Date & Time']) $('.cb-step-4 .cb-step-header h2').text(translations['Select Date & Time']);
-        if (translations['Choose your preferred date and time slot']) $('.cb-step-4 .cb-step-header p').text(translations['Choose your preferred date and time slot']);
-        if (translations['Your Details']) $('.cb-step-5 .cb-step-header h2').text(translations['Your Details']);
-        if (translations['Please provide your contact information to complete the booking']) $('.cb-step-5 .cb-step-header p').text(translations['Please provide your contact information to complete the booking']);
+        if (translations['Enter Your ZIP Code']) {
+            const step1Header = document.querySelector('.cb-step-1 .cb-step-header h2');
+            if (step1Header) step1Header.textContent = translations['Enter Your ZIP Code'];
+        }
+        if (translations['Let us know your location to check availability']) {
+            const step1Desc = document.querySelector('.cb-step-1 .cb-step-header p');
+            if (step1Desc) step1Desc.textContent = translations['Let us know your location to check availability'];
+        }
+        if (translations['Select Your Service']) {
+            const step2Header = document.querySelector('.cb-step-2 .cb-step-header h2');
+            if (step2Header) step2Header.textContent = translations['Select Your Service'];
+        }
+        if (translations['Choose the type of cleaning service you need']) {
+            const step2Desc = document.querySelector('.cb-step-2 .cb-step-header p');
+            if (step2Desc) step2Desc.textContent = translations['Choose the type of cleaning service you need'];
+        }
+        if (translations['Service Details']) {
+            const step3Header = document.querySelector('.cb-step-3 .cb-step-header h2');
+            if (step3Header) step3Header.textContent = translations['Service Details'];
+        }
+        if (translations['Tell us about your space and any additional services']) {
+            const step3Desc = document.querySelector('.cb-step-3 .cb-step-header p');
+            if (step3Desc) step3Desc.textContent = translations['Tell us about your space and any additional services'];
+        }
+        if (translations['Select Date & Time']) {
+            const step4Header = document.querySelector('.cb-step-4 .cb-step-header h2');
+            if (step4Header) step4Header.textContent = translations['Select Date & Time'];
+        }
+        if (translations['Choose your preferred date and time slot']) {
+            const step4Desc = document.querySelector('.cb-step-4 .cb-step-header p');
+            if (step4Desc) step4Desc.textContent = translations['Choose your preferred date and time slot'];
+        }
+        if (translations['Your Details']) {
+            const step5Header = document.querySelector('.cb-step-5 .cb-step-header h2');
+            if (step5Header) step5Header.textContent = translations['Your Details'];
+        }
+        if (translations['Please provide your contact information to complete the booking']) {
+            const step5Desc = document.querySelector('.cb-step-5 .cb-step-header p');
+            if (step5Desc) step5Desc.textContent = translations['Please provide your contact information to complete the booking'];
+        }
         
         // Update main title
-        if (translations['Book Your Cleaning Service']) $('.cb-title').text(translations['Book Your Cleaning Service']);
+        if (translations['Book Your Cleaning Service']) {
+            const mainTitle = document.querySelector('.cb-title');
+            if (mainTitle) mainTitle.textContent = translations['Book Your Cleaning Service'];
+        }
         
         // Update form labels
-        if (translations['ZIP Code']) $('label[for="cb-zip-code"]').text(translations['ZIP Code']);
-        if (translations['Square Meters']) $('label[for="cb-square-meters"]').text(translations['Square Meters']);
-        if (translations['Additional Services']) $('.cb-step-3 .cb-form-group label').text(translations['Additional Services']);
-        if (translations['Date']) $('label[for="cb-booking-date"]').text(translations['Date']);
-        if (translations['Available Time Slots']) $('.cb-step-4 .cb-form-group label').text(translations['Available Time Slots']);
-        if (translations['Full Name']) $('label[for="cb-customer-name"]').text(translations['Full Name']);
-        if (translations['Email Address']) $('label[for="cb-customer-email"]').text(translations['Email Address']);
-        if (translations['Phone Number']) $('label[for="cb-customer-phone"]').text(translations['Phone Number']);
-        if (translations['Address']) $('label[for="cb-customer-address"]').text(translations['Address']);
-        if (translations['Special Instructions']) $('label[for="cb-notes"]').text(translations['Special Instructions']);
+        if (translations['ZIP Code']) {
+            const zipLabel = document.querySelector('label[for="cb-zip-code"]');
+            if (zipLabel) zipLabel.textContent = translations['ZIP Code'];
+        }
+        if (translations['Square Meters']) {
+            const sqmLabel = document.querySelector('label[for="cb-square-meters"]');
+            if (sqmLabel) sqmLabel.textContent = translations['Square Meters'];
+        }
+        if (translations['Additional Services']) {
+            const extrasLabel = document.querySelector('.cb-step-3 .cb-form-group label');
+            if (extrasLabel) extrasLabel.textContent = translations['Additional Services'];
+        }
+        if (translations['Date']) {
+            const dateLabel = document.querySelector('label[for="cb-booking-date"]');
+            if (dateLabel) dateLabel.textContent = translations['Date'];
+        }
+        if (translations['Available Time Slots']) {
+            const timeLabel = document.querySelector('.cb-step-4 .cb-form-group label');
+            if (timeLabel) timeLabel.textContent = translations['Available Time Slots'];
+        }
+        if (translations['Full Name']) {
+            const nameLabel = document.querySelector('label[for="cb-customer-name"]');
+            if (nameLabel) nameLabel.textContent = translations['Full Name'];
+        }
+        if (translations['Email Address']) {
+            const emailLabel = document.querySelector('label[for="cb-customer-email"]');
+            if (emailLabel) emailLabel.textContent = translations['Email Address'];
+        }
+        if (translations['Phone Number']) {
+            const phoneLabel = document.querySelector('label[for="cb-customer-phone"]');
+            if (phoneLabel) phoneLabel.textContent = translations['Phone Number'];
+        }
+        if (translations['Address']) {
+            const addressLabel = document.querySelector('label[for="cb-customer-address"]');
+            if (addressLabel) addressLabel.textContent = translations['Address'];
+        }
+        if (translations['Special Instructions']) {
+            const notesLabel = document.querySelector('label[for="cb-notes"]');
+            if (notesLabel) notesLabel.textContent = translations['Special Instructions'];
+        }
         
         // Update placeholder text
         if (translations['Street address, apartment, etc.']) {
-            $('#cb-customer-address').attr('placeholder', translations['Street address, apartment, etc.']);
+            const addressInput = document.getElementById('cb-customer-address');
+            if (addressInput) addressInput.setAttribute('placeholder', translations['Street address, apartment, etc.']);
         }
         if (translations['Any special requests or instructions...']) {
-            $('#cb-notes').attr('placeholder', translations['Any special requests or instructions...']);
+            const notesInput = document.getElementById('cb-notes');
+            if (notesInput) notesInput.setAttribute('placeholder', translations['Any special requests or instructions...']);
         }
         
         // Update button text
-        if (translations['Check Availability']) $('.cb-next-step[data-next="2"]').text(translations['Check Availability']);
-        if (translations['Back']) $('.cb-prev-step').text(translations['Back']);
-        if (translations['Continue']) $('.cb-next-step:not([data-next="2"])').text(translations['Continue']);
-        if (translations['I am ordering']) $('#cb-sidebar-checkout').text(translations['I am ordering']);
-        if (translations['Proceed to Checkout']) $('.cb-btn-checkout').text(translations['Proceed to Checkout']);
+        if (translations['Check Availability']) {
+            const checkAvailabilityBtn = document.querySelector('.cb-next-step[data-next="2"]');
+            if (checkAvailabilityBtn) checkAvailabilityBtn.textContent = translations['Check Availability'];
+        }
+        if (translations['Back']) {
+            const backBtns = document.querySelectorAll('.cb-prev-step');
+            backBtns.forEach(btn => btn.textContent = translations['Back']);
+        }
+        if (translations['Continue']) {
+            const continueBtns = document.querySelectorAll('.cb-next-step:not([data-next="2"])');
+            continueBtns.forEach(btn => btn.textContent = translations['Continue']);
+        }
+        if (translations['I am ordering']) {
+            const checkoutBtn = document.getElementById('cb-sidebar-checkout');
+            if (checkoutBtn) checkoutBtn.textContent = translations['I am ordering'];
+        }
+        if (translations['Proceed to Checkout']) {
+            const proceedBtns = document.querySelectorAll('.cb-btn-checkout');
+            proceedBtns.forEach(btn => btn.textContent = translations['Proceed to Checkout']);
+        }
         
         // Update sidebar text
-        if (translations['Please select a service to see pricing']) $('#cb-sidebar-service-title').text(translations['Please select a service to see pricing']);
-        if (translations['Our contractors have all the necessary cleaning products and equipment']) $('.cb-info-text').text(translations['Our contractors have all the necessary cleaning products and equipment']);
-        if (translations['Approximate working time']) $('.cb-duration-label').text(translations['Approximate working time']);
-        if (translations['Promocode']) $('#cb-promocode').attr('placeholder', translations['Promocode']);
-        if (translations['Apply']) $('#cb-apply-promocode').text(translations['Apply']);
-        if (translations['To be paid:']) $('.cb-price-label').text(translations['To be paid:']);
+        if (translations['Please select a service to see pricing']) {
+            const sidebarTitle = document.getElementById('cb-sidebar-service-title');
+            if (sidebarTitle) sidebarTitle.textContent = translations['Please select a service to see pricing'];
+        }
+        if (translations['Our contractors have all the necessary cleaning products and equipment']) {
+            const infoText = document.querySelector('.cb-info-text');
+            if (infoText) infoText.textContent = translations['Our contractors have all the necessary cleaning products and equipment'];
+        }
+        if (translations['Approximate working time']) {
+            const durationLabel = document.querySelector('.cb-duration-label');
+            if (durationLabel) durationLabel.textContent = translations['Approximate working time'];
+        }
+        if (translations['Promocode']) {
+            const promocodeInput = document.getElementById('cb-promocode');
+            if (promocodeInput) promocodeInput.setAttribute('placeholder', translations['Promocode']);
+        }
+        if (translations['Apply']) {
+            const applyBtn = document.getElementById('cb-apply-promocode');
+            if (applyBtn) applyBtn.textContent = translations['Apply'];
+        }
+        if (translations['To be paid:']) {
+            const priceLabel = document.querySelector('.cb-price-label');
+            if (priceLabel) priceLabel.textContent = translations['To be paid:'];
+        }
         
         // Update all buttons more comprehensively
         if (translations['Check Availability']) {
-            $('.cb-next-step[data-next="2"]').text(translations['Check Availability']);
-            $('button:contains("Check Availability")').text(translations['Check Availability']);
+            const checkBtns = document.querySelectorAll('.cb-next-step[data-next="2"]');
+            checkBtns.forEach(btn => btn.textContent = translations['Check Availability']);
+            
+            // Also update any buttons containing the text
+            const allButtons = document.querySelectorAll('button');
+            allButtons.forEach(btn => {
+                if (btn.textContent.includes('Check Availability')) {
+                    btn.textContent = translations['Check Availability'];
+                }
+            });
         }
         if (translations['Back']) {
-            $('.cb-prev-step').text(translations['Back']);
-            $('button:contains("Back")').text(translations['Back']);
+            const backBtns = document.querySelectorAll('.cb-prev-step');
+            backBtns.forEach(btn => btn.textContent = translations['Back']);
+            
+            // Also update any buttons containing the text
+            const allButtons = document.querySelectorAll('button');
+            allButtons.forEach(btn => {
+                if (btn.textContent.includes('Back')) {
+                    btn.textContent = translations['Back'];
+                }
+            });
         }
         if (translations['Continue']) {
-            $('.cb-next-step:not([data-next="2"])').text(translations['Continue']);
-            $('button:contains("Continue")').text(translations['Continue']);
+            const continueBtns = document.querySelectorAll('.cb-next-step:not([data-next="2"])');
+            continueBtns.forEach(btn => btn.textContent = translations['Continue']);
+            
+            // Also update any buttons containing the text
+            const allButtons = document.querySelectorAll('button');
+            allButtons.forEach(btn => {
+                if (btn.textContent.includes('Continue')) {
+                    btn.textContent = translations['Continue'];
+                }
+            });
         }
         if (translations['I am ordering']) {
-            $('#cb-sidebar-checkout').text(translations['I am ordering']);
-            $('button:contains("I am ordering")').text(translations['I am ordering']);
+            const checkoutBtn = document.getElementById('cb-sidebar-checkout');
+            if (checkoutBtn) checkoutBtn.textContent = translations['I am ordering'];
+            
+            // Also update any buttons containing the text
+            const allButtons = document.querySelectorAll('button');
+            allButtons.forEach(btn => {
+                if (btn.textContent.includes('I am ordering')) {
+                    btn.textContent = translations['I am ordering'];
+                }
+            });
         }
         if (translations['Proceed to Checkout']) {
-            $('.cb-btn-checkout').text(translations['Proceed to Checkout']);
-            $('button:contains("Proceed to Checkout")').text(translations['Proceed to Checkout']);
+            const proceedBtns = document.querySelectorAll('.cb-btn-checkout');
+            proceedBtns.forEach(btn => btn.textContent = translations['Proceed to Checkout']);
+            
+            // Also update any buttons containing the text
+            const allButtons = document.querySelectorAll('button');
+            allButtons.forEach(btn => {
+                if (btn.textContent.includes('Proceed to Checkout')) {
+                    btn.textContent = translations['Proceed to Checkout'];
+                }
+            });
         }
         
         // Update booking summary
-        if (translations['Booking Summary']) $('.cb-booking-summary h4').text(translations['Booking Summary']);
-        if (translations['Service:']) $('.cb-summary-item:contains("Service:") span:first').text(translations['Service:']);
-        if (translations['Date:']) $('.cb-summary-item:contains("Date:") span:first').text(translations['Date:']);
-        if (translations['Time:']) $('.cb-summary-item:contains("Time:") span:first').text(translations['Time:']);
-        if (translations['Duration:']) $('.cb-summary-item:contains("Duration:") span:first').text(translations['Duration:']);
-        if (translations['Total Price:']) $('.cb-summary-item:contains("Total Price:") span:first').text(translations['Total Price:']);
+        if (translations['Booking Summary']) {
+            const summaryTitle = document.querySelector('.cb-booking-summary h4');
+            if (summaryTitle) summaryTitle.textContent = translations['Booking Summary'];
+        }
+        if (translations['Service:']) {
+            const serviceItems = document.querySelectorAll('.cb-summary-item');
+            serviceItems.forEach(item => {
+                if (item.textContent.includes('Service:')) {
+                    const firstSpan = item.querySelector('span:first-child');
+                    if (firstSpan) firstSpan.textContent = translations['Service:'];
+                }
+            });
+        }
+        if (translations['Date:']) {
+            const dateItems = document.querySelectorAll('.cb-summary-item');
+            dateItems.forEach(item => {
+                if (item.textContent.includes('Date:')) {
+                    const firstSpan = item.querySelector('span:first-child');
+                    if (firstSpan) firstSpan.textContent = translations['Date:'];
+                }
+            });
+        }
+        if (translations['Time:']) {
+            const timeItems = document.querySelectorAll('.cb-summary-item');
+            timeItems.forEach(item => {
+                if (item.textContent.includes('Time:')) {
+                    const firstSpan = item.querySelector('span:first-child');
+                    if (firstSpan) firstSpan.textContent = translations['Time:'];
+                }
+            });
+        }
+        if (translations['Duration:']) {
+            const durationItems = document.querySelectorAll('.cb-summary-item');
+            durationItems.forEach(item => {
+                if (item.textContent.includes('Duration:')) {
+                    const firstSpan = item.querySelector('span:first-child');
+                    if (firstSpan) firstSpan.textContent = translations['Duration:'];
+                }
+            });
+        }
+        if (translations['Total Price:']) {
+            const priceItems = document.querySelectorAll('.cb-summary-item');
+            priceItems.forEach(item => {
+                if (item.textContent.includes('Total Price:')) {
+                    const firstSpan = item.querySelector('span:first-child');
+                    if (firstSpan) firstSpan.textContent = translations['Total Price:'];
+                }
+            });
+        }
         
         // Update loading messages
-        if (translations['Loading services...']) $('.cb-loading').text(translations['Loading services...']);
-        if (translations['Loading extras...']) $('.cb-loading').text(translations['Loading extras...']);
-        if (translations['Loading available times...']) $('.cb-loading').text(translations['Loading available times...']);
-        if (translations['Select a date to see available times']) $('.cb-loading').text(translations['Select a date to see available times']);
+        if (translations['Loading services...']) {
+            const loadingElements = document.querySelectorAll('.cb-loading');
+            loadingElements.forEach(el => el.textContent = translations['Loading services...']);
+        }
+        if (translations['Loading extras...']) {
+            const loadingElements = document.querySelectorAll('.cb-loading');
+            loadingElements.forEach(el => el.textContent = translations['Loading extras...']);
+        }
+        if (translations['Loading available times...']) {
+            const loadingElements = document.querySelectorAll('.cb-loading');
+            loadingElements.forEach(el => el.textContent = translations['Loading available times...']);
+        }
+        if (translations['Select a date to see available times']) {
+            const loadingElements = document.querySelectorAll('.cb-loading');
+            loadingElements.forEach(el => el.textContent = translations['Select a date to see available times']);
+        }
         
         // Update time units
         if (translations['hours']) {
-            $('.cb-duration-value').text(function(i, text) {
-                return text.replace(/hours?/g, translations['hours']);
+            const durationElements = document.querySelectorAll('.cb-duration-value');
+            durationElements.forEach(el => {
+                el.textContent = el.textContent.replace(/hours?/g, translations['hours']);
             });
         }
         if (translations['hour']) {
-            $('.cb-duration-value').text(function(i, text) {
-                return text.replace(/hour/g, translations['hour']);
+            const durationElements = document.querySelectorAll('.cb-duration-value');
+            durationElements.forEach(el => {
+                el.textContent = el.textContent.replace(/hour/g, translations['hour']);
             });
         }
         
@@ -681,21 +1083,30 @@ jQuery(document).ready(function($) {
         // Update any text that might have been missed
         setTimeout(function() {
             // Force update main title if it's still in English
-            if (translations['Book Your Cleaning Service'] && $('.cb-title').text() === 'Book Your Cleaning Service') {
-                $('.cb-title').text(translations['Book Your Cleaning Service']);
+            if (translations['Book Your Cleaning Service']) {
+                const titleElement = document.querySelector('.cb-title');
+                if (titleElement && titleElement.textContent === 'Book Your Cleaning Service') {
+                    titleElement.textContent = translations['Book Your Cleaning Service'];
                 console.log('Updated main title to:', translations['Book Your Cleaning Service']);
+                }
             }
             
             // Force update step headers
-            if (translations['Select Your Service'] && $('.cb-step-2 .cb-step-header h2').text() === 'Select Your Service') {
-                $('.cb-step-2 .cb-step-header h2').text(translations['Select Your Service']);
+            if (translations['Select Your Service']) {
+                const step2Header = document.querySelector('.cb-step-2 .cb-step-header h2');
+                if (step2Header && step2Header.textContent === 'Select Your Service') {
+                    step2Header.textContent = translations['Select Your Service'];
                 console.log('Updated step 2 header to:', translations['Select Your Service']);
+                }
             }
             
             // Force update sidebar title
-            if (translations['Please select a service to see pricing'] && $('#cb-sidebar-service-title').text() === 'Please select a service to see pricing') {
-                $('#cb-sidebar-service-title').text(translations['Please select a service to see pricing']);
+            if (translations['Please select a service to see pricing']) {
+                const sidebarTitle = document.getElementById('cb-sidebar-service-title');
+                if (sidebarTitle && sidebarTitle.textContent === 'Please select a service to see pricing') {
+                    sidebarTitle.textContent = translations['Please select a service to see pricing'];
                 console.log('Updated sidebar title to:', translations['Please select a service to see pricing']);
+                }
             }
         }, 100);
     }
@@ -706,29 +1117,52 @@ jQuery(document).ready(function($) {
         }
         
         // Show loading state
-        $('#cb-sidebar-checkout').prop('disabled', true).text(cb_frontend.strings.processing);
+        const sidebarCheckout = document.getElementById('cb-sidebar-checkout');
+        if (sidebarCheckout) {
+            sidebarCheckout.disabled = true;
+            sidebarCheckout.textContent = cb_frontend.strings.processing;
+        }
         
         // Collect all form data
-        const formData = {
-            action: 'cb_create_booking',
-            nonce: cb_frontend.nonce,
-            ...bookingData,
-            ...collectPaymentData(),
-            extras: bookingData.extras || []
-        };
+        const formData = new FormData();
+        formData.append('action', 'cb_create_booking');
+        formData.append('nonce', cb_frontend.nonce);
         
-        console.log('Submitting booking data:', formData);
-        console.log('Extras being sent:', formData.extras, 'Type:', typeof formData.extras, 'Length:', formData.extras.length);
+        // Add booking data
+        Object.keys(bookingData).forEach(key => {
+            if (key === 'extras' && Array.isArray(bookingData[key])) {
+                bookingData[key].forEach(extra => {
+                    formData.append('extras[]', extra);
+                });
+            } else {
+                formData.append(key, bookingData[key]);
+            }
+        });
+        
+        // Add payment data
+        const paymentData = collectPaymentData();
+        Object.keys(paymentData).forEach(key => {
+            formData.append(key, paymentData[key]);
+        });
+        
+        console.log('Submitting booking data:', Object.fromEntries(formData));
+        console.log('Extras being sent:', bookingData.extras, 'Type:', typeof bookingData.extras, 'Length:', bookingData.extras.length);
         
         // Submit booking
-        $.ajax({
-            url: cb_frontend.ajax_url,
-            type: 'POST',
-            data: formData,
-            success: function(response) {
+        fetch(cb_frontend.ajax_url, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(response => {
                 console.log('Booking response:', response);
                 
                 if (response.success) {
+                // Release the held slot since booking is created
+                if (currentSlotSessionId) {
+                    releaseSlot();
+                }
+                
                     // Show success message
                     showSuccessMessage(response.data.message || 'Booking created successfully!');
                     
@@ -741,22 +1175,29 @@ jQuery(document).ready(function($) {
                         console.error('No checkout URL provided');
                         showNotification('Checkout URL not available. Please try again.', 'error');
                         // Restore button state
-                        $('#cb-sidebar-checkout').prop('disabled', false).text('Proceed to Checkout');
+                    if (sidebarCheckout) {
+                        sidebarCheckout.disabled = false;
+                        sidebarCheckout.textContent = 'Proceed to Checkout';
+                    }
                         }
                 } else {
                     console.error('Booking failed:', response);
                     showNotification(response.data.message || cb_frontend.strings.booking_error, 'error');
                     // Restore button state
-                    $('#cb-sidebar-checkout').prop('disabled', false).text('Proceed to Checkout');
+                if (sidebarCheckout) {
+                    sidebarCheckout.disabled = false;
+                    sidebarCheckout.textContent = 'Proceed to Checkout';
                 }
-            },
-            error: function(xhr, status, error) {
-                console.error('AJAX error:', {xhr, status, error});
+            }
+        })
+        .catch(error => {
+            console.error('Fetch error:', error);
                 
                 // Try to extract JSON from mixed HTML/JSON response
                 let errorMessage = cb_frontend.strings.server_error;
                 try {
-                    const responseText = xhr.responseText;
+                if (error.responseText) {
+                    const responseText = error.responseText;
                     console.log('Response text:', responseText);
                     
                     // Look for JSON in the response
@@ -766,6 +1207,7 @@ jQuery(document).ready(function($) {
                         if (jsonResponse.data && jsonResponse.data.message) {
                             errorMessage = jsonResponse.data.message;
                         }
+                        }
                     }
                 } catch (e) {
                     console.log('Could not parse JSON from response');
@@ -773,7 +1215,9 @@ jQuery(document).ready(function($) {
                 
                 showNotification(errorMessage, 'error');
                 // Restore button state
-                $('#cb-sidebar-checkout').prop('disabled', false).text('Proceed to Checkout');
+            if (sidebarCheckout) {
+                sidebarCheckout.disabled = false;
+                sidebarCheckout.textContent = 'Proceed to Checkout';
             }
         });
     }
@@ -808,7 +1252,8 @@ jQuery(document).ready(function($) {
     
     function validateZipCode() {
         return new Promise(function(resolve, reject) {
-            const zipCode = $('#cb-zip-code').val().trim();
+            const zipCodeInput = document.getElementById('cb-zip-code');
+            const zipCode = zipCodeInput ? zipCodeInput.value.trim() : '';
             
             if (!zipCode) {
                 showError('cb-zip-error', cb_frontend.strings.zip_required);
@@ -827,14 +1272,16 @@ jQuery(document).ready(function($) {
             hideError('cb-zip-error');
             
             // Check availability
-            $.ajax({
-                url: cb_frontend.ajax_url,
-                type: 'POST',
-                data: {
-                    action: 'cb_check_zip_availability',
-                    zip_code: zipCode
-                },
-                success: function(response) {
+            const formData = new FormData();
+            formData.append('action', 'cb_check_zip_availability');
+            formData.append('zip_code', zipCode);
+            
+            fetch(cb_frontend.ajax_url, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(response => {
                     if (response.success && response.data.available) {
                         hideError('cb-zip-error');
                         bookingData.zip_code = zipCode; // Save valid ZIP code
@@ -845,12 +1292,12 @@ jQuery(document).ready(function($) {
                         showNotification(response.data.message || cb_frontend.strings.zip_unavailable, 'error');
                         resolve(false);
                     }
-                },
-                error: function() {
+            })
+            .catch(error => {
+                console.error('ZIP code validation error:', error);
                     showError('cb-zip-error', cb_frontend.strings.server_error);
                     showNotification(cb_frontend.strings.server_error, 'error');
                     reject(new Error('ZIP code validation failed'));
-                }
             });
         });
     }
@@ -868,10 +1315,12 @@ jQuery(document).ready(function($) {
     
     function validateServiceDetails() {
         return new Promise(function(resolve, reject) {
-            const squareMeters = parseInt($('#cb-square-meters').val());
+            const squareMetersInput = document.getElementById('cb-square-meters');
+            const squareMeters = squareMetersInput ? parseInt(squareMetersInput.value, 10) : 0;
             
-            if (!squareMeters || squareMeters < 1) {
-                showError('cb-sqm-error', cb_frontend.strings.square_meters_required);
+            // Allow 0 for skipping, only validate if user enters a positive number
+            if (squareMeters < 0) {
+                showError('cb-sqm-error', 'Square meters cannot be negative');
                 resolve(false);
                 return;
             }
@@ -909,9 +1358,19 @@ jQuery(document).ready(function($) {
     function validateCustomerDetails() {
         let isValid = true;
         
-        const customerName = $('#cb-customer-name').val().trim();
-        const customerEmail = $('#cb-customer-email').val().trim();
-        const customerPhone = $('#cb-customer-phone').val().trim();
+        const customerNameInput = document.getElementById('cb-customer-name');
+        const customerEmailInput = document.getElementById('cb-customer-email');
+        const customerPhoneInput = document.getElementById('cb-customer-phone');
+        const customerAddressInput = document.getElementById('cb-customer-address');
+        const customerCompanyInput = document.getElementById('cb-customer-company');
+        const customerCityInput = document.getElementById('cb-customer-city');
+        const customerStateInput = document.getElementById('cb-customer-state');
+        const notesInput = document.getElementById('cb-notes');
+        
+        const customerName = customerNameInput ? customerNameInput.value.trim() : '';
+        const customerEmail = customerEmailInput ? customerEmailInput.value.trim() : '';
+        const customerPhone = customerPhoneInput ? customerPhoneInput.value.trim() : '';
+        const customerAddress = customerAddressInput ? customerAddressInput.value.trim() : '';
         
         if (!customerName) {
             showError('cb-name-error', cb_frontend.strings.name_required);
@@ -937,36 +1396,66 @@ jQuery(document).ready(function($) {
             hideError('cb-phone-error');
         }
         
+        if (!customerAddress) {
+            showError('cb-address-error', 'Address is required');
+            isValid = false;
+        } else {
+            hideError('cb-address-error');
+        }
+        
+        // Validate payment method selection
+        const selectedPayment = document.querySelector('.cb-payment-option.selected');
+        if (!selectedPayment) {
+            showError('cb-payment-error', 'Please select a payment method');
+            isValid = false;
+        } else {
+            hideError('cb-payment-error');
+        }
+        
         // Save valid customer data
         if (isValid) {
             bookingData.customer_name = customerName;
             bookingData.customer_email = customerEmail;
             bookingData.customer_phone = customerPhone;
-            bookingData.address = $('#cb-customer-address').val().trim();
-            bookingData.notes = $('#cb-notes').val().trim();
+            bookingData.customer_company = customerCompanyInput ? customerCompanyInput.value.trim() : '';
+            bookingData.address = customerAddress;
+            bookingData.customer_city = customerCityInput ? customerCityInput.value.trim() : '';
+            bookingData.customer_state = customerStateInput ? customerStateInput.value.trim() : '';
+            bookingData.notes = notesInput ? notesInput.value.trim() : '';
+            bookingData.payment_method = selectedPayment ? selectedPayment.dataset.payment : 'cash';
         }
         
         return isValid;
     }
     
     function validateBookingData() {
+        const customerNameInput = document.getElementById('cb-customer-name');
+        const customerEmailInput = document.getElementById('cb-customer-email');
+        const customerPhoneInput = document.getElementById('cb-customer-phone');
+        
         return bookingData.service_id && 
                bookingData.square_meters && 
                bookingData.booking_date && 
                bookingData.booking_time &&
                bookingData.payment_method &&
-               $('#cb-customer-name').val().trim() &&
-               $('#cb-customer-email').val().trim() &&
-               $('#cb-customer-phone').val().trim();
+               (customerNameInput ? customerNameInput.value.trim() : '') &&
+               (customerEmailInput ? customerEmailInput.value.trim() : '') &&
+               (customerPhoneInput ? customerPhoneInput.value.trim() : '');
     }
     
     function collectPaymentData() {
+        const customerNameInput = document.getElementById('cb-customer-name');
+        const customerEmailInput = document.getElementById('cb-customer-email');
+        const customerPhoneInput = document.getElementById('cb-customer-phone');
+        const customerAddressInput = document.getElementById('cb-customer-address');
+        const notesInput = document.getElementById('cb-notes');
+        
         return {
-            customer_name: $('#cb-customer-name').val().trim(),
-            customer_email: $('#cb-customer-email').val().trim(),
-            customer_phone: $('#cb-customer-phone').val().trim(),
-            address: $('#cb-customer-address').val().trim(),
-            notes: $('#cb-notes').val().trim(),
+            customer_name: customerNameInput ? customerNameInput.value.trim() : '',
+            customer_email: customerEmailInput ? customerEmailInput.value.trim() : '',
+            customer_phone: customerPhoneInput ? customerPhoneInput.value.trim() : '',
+            address: customerAddressInput ? customerAddressInput.value.trim() : '',
+            notes: notesInput ? notesInput.value.trim() : '',
             payment_method: bookingData.payment_method || 'cash'
         };
     }
@@ -978,51 +1467,64 @@ jQuery(document).ready(function($) {
             return;
         }
         
-        const $timeSlotsContainer = $('#cb-time-slots');
-        $timeSlotsContainer.html('<div class="cb-loading">' + cb_frontend.strings.loading_slots + '</div>');
+        const timeSlotsContainer = document.getElementById('cb-time-slots');
+        if (timeSlotsContainer) {
+            timeSlotsContainer.innerHTML = '<div class="cb-loading">' + cb_frontend.strings.loading_slots + '</div>';
+        }
         
         // Use default duration since pricing is disabled
         const defaultDuration = 120; // 2 hours default
         
-        $.ajax({
-            url: cb_frontend.ajax_url,
-            type: 'POST',
-            data: {
-                action: 'cb_get_available_slots',
-                booking_date: bookingData.booking_date,
-                duration: defaultDuration
-            },
-            success: function(response) {
+        const formData = new FormData();
+        formData.append('action', 'cb_get_available_slots');
+        formData.append('booking_date', bookingData.booking_date);
+        formData.append('duration', defaultDuration);
+        
+        fetch(cb_frontend.ajax_url, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(response => {
                 if (response.success && response.data.slots) {
                     availableSlots = response.data.slots;
                     displayTimeSlots();
                 } else {
-                    $timeSlotsContainer.html('<div class="cb-loading">' + (response.data.message || cb_frontend.strings.no_slots_available) + '</div>');
+                if (timeSlotsContainer) {
+                    timeSlotsContainer.innerHTML = '<div class="cb-loading">' + (response.data.message || cb_frontend.strings.no_slots_available) + '</div>';
                 }
-            },
-            error: function() {
-                $timeSlotsContainer.html('<div class="cb-loading">' + cb_frontend.strings.loading_error + '</div>');
+            }
+        })
+        .catch(error => {
+            console.error('Load available slots error:', error);
+            if (timeSlotsContainer) {
+                timeSlotsContainer.innerHTML = '<div class="cb-loading">' + cb_frontend.strings.loading_error + '</div>';
             }
         });
     }
     
     function displayTimeSlots() {
-        const $timeSlotsContainer = $('#cb-time-slots');
-        $timeSlotsContainer.empty();
+        const timeSlotsContainer = document.getElementById('cb-time-slots');
+        if (!timeSlotsContainer) return;
+        
+        timeSlotsContainer.innerHTML = '';
         
         if (availableSlots.length === 0) {
-            $timeSlotsContainer.html('<div class="cb-loading">' + cb_frontend.strings.no_slots_available + '</div>');
+            timeSlotsContainer.innerHTML = '<div class="cb-loading">' + cb_frontend.strings.no_slots_available + '</div>';
             return;
         }
         
         availableSlots.forEach(function(slot) {
-            const $slot = $('<div class="cb-time-slot" data-time="' + slot.time + '">' + slot.time + '</div>');
+            const slotElement = document.createElement('div');
+            slotElement.className = 'cb-time-slot';
+            slotElement.dataset.time = slot.time;
+            slotElement.textContent = slot.time;
             
             if (!slot.available) {
-                $slot.addClass('unavailable');
+                slotElement.classList.add('unavailable');
             }
             
-            $timeSlotsContainer.append($slot);
+            timeSlotsContainer.appendChild(slotElement);
         });
     }
     
@@ -1030,37 +1532,58 @@ jQuery(document).ready(function($) {
         const service = services.find(s => s.id == bookingData.service_id);
         
         if (service) {
-            $('#cb-summary-service').text(service.name);
+            const summaryService = document.getElementById('cb-summary-service');
+            if (summaryService) {
+                summaryService.textContent = service.name;
+            }
         }
         
         if (bookingData.booking_date) {
-            $('#cb-summary-date').text(formatDate(bookingData.booking_date));
+            const summaryDate = document.getElementById('cb-summary-date');
+            if (summaryDate) {
+                summaryDate.textContent = formatDate(bookingData.booking_date);
+            }
         }
         
         if (bookingData.booking_time) {
-            $('#cb-summary-time').text(formatTime(bookingData.booking_time));
+            const summaryTime = document.getElementById('cb-summary-time');
+            if (summaryTime) {
+                summaryTime.textContent = formatTime(bookingData.booking_time);
+            }
         }
         
         // Use calculated pricing data if available
+        const summaryDuration = document.getElementById('cb-summary-duration');
+        const summaryPrice = document.getElementById('cb-summary-price');
+        
         if (bookingData.pricing) {
-            $('#cb-summary-duration').text(formatDuration(bookingData.pricing.total_duration));
-            $('#cb-summary-price').text(formatPrice(bookingData.pricing.total_price));
+            if (summaryDuration) summaryDuration.textContent = formatDuration(bookingData.pricing.total_duration);
+            if (summaryPrice) summaryPrice.textContent = formatPrice(bookingData.pricing.total_price);
         } else {
-            $('#cb-summary-duration').text('2 hours');
-            $('#cb-summary-price').text('Price will be calculated');
+            if (summaryDuration) summaryDuration.textContent = '2 hours';
+            if (summaryPrice) summaryPrice.textContent = 'Price will be calculated';
         }
     }
     
     function updateStepDisplay() {
         // Hide all steps
-        $('.cb-step-content').removeClass('cb-step-active');
+        const stepContents = document.querySelectorAll('.cb-step-content');
+        stepContents.forEach(step => step.classList.remove('cb-step-active'));
         
         // Show current step
-        $(`.cb-step-${currentStep}`).addClass('cb-step-active');
+        const currentStepElement = document.querySelector(`.cb-step-${currentStep}`);
+        if (currentStepElement) {
+            currentStepElement.classList.add('cb-step-active');
+        }
         
         // Update step indicators
-        $('.cb-step').removeClass('cb-step-active');
-        $(`.cb-step[data-step="${currentStep}"]`).addClass('cb-step-active');
+        const stepIndicators = document.querySelectorAll('.cb-step');
+        stepIndicators.forEach(step => step.classList.remove('cb-step-active'));
+        
+        const currentStepIndicator = document.querySelector(`.cb-step[data-step="${currentStep}"]`);
+        if (currentStepIndicator) {
+            currentStepIndicator.classList.add('cb-step-active');
+        }
         
         // Handle step-specific logic
         switch(currentStep) {
@@ -1078,6 +1601,21 @@ jQuery(document).ready(function($) {
             case 3:
                 // Service details step
                 console.log('Step 3 - service_id:', bookingData.service_id, 'extras.length:', extras.length, 'bookingData.extras:', bookingData.extras);
+                
+                // Auto-trigger calculation when entering step 3
+                if (bookingData.service_id) {
+                    console.log('Step 3 - Auto-triggering price calculation');
+                    
+                    // Ensure extras is initialized as empty array for base service calculation
+                    // Only initialize if it doesn't exist, don't reset existing selections
+                    if (!bookingData.extras || !Array.isArray(bookingData.extras)) {
+                        bookingData.extras = [];
+                    }
+                    
+                    console.log('Step 3 - Current extras before calculation:', bookingData.extras);
+                    calculatePrice();
+                }
+                
                 if (bookingData.service_id && extras.length === 0) {
                     console.log('Step 3 - calling loadExtras');
                     loadExtras();
@@ -1090,6 +1628,9 @@ jQuery(document).ready(function($) {
                         forceUpdateExtrasVisualState();
                     }, 100);
                 }
+                
+                // Set default area for the selected service
+                setDefaultArea(bookingData.service_id);
                 
                 // Update sidebar display
                 updateSidebarDisplay();
@@ -1116,7 +1657,7 @@ jQuery(document).ready(function($) {
         updateButtonStates();
         
         // Auto-scroll to top
-        $('html, body').animate({ scrollTop: 0 }, 300);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
     
     function updateButtonStates() {
@@ -1124,20 +1665,33 @@ jQuery(document).ready(function($) {
         switch(currentStep) {
             case 1:
                 // ZIP code step - enable if ZIP code is valid
-                $('.cb-next-step').prop('disabled', !bookingData.zip_code);
+                const nextStepBtns1 = document.querySelectorAll('.cb-next-step');
+                nextStepBtns1.forEach(btn => {
+                    btn.disabled = !bookingData.zip_code;
+                });
                 break;
             case 2:
                 // Service selection step - enable if service is selected
-                $('.cb-next-step').prop('disabled', !bookingData.service_id);
+                const nextStepBtns2 = document.querySelectorAll('.cb-next-step');
+                nextStepBtns2.forEach(btn => {
+                    btn.disabled = !bookingData.service_id;
+                });
                 break;
             case 3:
-                // Service details step - enable if square meters is valid
-                const squareMeters = parseInt($('#cb-square-meters').val());
-                $('.cb-next-step').prop('disabled', !squareMeters || squareMeters < 1);
+                // Service details step - enable if square meters is valid (0 is allowed for skip)
+                const squareMetersInput = document.getElementById('cb-square-meters');
+                const squareMeters = squareMetersInput ? parseInt(squareMetersInput.value, 10) : 0;
+                const nextStepBtns3 = document.querySelectorAll('.cb-next-step');
+                nextStepBtns3.forEach(btn => {
+                    btn.disabled = squareMeters < 0; // Allow 0 for skip option
+                });
                 break;
             case 4:
                 // Date & time step - enable if date and time are selected
-                $('.cb-next-step').prop('disabled', !bookingData.booking_date || !bookingData.booking_time);
+                const nextStepBtns4 = document.querySelectorAll('.cb-next-step');
+                nextStepBtns4.forEach(btn => {
+                    btn.disabled = !bookingData.booking_date || !bookingData.booking_time;
+                });
                 break;
             case 5:
                 // Customer details step - enable if all required fields are filled AND payment method is selected
@@ -1145,7 +1699,10 @@ jQuery(document).ready(function($) {
                                         bookingData.customer_email && 
                                         bookingData.customer_phone;
                 const hasPaymentMethod = bookingData.payment_method;
-                $('.cb-btn-checkout').prop('disabled', !hasRequiredFields || !hasPaymentMethod);
+                const checkoutBtns = document.querySelectorAll('.cb-btn-checkout');
+                checkoutBtns.forEach(btn => {
+                    btn.disabled = !hasRequiredFields || !hasPaymentMethod;
+                });
                 break;
         }
     }
@@ -1156,102 +1713,178 @@ jQuery(document).ready(function($) {
             return;
         }
         
-        const $servicesContainer = $('#cb-services-container');
-        $servicesContainer.html('<div class="cb-loading">' + cb_frontend.strings.loading_services + '</div>');
+        const servicesContainer = document.getElementById('cb-services-container');
+        if (servicesContainer) {
+            servicesContainer.innerHTML = '<div class="cb-loading">' + cb_frontend.strings.loading_services + '</div>';
+        }
         
         // First test debug endpoint
-        $.ajax({
-            url: cb_frontend.ajax_url,
-            type: 'POST',
-            data: {
-                action: 'cb_debug'
-            },
-            beforeSend: function(xhr) {
-                console.log('Debug request - Action:', 'cb_debug');
-            },
-            success: function(response) {
+        const debugFormData = new FormData();
+        debugFormData.append('action', 'cb_debug');
+        
+        fetch(cb_frontend.ajax_url, {
+            method: 'POST',
+            body: debugFormData
+        })
+        .then(response => response.json())
+        .then(response => {
                 // Now try to get services
                 loadServicesReal();
-            },
-            error: function(xhr, status, error) {
-                console.error('Debug error:', {xhr, status, error});
-                $servicesContainer.html('<div class="cb-loading">Debug Error: ' + error + '</div>');
+        })
+        .catch(error => {
+            console.error('Debug error:', error);
+            if (servicesContainer) {
+                servicesContainer.innerHTML = '<div class="cb-loading">Debug Error: ' + error.message + '</div>';
             }
         });
     }
     
     function loadServicesReal() {
-        const $servicesContainer = $('#cb-services-container');
+        const servicesContainer = document.getElementById('cb-services-container');
         
-        $.ajax({
-            url: cb_frontend.ajax_url,
-            type: 'POST',
-            data: {
-                action: 'cb_get_services'
-            },
-            beforeSend: function(xhr) {
-                console.log('Services AJAX request - URL:', cb_frontend.ajax_url);
-                console.log('Services AJAX request - Action:', 'cb_get_services');
-            },
-            success: function(response) {
-                console.log('Services AJAX response:', response);
+        const formData = new FormData();
+        formData.append('action', 'cb_get_services');
+        
+        console.log('Services fetch request - URL:', cb_frontend.ajax_url);
+        console.log('Services fetch request - Action:', 'cb_get_services');
+        
+        fetch(cb_frontend.ajax_url, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(response => {
+            console.log('Services fetch response:', response);
                 if (response.success && response.data.services) {
                     services = response.data.services;
                     displayServices();
                 } else {
-                    $servicesContainer.html('<div class="cb-loading">' + cb_frontend.strings.no_services_available + '</div>');
+                if (servicesContainer) {
+                    servicesContainer.innerHTML = '<div class="cb-loading">' + cb_frontend.strings.no_services_available + '</div>';
                 }
-            },
-            error: function(xhr, status, error) {
-                console.error('Services AJAX error:', {xhr, status, error});
+            }
+        })
+        .catch(error => {
+            console.error('Services fetch error:', error);
                 console.log('Trying REST API fallback...');
                 
                 // Fallback to REST API
-                $.ajax({
-                    url: cb_frontend.rest_url + 'services',
-                    type: 'GET',
-                    beforeSend: function(xhr) {
-                        console.log('Services REST request - URL:', cb_frontend.rest_url + 'services');
-                    },
-                    success: function(response) {
+            fetch(cb_frontend.rest_url + 'services', {
+                method: 'GET'
+            })
+            .then(response => response.json())
+            .then(response => {
                         console.log('Services REST response:', response);
                         if (response.success && response.services) {
                             services = response.services;
                             displayServices();
                         } else {
-                            $servicesContainer.html('<div class="cb-loading">' + cb_frontend.strings.no_services_available + '</div>');
-                        }
-                    },
-                    error: function(xhr, status, error) {
-                        console.error('Services REST error:', {xhr, status, error});
-                        $servicesContainer.html('<div class="cb-loading">Connection Error: ' + error + '</div>');
+                    if (servicesContainer) {
+                        servicesContainer.innerHTML = '<div class="cb-loading">' + cb_frontend.strings.no_services_available + '</div>';
                     }
-                });
-            }
+                }
+            })
+            .catch(error => {
+                console.error('Services REST error:', error);
+                if (servicesContainer) {
+                    servicesContainer.innerHTML = '<div class="cb-loading">Connection Error: ' + error.message + '</div>';
+                }
+            });
         });
     }
     
     function displayServices() {
-        const $servicesContainer = $('#cb-services-container');
-        $servicesContainer.empty();
+        const servicesContainer = document.getElementById('cb-services-container');
+        if (!servicesContainer) return;
+        
+        servicesContainer.innerHTML = '';
         
         services.forEach(function(service) {
             const isSelected = bookingData.service_id == service.id;
             const selectedClass = isSelected ? ' selected' : '';
             
-            const $card = $(`
-                <div class="cb-service-card${selectedClass}" data-service-id="${service.id}">
+            const cardElement = document.createElement('div');
+            cardElement.className = `cb-service-card${selectedClass}`;
+            cardElement.dataset.serviceId = service.id;
+            
+            cardElement.innerHTML = `
                     <div class="cb-service-icon">🧹</div>
                     <h4>${service.name}</h4>
                     <p>${service.description}</p>
-                    <div class="cb-service-price">
-                        <span class="cb-price-current">$${parseFloat(service.base_price).toFixed(2)}</span>
+                    <div class="cb-service-details">
+                        <div class="cb-service-price">
+                            <span class="cb-price-current">$${parseFloat(service.base_price).toFixed(2)}</span>
+                        </div>
+                        <div class="cb-service-duration">
+                            <span class="cb-duration-label">Duration:</span>
+                            <span class="cb-duration-value">${service.base_duration} min</span>
+                        </div>
+                        ${service.default_area > 0 ? `
+                        <div class="cb-service-area">
+                            <span class="cb-area-label">Includes:</span>
+                            <span class="cb-area-value">${service.default_area} m²</span>
+                        </div>
+                        ` : ''}
                     </div>
-                </div>
-            `);
+            `;
             
-            $servicesContainer.append($card);
+            servicesContainer.appendChild(cardElement);
         });
+    }
+    
+    /**
+     * Set default area for the selected service
+     */
+    function setDefaultArea(serviceId) {
+        if (!serviceId) return;
+        
+        // Get service data from the services array
+        const service = services.find(s => s.id == serviceId);
+        const hintElement = document.getElementById('cb-sqm-hint');
+        const baseAreaInfo = document.getElementById('cb-base-area-info');
+        const baseAreaMessage = document.getElementById('cb-base-area-message');
+        const basePriceDisplay = document.getElementById('cb-base-price-display');
+        const baseDurationDisplay = document.getElementById('cb-base-duration-display');
+        
+        if (!service || !service.default_area || service.default_area <= 0) {
+            // No default area - hide all hints and info
+            if (hintElement) hintElement.style.display = 'none';
+            if (baseAreaInfo) baseAreaInfo.style.display = 'none';
+            return;
+        }
+        
+        // Show hint about additional area
+        if (hintElement) {
+            hintElement.style.display = 'block';
+            hintElement.innerHTML = `<small>Enter additional space beyond the default ${service.default_area} m², or leave as 0 to skip</small>`;
+        }
+        
+        // Show base area info card
+        if (baseAreaInfo && baseAreaMessage && basePriceDisplay && baseDurationDisplay) {
+            baseAreaInfo.style.display = 'block';
+            
+            // Set base area message with skip option
+            baseAreaMessage.textContent = `This service includes ${service.default_area} m² at base price. Enter additional space above if needed, or skip to proceed with base service.`;
+            
+            // Calculate and display base pricing
+            const basePrice = parseFloat(service.base_price) || 0;
+            const baseDuration = parseInt(service.base_duration, 10) || 0;
+            
+            basePriceDisplay.textContent = `Base Price: $${basePrice.toFixed(2)}`;
+            baseDurationDisplay.textContent = `Base Duration: ${baseDuration} min`;
+        }
+        
+        // Clear the input field and set to 0 (no additional area)
+        const squareMetersInput = document.getElementById('cb-square-meters');
+        if (squareMetersInput) {
+            squareMetersInput.value = '0';
+            bookingData.square_meters = 0; // Start with 0 additional area
+            
+            // Trigger change event to calculate price (base + 0 additional)
+            squareMetersInput.dispatchEvent(new Event('input', { bubbles: true }));
+            
+            console.log('CB Debug - Set smart area logic for service:', service.name, 'Default:', service.default_area, 'Additional: 0');
+        }
     }
     
     function loadExtras() {
@@ -1263,49 +1896,57 @@ jQuery(document).ready(function($) {
             return;
         }
         
-        const $extrasContainer = $('#cb-extras-container');
-        $extrasContainer.html('<div class="cb-loading">' + cb_frontend.strings.loading_extras + '</div>');
+        const extrasContainer = document.getElementById('cb-extras-container');
+        if (extrasContainer) {
+            extrasContainer.innerHTML = '<div class="cb-loading">' + cb_frontend.strings.loading_extras + '</div>';
+        }
         
-        console.log('Making AJAX call to load extras for service_id:', bookingData.service_id);
+        console.log('Making fetch call to load extras for service_id:', bookingData.service_id);
         
-        $.ajax({
-            url: cb_frontend.ajax_url,
-            type: 'POST',
-            data: {
-                action: 'cb_get_extras',
-                service_id: bookingData.service_id
-            },
-            success: function(response) {
-                console.log('Extras AJAX response:', response);
+        const formData = new FormData();
+        formData.append('action', 'cb_get_extras');
+        formData.append('service_id', bookingData.service_id);
+        
+        fetch(cb_frontend.ajax_url, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(response => {
+            console.log('Extras fetch response:', response);
                 if (response.success && response.data.extras) {
                     extras = response.data.extras;
                     console.log('Loaded extras:', extras);
                     displayExtras();
                 } else {
                     console.log('No extras available or error:', response.data.message);
-                    $extrasContainer.html('<div class="cb-loading">' + (response.data.message || cb_frontend.strings.no_extras_available) + '</div>');
+                if (extrasContainer) {
+                    extrasContainer.innerHTML = '<div class="cb-loading">' + (response.data.message || cb_frontend.strings.no_extras_available) + '</div>';
                 }
-            },
-            error: function(xhr, status, error) {
-                console.error('Extras AJAX error:', {xhr, status, error});
-                $extrasContainer.html('<div class="cb-loading">' + cb_frontend.strings.loading_error + '</div>');
+            }
+        })
+        .catch(error => {
+            console.error('Extras fetch error:', error);
+            if (extrasContainer) {
+                extrasContainer.innerHTML = '<div class="cb-loading">' + cb_frontend.strings.loading_error + '</div>';
             }
         });
     }
     
     function displayExtras() {
-        const $extrasContainer = $('#cb-extras-container');
+        const extrasContainer = document.getElementById('cb-extras-container');
+        if (!extrasContainer) return;
         
         // Preserve current state before clearing
         const preservedExtras = preserveExtrasState();
         
-        $extrasContainer.empty();
+        extrasContainer.innerHTML = '';
         
         if (extras.length === 0) {
-            $extrasContainer.html('<div class="cb-extras-optional">' + 
+            extrasContainer.innerHTML = '<div class="cb-extras-optional">' + 
                 '<p style="color: #666; font-style: italic; text-align: center; padding: 20px;">' +
                 'No additional services available for this service. You can proceed to the next step.' +
-                '</p></div>');
+                '</p></div>';
             return;
         }
         
@@ -1317,20 +1958,24 @@ jQuery(document).ready(function($) {
             const isSelected = bookingData.extras && bookingData.extras.some(id => id == extra.id);
             const selectedClass = isSelected ? ' selected' : '';
             
-            const $item = $(`
-                <div class="cb-extra-item${selectedClass}" data-extra-id="${extra.id}" data-extra-price="${extra.price}" style="cursor: pointer;">
+            const itemElement = document.createElement('div');
+            itemElement.className = `cb-extra-item${selectedClass}`;
+            itemElement.dataset.extraId = extra.id;
+            itemElement.dataset.extraPrice = extra.price;
+            itemElement.style.cursor = 'pointer';
+            
+            itemElement.innerHTML = `
                     <div class="cb-extra-checkbox"></div>
                     <div class="cb-extra-info">
                         <div class="cb-extra-name">${extra.name}</div>
                         <div class="cb-extra-description">${extra.description}</div>
                         <div class="cb-extra-price">$${parseFloat(extra.price).toFixed(2)}</div>
                     </div>
-                </div>
-            `);
+            `;
             
             // Click handler is already attached via document delegation
             
-            $extrasContainer.append($item);
+            extrasContainer.appendChild(itemElement);
         });
     }
     
@@ -1343,7 +1988,7 @@ jQuery(document).ready(function($) {
     
     function restoreExtrasState(preservedExtras) {
         // Restore the selected extras after DOM manipulation
-        if (preservedExtras && preservedExtras.length > 0) {
+        if (preservedExtras && Array.isArray(preservedExtras)) {
             bookingData.extras = [...preservedExtras];
             console.log('Restored extras state:', bookingData.extras);
         }
@@ -1353,23 +1998,23 @@ jQuery(document).ready(function($) {
         console.log('Force updating extras visual state - bookingData.extras:', bookingData.extras);
         
         // Update all extra items to reflect current state
-        $('.cb-extra-item').each(function() {
-            const $item = $(this);
-            const extraId = parseInt($item.data('extra-id'));
+        const extraItems = document.querySelectorAll('.cb-extra-item');
+        extraItems.forEach(function(item) {
+            const extraId = parseInt(item.dataset.extraId, 10);
             const isSelected = bookingData.extras && bookingData.extras.some(id => id == extraId);
             
             console.log('Updating visual state for extra ID:', extraId, 'Selected:', isSelected);
             
             if (isSelected) {
                 // Only add class if not already present
-                if (!$item.hasClass('selected')) {
-                    $item.addClass('selected');
+                if (!item.classList.contains('selected')) {
+                    item.classList.add('selected');
                 }
                 console.log('Applied selected class to extra ID:', extraId);
             } else {
                 // Only remove class if present
-                if ($item.hasClass('selected')) {
-                    $item.removeClass('selected');
+                if (item.classList.contains('selected')) {
+                    item.classList.remove('selected');
                 }
             }
         });
@@ -1380,24 +2025,63 @@ jQuery(document).ready(function($) {
     
     // Price calculation functions
     function calculatePrice() {
-        if (!bookingData.service_id || !bookingData.square_meters) {
+        if (!bookingData.service_id) {
             return;
         }
         
-        console.log('Calculating price for service:', bookingData.service_id, 'sqm:', bookingData.square_meters, 'extras:', bookingData.extras);
+        // Get service data to check for default area
+        const service = services.find(s => s.id == bookingData.service_id);
+        const additionalArea = bookingData.square_meters || 0;
         
-        $.ajax({
-            url: cb_frontend.ajax_url,
-            type: 'POST',
-            data: {
+        console.log('Calculating price for service:', bookingData.service_id, 'additional sqm:', additionalArea, 'extras:', bookingData.extras);
+        
+        const formData = new FormData();
+        formData.append('action', 'cb_calculate_price');
+        formData.append('nonce', cb_frontend.nonce);
+        formData.append('service_id', bookingData.service_id);
+        formData.append('square_meters', additionalArea); // Send additional area only
+        formData.append('use_smart_area', '1'); // Flag to indicate smart area calculation
+        
+        // Handle extras properly - ensure it's always an array
+        if (bookingData.extras && Array.isArray(bookingData.extras) && bookingData.extras.length > 0) {
+            formData.append('extras', JSON.stringify(bookingData.extras));
+            console.log('Sending extras:', bookingData.extras);
+        } else {
+            formData.append('extras', '[]'); // Send empty array as JSON string
+            console.log('No extras to send, sending empty array');
+        }
+        
+        formData.append('zip_code', bookingData.zip_code);
+        
+        console.log('Sending smart price calculation request:', {
                 action: 'cb_calculate_price',
                 nonce: cb_frontend.nonce,
                 service_id: bookingData.service_id,
-                square_meters: bookingData.square_meters,
+                square_meters: additionalArea,
+                use_smart_area: '1',
                 extras: bookingData.extras,
                 zip_code: bookingData.zip_code
-            },
-            success: function(response) {
+        });
+        
+        fetch(cb_frontend.ajax_url, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.text().then(text => {
+                console.log('Raw server response:', text);
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    console.error('Invalid JSON response:', text);
+                    throw new Error('Server returned invalid JSON');
+                }
+            });
+        })
+        .then(response => {
                 console.log('Price calculation response:', response);
                 if (response.success) {
                     bookingData.pricing = response.data.pricing;
@@ -1407,29 +2091,21 @@ jQuery(document).ready(function($) {
                 } else {
                     console.error('Price calculation failed:', response.data.message);
                 }
-            },
-            error: function(xhr, status, error) {
-                console.error('Price calculation error:', {xhr, status, error});
-                console.error('Response text:', xhr.responseText);
+        })
+        .catch(error => {
+            console.error('Price calculation error:', error);
+            
+            // Show user-friendly error message
+            showNotification('Unable to calculate price. Please try again.', 'error');
                 
                 // Try to extract JSON from mixed response
                 try {
-                    const responseText = xhr.responseText;
-                    const jsonStart = responseText.lastIndexOf('{');
-                    if (jsonStart !== -1) {
-                        const jsonPart = responseText.substring(jsonStart);
-                        const response = JSON.parse(jsonPart);
-                        
-                        if (response.success) {
-                            console.log('Extracted successful response from mixed content');
-                            bookingData.pricing = response.data.pricing;
-                            updatePricingDisplay();
-                            updateSidebarDisplay();
-                        }
+                if (error.message && error.message.includes('Invalid JSON')) {
+                    console.error('Server returned HTML instead of JSON - likely a PHP error');
+                    showNotification('Server error occurred. Please check your configuration.', 'error');
                     }
                 } catch (e) {
-                    console.error('Could not extract JSON from response:', e);
-                }
+                console.error('Could not extract error details:', e);
             }
         });
     }
@@ -1437,25 +2113,83 @@ jQuery(document).ready(function($) {
     function updatePricingDisplay() {
         const pricing = bookingData.pricing;
         
+        // Debug logging
+        console.log('updatePricingDisplay called with pricing:', pricing);
+        console.log('Extras price:', pricing.extras_price);
+        console.log('Total price:', pricing.total_price);
+        
         // Update main pricing display (Step 5)
-        $('#cb-summary-price').text(formatPrice(pricing.total_price));
-        $('#cb-summary-duration').text(formatDuration(pricing.total_duration));
+        const summaryPrice = document.getElementById('cb-summary-price');
+        const summaryDuration = document.getElementById('cb-summary-duration');
+        
+        if (summaryPrice) summaryPrice.textContent = formatPrice(pricing.total_price);
+        if (summaryDuration) summaryDuration.textContent = formatDuration(pricing.total_duration);
         
         // Update sidebar pricing
-        $('#cb-sidebar-total').text(formatPrice(pricing.total_price));
+        const sidebarTotal = document.getElementById('cb-sidebar-total');
+        if (sidebarTotal) sidebarTotal.textContent = formatPrice(pricing.total_price);
         
         // Update checkout button price
-        $('#cb-checkout-price').text(formatPrice(pricing.total_price));
+        const checkoutPrice = document.getElementById('cb-checkout-price');
+        if (checkoutPrice) checkoutPrice.textContent = formatPrice(pricing.total_price);
         
-        // Update Step 3 pricing display
-        $('#cb-step3-service-price').text(formatPrice(pricing.service_price));
-        $('#cb-step3-extras-price').text(formatPrice(pricing.extras_price));
-        $('#cb-step3-total-price').text(formatPrice(pricing.total_price));
+        // Update Step 3 pricing display with smart area breakdown
+        const step3ServicePrice = document.getElementById('cb-step3-service-price');
+        const step3ExtrasPrice = document.getElementById('cb-step3-extras-price');
+        const step3TotalPrice = document.getElementById('cb-step3-total-price');
         
-        // Update Step 3 duration display
-        $('#cb-step3-service-duration').text(formatDuration(pricing.service_duration));
-        $('#cb-step3-extras-duration').text(formatDuration(pricing.extras_duration));
-        $('#cb-step3-total-duration').text(formatDuration(pricing.total_duration));
+        if (step3ServicePrice) {
+            if (pricing.smart_area && pricing.smart_area.use_smart_area) {
+                // Show base + additional breakdown using backend data
+                const basePrice = parseFloat(pricing.smart_area.base_price) || 0;
+                const additionalPrice = parseFloat(pricing.smart_area.additional_price) || 0;
+                
+                step3ServicePrice.innerHTML = `
+                    <div class="cb-price-breakdown">
+                        <div>Base: ${formatPrice(basePrice)}</div>
+                        ${additionalPrice > 0 ? `<div>Extra: ${formatPrice(additionalPrice)}</div>` : ''}
+                        ${pricing.zip_surcharge > 0 ? `<div>Zip Fee: ${formatPrice(pricing.zip_surcharge)}</div>` : ''}
+                    </div>
+                `;
+            } else {
+                step3ServicePrice.textContent = formatPrice(pricing.service_price);
+            }
+        }
+        
+        // Update extras price separately
+        if (step3ExtrasPrice) {
+            if (pricing.extras_price > 0) {
+                step3ExtrasPrice.textContent = formatPrice(pricing.extras_price);
+            } else {
+                step3ExtrasPrice.textContent = '$0.00';
+            }
+        }
+        if (step3TotalPrice) step3TotalPrice.textContent = formatPrice(pricing.total_price);
+        
+        // Update Step 3 duration display with smart area breakdown
+        const step3ServiceDuration = document.getElementById('cb-step3-service-duration');
+        const step3ExtrasDuration = document.getElementById('cb-step3-extras-duration');
+        const step3TotalDuration = document.getElementById('cb-step3-total-duration');
+        
+        if (step3ServiceDuration) {
+            if (pricing.smart_area && pricing.smart_area.use_smart_area) {
+                // Show base + additional breakdown using backend data
+                const baseDuration = parseInt(pricing.smart_area.base_duration, 10) || 0;
+                const additionalDuration = parseInt(pricing.smart_area.additional_duration, 10) || 0;
+                
+                step3ServiceDuration.innerHTML = `
+                    <div class="cb-duration-breakdown">
+                        <div>Base: ${formatDuration(baseDuration)}</div>
+                        ${additionalDuration > 0 ? `<div>Extra: ${formatDuration(additionalDuration)}</div>` : ''}
+                    </div>
+                `;
+            } else {
+                step3ServiceDuration.textContent = formatDuration(pricing.service_duration);
+            }
+        }
+        
+        if (step3ExtrasDuration) step3ExtrasDuration.textContent = formatDuration(pricing.extras_duration);
+        if (step3TotalDuration) step3TotalDuration.textContent = formatDuration(pricing.total_duration);
         
         // Update booking summary to ensure all fields are current
         updateBookingSummary();
@@ -1489,7 +2223,11 @@ jQuery(document).ready(function($) {
     
     // Utility functions
     function showError(errorId, message) {
-        $('#' + errorId).text(message).addClass('show');
+        const errorElement = document.getElementById(errorId);
+        if (errorElement) {
+            errorElement.textContent = message;
+            errorElement.classList.add('show');
+        }
         
         // Also show notification for important errors
         if (message.includes('required') || message.includes('invalid')) {
@@ -1498,27 +2236,47 @@ jQuery(document).ready(function($) {
     }
     
     function hideError(errorId) {
-        $('#' + errorId).removeClass('show').text('');
+        const errorElement = document.getElementById(errorId);
+        if (errorElement) {
+            errorElement.classList.remove('show');
+            errorElement.textContent = '';
+        }
     }
     
     function showNotification(message, type = 'info') {
         // Remove any existing notifications
-        $('.cb-notification').remove();
+        const existingNotifications = document.querySelectorAll('.cb-notification');
+        existingNotifications.forEach(notification => notification.remove());
         
         // Create notification element
-        const $notification = $(`
-            <div class="cb-notification cb-notification-${type}" style="position: fixed; top: 20px; right: 20px; z-index: 10000; background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#F44336' : '#2196F3'}; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-width: 400px; animation: slideInRight 0.3s ease;">
-                ${message}
-            </div>
-        `);
+        const notification = document.createElement('div');
+        notification.className = `cb-notification cb-notification-${type}`;
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+            background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#F44336' : '#2196F3'};
+            color: white;
+            padding: 16px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            max-width: 400px;
+            animation: slideInRight 0.3s ease;
+        `;
+        notification.textContent = message;
         
-        $('body').append($notification);
+        document.body.appendChild(notification);
         
         // Auto-remove after 5 seconds
         setTimeout(function() {
-            $notification.fadeOut(function() {
-                $notification.remove();
-            });
+            notification.style.opacity = '0';
+            notification.style.transition = 'opacity 0.3s ease';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 300);
         }, 5000);
     }
     
@@ -1563,28 +2321,106 @@ jQuery(document).ready(function($) {
     }
     
     // Initialize payment method selection
-    $(document).on('click', '.cb-payment-option', function() {
-        $('.cb-payment-option').removeClass('selected');
-        $(this).addClass('selected');
-        
-        const paymentMethod = $(this).data('payment');
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.cb-payment-option')) {
+            const clickedOption = e.target.closest('.cb-payment-option');
+            
+            // Remove previous selection
+            const paymentOptions = document.querySelectorAll('.cb-payment-option');
+            paymentOptions.forEach(option => option.classList.remove('selected'));
+            
+            // Add selection to clicked option
+            clickedOption.classList.add('selected');
+            
+            const paymentMethod = clickedOption.dataset.payment;
         bookingData.payment_method = paymentMethod;
         
         console.log('Payment method selected:', paymentMethod);
         
         // Update button states
         updateButtonStates();
+        }
     });
     
     // Initialize default payment method selection when step 5 is displayed
     function initializePaymentMethod() {
         if (currentStep === 5) {
             // Set default selection to cash
-            $('.cb-payment-option[data-payment="cash"]').addClass('selected');
+            const cashOption = document.querySelector('.cb-payment-option[data-payment="cash"]');
+            if (cashOption) {
+                cashOption.classList.add('selected');
+            }
             bookingData.payment_method = 'cash';
             
             // Update button states
             updateButtonStates();
+        }
+    }
+    
+    // Add database check function for debugging
+    window.checkDatabaseStatus = function() {
+        const formData = new FormData();
+        formData.append('action', 'cb_check_database');
+        
+        fetch(cb_frontend.ajax_url, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(response => {
+            console.log('Database Status:', response);
+            if (response.success) {
+                const data = response.data;
+                console.log('Services table exists:', data.services_table_exists);
+                console.log('Extras table exists:', data.extras_table_exists);
+                console.log('Services count:', data.services_count);
+                console.log('Extras count:', data.extras_count);
+                console.log('Pricing class exists:', data.pricing_class_exists);
+            }
+        })
+        .catch(error => {
+            console.error('Database check failed:', error);
+        });
+    };
+    
+    // Release slot when page is unloaded
+    window.addEventListener('beforeunload', function() {
+        if (currentSlotSessionId) {
+            // Use synchronous request for beforeunload
+            const formData = new FormData();
+            formData.append('action', 'cb_release_slot');
+            formData.append('session_id', currentSlotSessionId);
+            
+            // Use sendBeacon if available, otherwise synchronous XMLHttpRequest
+            if (navigator.sendBeacon) {
+                navigator.sendBeacon(cb_frontend.ajax_url, formData);
+            } else {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', cb_frontend.ajax_url, false);
+                xhr.send(formData);
+            }
+        }
+    });
+
+    // Clear any cached form data when the page loads
+    clearCachedFormData();
+    
+    function clearCachedFormData() {
+        // Clear any localStorage data that might be caching old form data
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && (key.startsWith('cb_') || key.startsWith('woocommerce_'))) {
+                keysToRemove.push(key);
+            }
+        }
+        
+        keysToRemove.forEach(key => {
+            localStorage.removeItem(key);
+        });
+        
+        if (keysToRemove.length > 0) {
+            console.log('CB Debug - Cleared cached form data:', keysToRemove);
         }
     }
 });

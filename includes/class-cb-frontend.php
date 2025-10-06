@@ -34,6 +34,10 @@ class CB_Frontend {
         add_action('wp_ajax_cb_debug', array($this, 'ajax_debug'));
         add_action('wp_ajax_nopriv_cb_debug', array($this, 'ajax_debug'));
         
+        // Add a database check endpoint
+        add_action('wp_ajax_cb_check_database', array($this, 'ajax_check_database'));
+        add_action('wp_ajax_nopriv_cb_check_database', array($this, 'ajax_check_database'));
+        
         // Run database migrations for existing installations
         $this->run_database_migrations();
         
@@ -45,6 +49,8 @@ class CB_Frontend {
         add_action('wp_ajax_cb_get_services', array($this, 'ajax_get_services'));
         add_action('wp_ajax_cb_get_extras', array($this, 'ajax_get_extras'));
         add_action('wp_ajax_cb_calculate_price', array($this, 'ajax_calculate_price'));
+        add_action('wp_ajax_cb_hold_slot', array($this, 'ajax_hold_slot'));
+        add_action('wp_ajax_cb_release_slot', array($this, 'ajax_release_slot'));
         
         // AJAX actions for non-authenticated users (public access)
         add_action('wp_ajax_nopriv_cb_create_booking', array($this, 'ajax_create_booking'));
@@ -54,6 +60,80 @@ class CB_Frontend {
         add_action('wp_ajax_nopriv_cb_get_services', array($this, 'ajax_get_services'));
         add_action('wp_ajax_nopriv_cb_get_extras', array($this, 'ajax_get_extras'));
         add_action('wp_ajax_nopriv_cb_calculate_price', array($this, 'ajax_calculate_price'));
+        add_action('wp_ajax_nopriv_cb_hold_slot', array($this, 'ajax_hold_slot'));
+        add_action('wp_ajax_nopriv_cb_release_slot', array($this, 'ajax_release_slot'));
+        
+        // Clear WooCommerce session data when booking widget is loaded
+        add_action('wp_footer', array($this, 'clear_woocommerce_session_on_widget_load'));
+    }
+    
+    /**
+     * Clear WooCommerce session data when booking widget is loaded
+     * This ensures fresh data for each new booking
+     */
+    public function clear_woocommerce_session_on_widget_load() {
+        // Only run if WooCommerce is active and we're on a page with the booking widget
+        if (!class_exists('WooCommerce') || !WC()->session) {
+            return;
+        }
+        
+        // Check if the booking widget is present on the page
+        if (strpos(get_the_content(), '[cb_widget]') !== false || 
+            strpos(get_the_content(), 'cb-widget') !== false ||
+            is_page() && has_shortcode(get_post()->post_content, 'cb_widget')) {
+            
+            // Clear WooCommerce session data to prevent old data from persisting
+            WC()->session->set('billing_first_name', '');
+            WC()->session->set('billing_last_name', '');
+            WC()->session->set('billing_company', '');
+            WC()->session->set('billing_email', '');
+            WC()->session->set('billing_phone', '');
+            WC()->session->set('billing_address_1', '');
+            WC()->session->set('billing_city', '');
+            WC()->session->set('billing_state', '');
+            WC()->session->set('billing_postcode', '');
+            WC()->session->set('billing_country', '');
+            
+            WC()->session->set('shipping_first_name', '');
+            WC()->session->set('shipping_last_name', '');
+            WC()->session->set('shipping_company', '');
+            WC()->session->set('shipping_address_1', '');
+            WC()->session->set('shipping_city', '');
+            WC()->session->set('shipping_state', '');
+            WC()->session->set('shipping_postcode', '');
+            WC()->session->set('shipping_country', '');
+            
+            WC()->session->set('order_comments', '');
+            WC()->session->set('chosen_payment_method', '');
+            WC()->session->set('customer_data', array());
+            
+            // Also clear WooCommerce customer data directly
+            if (WC()->customer) {
+                WC()->customer->set_billing_first_name('');
+                WC()->customer->set_billing_last_name('');
+                WC()->customer->set_billing_company('');
+                WC()->customer->set_billing_email('');
+                WC()->customer->set_billing_phone('');
+                WC()->customer->set_billing_address_1('');
+                WC()->customer->set_billing_city('');
+                WC()->customer->set_billing_state('');
+                WC()->customer->set_billing_postcode('');
+                WC()->customer->set_billing_country('');
+                
+                WC()->customer->set_shipping_first_name('');
+                WC()->customer->set_shipping_last_name('');
+                WC()->customer->set_shipping_company('');
+                WC()->customer->set_shipping_address_1('');
+                WC()->customer->set_shipping_city('');
+                WC()->customer->set_shipping_state('');
+                WC()->customer->set_shipping_postcode('');
+                WC()->customer->set_shipping_country('');
+                
+                WC()->customer->save();
+            }
+            
+            error_log("CB Debug - Cleared WooCommerce session and customer data on booking widget load");
+        }
     }
     
     /**
@@ -202,6 +282,9 @@ class CB_Frontend {
             wp_enqueue_script('cb-frontend', CB_PLUGIN_URL . 'assets/js/frontend.js', array('jquery'), CB_VERSION, false);
             wp_enqueue_style('cb-frontend', CB_PLUGIN_URL . 'assets/css/frontend.css', array(), CB_VERSION);
             
+            // Add dynamic CSS for admin color customization
+            $this->add_dynamic_css();
+            
             // Set high priority and ensure it loads before other scripts
             wp_script_add_data('cb-frontend-init', 'priority', 1);
             wp_script_add_data('cb-frontend', 'priority', 2);
@@ -253,15 +336,8 @@ class CB_Frontend {
     public function booking_widget_shortcode($atts) {
         $atts = shortcode_atts(array(
             'title' => __('Book Your Cleaning Service', 'cleaning-booking'),
-            'show_steps' => 'true',
-            'theme' => 'light'
+            'show_steps' => 'true'
         ), $atts);
-        
-        // Validate theme parameter
-        $themes = array('light', 'dark');
-        if (!in_array($atts['theme'], $themes)) {
-            $atts['theme'] = 'light';
-        }
         
         // Convert show_steps to boolean
         $atts['show_steps'] = filter_var($atts['show_steps'], FILTER_VALIDATE_BOOLEAN);
@@ -277,10 +353,6 @@ class CB_Frontend {
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'cb_frontend_nonce')) {
             wp_send_json_error(array('message' => __('Security ticket expired. Please refresh the page.', 'cleaning-booking')));
         }
-            
-            // Debug logging
-            error_log('CB Debug - Creating booking with data: ' . print_r($_POST, true));
-            error_log('CB Debug - Extras received: ' . print_r($_POST['extras'], true));
         
         $data = array(
             'customer_name' => sanitize_text_field($_POST['customer_name']),
@@ -333,6 +405,16 @@ class CB_Frontend {
         $data['total_price'] = $total_price;
         $data['total_duration'] = $total_duration;
         
+        // Assign available truck automatically
+        $available_truck = CB_Database::get_available_truck($data['booking_date'], $data['booking_time'], $total_duration);
+        if ($available_truck) {
+            $data['truck_id'] = $available_truck->id;
+            error_log("CB Debug - Assigned truck {$available_truck->id} ({$available_truck->truck_name}) to booking");
+        } else {
+            error_log("CB Debug - No available truck found for booking on {$data['booking_date']} at {$data['booking_time']}");
+            wp_send_json_error(array('message' => __('No trucks available for the selected time slot. Please choose another time.', 'cleaning-booking')));
+        }
+        
         // Create booking
         $booking_id = CB_Database::create_booking($data);
         
@@ -343,13 +425,8 @@ class CB_Frontend {
             $woocommerce = new CB_WooCommerce();
             $order_url = $woocommerce->create_booking_order($booking);
                 
-                // Debug logging
-                error_log('CB Debug - Booking created with ID: ' . $booking_id);
-                error_log('CB Debug - Checkout URL: ' . $order_url);
-                
                 // If WooCommerce is not available, provide a fallback
                 if (!$order_url) {
-                    error_log('CB Debug - WooCommerce not available, using fallback');
                     $order_url = add_query_arg(array(
                         'booking_id' => $booking_id,
                         'booking_reference' => $booking->booking_reference
@@ -415,8 +492,9 @@ class CB_Frontend {
             wp_send_json_error(array('message' => __('Please select a date.', 'cleaning-booking')));
         }
         
-        // Generate available time slots for the given date
-        $slots = $this->generate_time_slots($booking_date, $duration);
+        // Use the proper slot manager to get available slots
+        $slot_manager = new CB_Slot_Manager();
+        $slots = $slot_manager->get_available_slots($booking_date, $duration);
         
         wp_send_json_success(array('slots' => $slots));
     }
@@ -457,10 +535,6 @@ class CB_Frontend {
         
         // Get active extras for the selected service
         $extras = CB_Database::get_service_extras($service_id, true);
-        
-        // Debug logging
-        error_log('CB Debug - ajax_get_extras called for service_id: ' . $service_id);
-        error_log('CB Debug - extras found: ' . print_r($extras, true));
         
         wp_send_json_success(array('extras' => $extras));
     }
@@ -589,6 +663,55 @@ class CB_Frontend {
         ));
     }
     
+    public function ajax_hold_slot() {
+        try {
+            $booking_date = sanitize_text_field($_POST['booking_date']);
+            $booking_time = sanitize_text_field($_POST['booking_time']);
+            $duration = intval($_POST['duration']);
+            
+            if (empty($booking_date) || empty($booking_time)) {
+                wp_send_json_error(array('message' => __('Date and time are required.', 'cleaning-booking')));
+            }
+            
+            $slot_manager = new CB_Slot_Manager();
+            $session_id = $slot_manager->hold_slot($booking_date, $booking_time, $duration);
+            
+            if ($session_id) {
+                wp_send_json_success(array(
+                    'session_id' => $session_id,
+                    'message' => __('Time slot held successfully.', 'cleaning-booking')
+                ));
+            } else {
+                wp_send_json_error(array('message' => __('Slot is no longer available.', 'cleaning-booking')));
+            }
+            
+        } catch (Exception $e) {
+            wp_send_json_error(array('message' => __('Failed to hold slot. Please try again.', 'cleaning-booking')));
+        }
+    }
+    
+    public function ajax_release_slot() {
+        try {
+            $session_id = sanitize_text_field($_POST['session_id']);
+            
+            if (empty($session_id)) {
+                wp_send_json_error(array('message' => __('Session ID is required.', 'cleaning-booking')));
+            }
+            
+            $slot_manager = new CB_Slot_Manager();
+            $result = $slot_manager->release_slot($session_id);
+            
+            if ($result) {
+                wp_send_json_success(array('message' => __('Slot released successfully.', 'cleaning-booking')));
+            } else {
+                wp_send_json_error(array('message' => __('Failed to release slot.', 'cleaning-booking')));
+            }
+            
+        } catch (Exception $e) {
+            wp_send_json_error(array('message' => __('Failed to release slot. Please try again.', 'cleaning-booking')));
+        }
+    }
+    
     public function register_rest_routes() {
         register_rest_route('cleaning-booking/v1', '/services', array(
             'methods' => 'GET',
@@ -626,22 +749,51 @@ class CB_Frontend {
     
     public function ajax_calculate_price() {
         try {
+            
             // Require nonce for price calculation
             if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'cb_frontend_nonce')) {
+                error_log('CB Debug - Nonce verification failed');
                 wp_send_json_error(array('message' => __('Security ticket expired. Please refresh the page.', 'cleaning-booking')));
             }
             
             $service_id = intval($_POST['service_id']);
-            $square_meters = intval($_POST['square_meters']);
-            $extras = isset($_POST['extras']) ? array_map('intval', $_POST['extras']) : array();
+            $additional_area = intval($_POST['square_meters']); // This is now additional area
+            $use_smart_area = isset($_POST['use_smart_area']) && $_POST['use_smart_area'] === '1';
+            
+            // Handle extras properly - it might be an empty string or array
+            $extras = array();
+            error_log('CB Debug - Raw $_POST[extras]: ' . print_r($_POST['extras'], true));
+            if (isset($_POST['extras']) && !empty($_POST['extras'])) {
+                if (is_array($_POST['extras'])) {
+                    $extras = array_map('intval', $_POST['extras']);
+                    error_log('CB Debug - Extras parsed as array: ' . print_r($extras, true));
+                } else {
+                    // If it's a string, try to decode it as JSON or split by comma
+                    $extras_string = trim($_POST['extras']);
+                    error_log('CB Debug - Extras as string: ' . $extras_string);
+                    if (!empty($extras_string)) {
+                        // Try JSON decode first
+                        $decoded = json_decode($extras_string, true);
+                        if (is_array($decoded)) {
+                            $extras = array_map('intval', $decoded);
+                            error_log('CB Debug - Extras decoded from JSON: ' . print_r($extras, true));
+                        } else {
+                            // Fallback: split by comma
+                            $extras = array_map('intval', explode(',', $extras_string));
+                            error_log('CB Debug - Extras split by comma: ' . print_r($extras, true));
+                        }
+                    }
+                }
+            } else {
+                error_log('CB Debug - No extras found in $_POST');
+            }
+            
             $zip_code = sanitize_text_field($_POST['zip_code']);
-            
-            // Debug logging
-            error_log('CB Debug - Price calculation request: service_id=' . $service_id . ', sqm=' . $square_meters . ', extras=' . print_r($extras, true) . ', zip=' . $zip_code);
-            
+
             // Validate required fields
-            if (empty($service_id) || empty($square_meters)) {
-                wp_send_json_error(array('message' => __('Service and square meters are required for price calculation.', 'cleaning-booking')));
+            if (empty($service_id)) {
+                error_log('CB Debug - Validation failed: service_id=' . $service_id);
+                wp_send_json_error(array('message' => __('Service is required for price calculation.', 'cleaning-booking')));
             }
             
             // Check if CB_Pricing class exists
@@ -650,8 +802,49 @@ class CB_Frontend {
                 wp_send_json_error(array('message' => __('Pricing system not available.', 'cleaning-booking')));
             }
             
-            // Calculate pricing breakdown
-            $pricing = CB_Pricing::get_pricing_breakdown($service_id, $square_meters, $extras, $zip_code);
+            // Get service data to check for default area
+            $service = CB_Database::get_service($service_id);
+            if (!$service) {
+                wp_send_json_error(array('message' => __('Service not found.', 'cleaning-booking')));
+            }
+            
+            $total_area = $additional_area;
+            $base_area_included = 0;
+            
+            if ($use_smart_area && $service->default_area > 0) {
+                // Smart area calculation: base area + additional area
+                $base_area_included = $service->default_area;
+                $total_area = $base_area_included + $additional_area;
+                
+                error_log("CB Debug - Smart area calculation: Base={$base_area_included}m², Additional={$additional_area}m², Total={$total_area}m²");
+            }
+            
+            error_log('CB Debug - About to call get_pricing_breakdown with additional_area=' . $additional_area . ', extras=' . print_r($extras, true));
+            
+            // Calculate pricing breakdown using ONLY additional area (not total area)
+            // The base service is handled separately in smart_area calculation
+            $pricing = CB_Pricing::get_pricing_breakdown($service_id, $additional_area, $extras, $zip_code);
+            
+            // Add smart area info to response
+            $pricing['smart_area'] = array(
+                'use_smart_area' => $use_smart_area,
+                'base_area_included' => $base_area_included,
+                'additional_area' => $additional_area,
+                'total_area' => $total_area,
+                'base_price' => $service->base_price,
+                'base_duration' => $service->base_duration,
+                'additional_price' => $use_smart_area && $additional_area > 0 ? ($additional_area * $service->sqm_multiplier) : 0,
+                'additional_duration' => $use_smart_area && $additional_area > 0 ? ($additional_area * $service->sqm_duration_multiplier) : 0
+            );
+            
+            // Override pricing for smart area calculation
+            if ($use_smart_area && $service->default_area > 0) {
+                // For smart area, we want base service + additional area pricing
+                $pricing['service_price'] = floatval($service->base_price) + ($additional_area * floatval($service->sqm_multiplier));
+                $pricing['service_duration'] = intval($service->base_duration) + ($additional_area * floatval($service->sqm_duration_multiplier));
+                $pricing['total_price'] = $pricing['service_price'] + $pricing['extras_price'] + $pricing['zip_surcharge'];
+                $pricing['total_duration'] = max($pricing['service_duration'] + $pricing['extras_duration'], 30);
+            }
             
             error_log('CB Debug - Price calculation result: ' . print_r($pricing, true));
             
@@ -662,7 +855,6 @@ class CB_Frontend {
             ));
             
         } catch (Exception $e) {
-            error_log('CB Debug - Price calculation error: ' . $e->getMessage());
             error_log('CB Debug - Price calculation stack trace: ' . $e->getTraceAsString());
             wp_send_json_error(array('message' => __('Unable to calculate price. Please try again.', 'cleaning-booking')));
         }
@@ -688,5 +880,33 @@ class CB_Frontend {
         
         // Run migrations
         CB_Database::run_migrations();
+    }
+    
+    /**
+     * Add dynamic CSS for admin color customization
+     */
+    private function add_dynamic_css() {
+        $primary_color = get_option('cb_primary_color', '#0073aa');
+        $secondary_color = get_option('cb_secondary_color', '#00a0d2');
+        $background_color = get_option('cb_background_color', '#ffffff');
+        $text_color = get_option('cb_text_color', '#333333');
+        $border_color = get_option('cb_border_color', '#dddddd');
+        $success_color = get_option('cb_success_color', '#46b450');
+        $error_color = get_option('cb_error_color', '#dc3232');
+        
+        $css = "
+        <style id='cb-dynamic-colors'>
+        :root {
+            --cb-admin-primary: {$primary_color};
+            --cb-admin-secondary: {$secondary_color};
+            --cb-admin-background: {$background_color};
+            --cb-admin-text: {$text_color};
+            --cb-admin-border: {$border_color};
+            --cb-admin-success: {$success_color};
+            --cb-admin-error: {$error_color};
+        }
+        </style>";
+        
+        echo $css;
     }
 }
