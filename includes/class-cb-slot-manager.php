@@ -51,7 +51,8 @@ class CB_Slot_Manager {
                 );
             }
             
-            $current_time += ($slot_duration * 60);
+            // Move to next slot: slot duration + buffer time
+            $current_time += ($slot_duration * 60) + ($buffer_time * 60);
         }
         
         return $slots;
@@ -62,6 +63,7 @@ class CB_Slot_Manager {
         
         $bookings_table = $wpdb->prefix . 'cb_bookings';
         $trucks_table = $wpdb->prefix . 'cb_trucks';
+        $buffer_time = get_option('cb_buffer_time', 15);
         
         // Count total active trucks (one truck = one slot)
         $total_trucks = $wpdb->get_var(
@@ -76,14 +78,16 @@ class CB_Slot_Manager {
                  WHERE booking_date = %s 
                  AND status IN ('pending', 'confirmed', 'paid', 'on-hold')
                  AND (
-                     (booking_time <= %s AND ADDTIME(booking_time, SEC_TO_TIME(total_duration * 60)) > %s) OR
-                     (booking_time < ADDTIME(%s, SEC_TO_TIME(%d * 60)) AND ADDTIME(booking_time, SEC_TO_TIME(total_duration * 60)) >= ADDTIME(%s, SEC_TO_TIME(%d * 60)))
+                     (booking_time <= %s AND ADDTIME(booking_time, SEC_TO_TIME((total_duration + %d) * 60)) > %s) OR
+                     (booking_time < ADDTIME(%s, SEC_TO_TIME(%d * 60)) AND ADDTIME(booking_time, SEC_TO_TIME((total_duration + %d) * 60)) >= ADDTIME(%s, SEC_TO_TIME(%d * 60)))
                  )",
                 $date,
                 $time,
+                $buffer_time,
                 $time,
                 $time,
                 $duration,
+                $buffer_time,
                 $time,
                 $duration
             ));
@@ -93,19 +97,22 @@ class CB_Slot_Manager {
         }
         
         // Count existing bookings for this time slot (pending, confirmed, paid, on-hold)
+        // Include buffer time in the conflict detection
         $existing_bookings_count = $wpdb->get_var($wpdb->prepare(
             "SELECT COUNT(*) FROM $bookings_table 
              WHERE booking_date = %s 
              AND status IN ('pending', 'confirmed', 'paid', 'on-hold')
              AND (
-                 (booking_time <= %s AND ADDTIME(booking_time, SEC_TO_TIME(total_duration * 60)) > %s) OR
-                 (booking_time < ADDTIME(%s, SEC_TO_TIME(%d * 60)) AND ADDTIME(booking_time, SEC_TO_TIME(total_duration * 60)) >= ADDTIME(%s, SEC_TO_TIME(%d * 60)))
+                 (booking_time <= %s AND ADDTIME(booking_time, SEC_TO_TIME((total_duration + %d) * 60)) > %s) OR
+                 (booking_time < ADDTIME(%s, SEC_TO_TIME(%d * 60)) AND ADDTIME(booking_time, SEC_TO_TIME((total_duration + %d) * 60)) >= ADDTIME(%s, SEC_TO_TIME(%d * 60)))
              )",
             $date,
             $time,
+            $buffer_time,
             $time,
             $time,
             $duration,
+            $buffer_time,
             $time,
             $duration
         ));
@@ -115,10 +122,12 @@ class CB_Slot_Manager {
     }
     
     private function slots_overlap($time1, $duration1, $time2, $duration2) {
+        $buffer_time = get_option('cb_buffer_time', 15);
+        
         $start1 = strtotime($time1);
-        $end1 = $start1 + ($duration1 * 60);
+        $end1 = $start1 + (($duration1 + $buffer_time) * 60); // Include buffer time
         $start2 = strtotime($time2);
-        $end2 = $start2 + ($duration2 * 60);
+        $end2 = $start2 + (($duration2 + $buffer_time) * 60); // Include buffer time
         
         return ($start1 < $end2 && $end1 > $start2);
     }
@@ -156,11 +165,37 @@ class CB_Slot_Manager {
         global $wpdb;
         
         $slot_holds_table = $wpdb->prefix . 'cb_slot_holds';
+        $bookings_table = $wpdb->prefix . 'cb_bookings';
         
+        // First, get the slot hold details
+        $hold = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $slot_holds_table WHERE session_id = %s",
+            $session_id
+        ));
+        
+        if (!$hold) {
+            return false; // Hold not found
+        }
+        
+        // Check if there's already a booking for this slot (any status)
+        $existing_booking = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM $bookings_table 
+             WHERE booking_date = %s 
+             AND booking_time = %s 
+             AND status IN ('pending', 'confirmed', 'paid', 'on-hold')",
+            $hold->booking_date,
+            $hold->booking_time
+        ));
+        
+        // If a booking exists, don't release the slot - it should remain blocked
+        if ($existing_booking > 0) {
+            return false;
+        }
+        
+        // No booking exists, safe to release the slot
         $result = $wpdb->delete($slot_holds_table, array(
             'session_id' => $session_id
         ));
-        
         return $result > 0;
     }
     
@@ -168,9 +203,35 @@ class CB_Slot_Manager {
         global $wpdb;
         
         $slot_holds_table = $wpdb->prefix . 'cb_slot_holds';
+        $bookings_table = $wpdb->prefix . 'cb_bookings';
         
-        // Delete expired holds
-        $wpdb->query("DELETE FROM $slot_holds_table WHERE expires_at < NOW()");
+        // Get expired holds
+        $expired_holds = $wpdb->get_results(
+            "SELECT * FROM $slot_holds_table WHERE expires_at < NOW()"
+        );
+        
+        foreach ($expired_holds as $hold) {
+            // Check if there's a booking for this slot
+            $existing_booking = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM $bookings_table 
+                 WHERE booking_date = %s 
+                 AND booking_time = %s 
+                 AND status IN ('pending', 'confirmed', 'paid', 'on-hold')",
+                $hold->booking_date,
+                $hold->booking_time
+            ));
+            
+            if ($existing_booking > 0) {
+                // Booking exists, remove the hold but slot remains blocked by booking
+                error_log("CB Debug - Cleanup: Removing expired hold for {$hold->booking_date} {$hold->booking_time} (booking exists)");
+            } else {
+                // No booking exists, safe to remove hold
+                error_log("CB Debug - Cleanup: Removing expired hold for {$hold->booking_date} {$hold->booking_time} (no booking)");
+            }
+            
+            // Remove the expired hold regardless (booking will block the slot if it exists)
+            $wpdb->delete($slot_holds_table, array('id' => $hold->id));
+        }
     }
     
     public function get_booking_conflicts($date, $time, $duration, $exclude_booking_id = null) {

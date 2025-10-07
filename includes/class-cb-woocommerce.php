@@ -136,7 +136,11 @@ class CB_WooCommerce {
         
         // Set preferred payment method
         if (!empty($booking->payment_method)) {
-            WC()->session->set('chosen_payment_method', $this->map_payment_method($booking->payment_method));
+            $mapped_payment_method = $this->map_payment_method($booking->payment_method);
+            WC()->session->set('chosen_payment_method', $mapped_payment_method);
+            error_log("CB Debug - Payment method mapping: {$booking->payment_method} -> {$mapped_payment_method}");
+        } else {
+            error_log("CB Debug - No payment method found in booking data");
         }
         
         // Set customer data for WooCommerce
@@ -245,8 +249,6 @@ class CB_WooCommerce {
     private function map_payment_method($booking_payment_method) {
         $payment_mapping = array(
             'cash' => 'cod', // Cash on Delivery
-            'card' => 'stripe', // Credit/Debit Card (Stripe)
-            'paypal' => 'ppec_paypal', // PayPal
             'bank_transfer' => 'bacs' // Bank Transfer
         );
         
@@ -448,28 +450,51 @@ class CB_WooCommerce {
         global $wpdb;
         
         $service = $wpdb->get_row($wpdb->prepare(
-            "SELECT name FROM {$wpdb->prefix}cb_services WHERE id = %d",
+            "SELECT name, default_area FROM {$wpdb->prefix}cb_services WHERE id = %d",
             $booking->service_id
         ));
         
         $service_name = $service ? $service->name : 'Cleaning Service';
         
+        // Calculate total space (base + additional)
+        $base_area = $service ? intval($service->default_area) : 0;
+        $additional_area = intval($booking->square_meters);
+        $total_space = $base_area + $additional_area;
+        
+        // If total_space is 0 but we have a base_area, show the base_area
+        if ($total_space == 0 && $base_area > 0) {
+            $total_space = $base_area;
+        }
+        
         $description = sprintf(
-            "Booking Reference: %s\nService: %s\nSquare Meters: %d\nDate: %s\nTime: %s\nDuration: %d minutes",
+            "Booking Reference: %s\nService: %s\nSquare Meters: %d m²",
             $booking->booking_reference,
             $service_name,
-            $booking->square_meters,
+            $total_space
+        );
+        
+        // Add breakdown if both base and additional areas exist
+        if ($base_area > 0 && $additional_area > 0) {
+            $description .= sprintf(" (%d base + %d additional)", $base_area, $additional_area);
+        } elseif ($base_area > 0) {
+            $description .= sprintf(" (%d base)", $base_area);
+        }
+        
+        $description .= sprintf(
+            "\nDate: %s\nTime: %s\nDuration: %d minutes",
             $booking->booking_date,
             $booking->booking_time,
             $booking->total_duration
         );
                     
-                    if ($booking->extras_data) {
-                        $extras = json_decode($booking->extras_data, true);
-                        if (!empty($extras)) {
+        if ($booking->extras_data) {
+            $extras = json_decode($booking->extras_data, true);
+            if (!empty($extras) && is_array($extras)) {
                 $description .= "\n\nAdditional Services:";
-                            foreach ($extras as $extra) {
-                    $description .= "\n- " . $extra['name'] . " (x" . $extra['quantity'] . ")";
+                foreach ($extras as $extra) {
+                    if (is_array($extra) && isset($extra['name']) && isset($extra['quantity'])) {
+                        $description .= "\n- " . $extra['name'] . " (x" . $extra['quantity'] . ")";
+                    }
                 }
             }
         }
@@ -524,15 +549,21 @@ class CB_WooCommerce {
         $slot_holds_table = $wpdb->prefix . 'cb_slot_holds';
         $hold_duration = get_option('cb_booking_hold_time', 15); // minutes
         
+        // Use the same session ID system as frontend (UUID4)
+        $session_id = wp_generate_uuid4();
+        
         $hold_data = array(
             'booking_date' => $booking->booking_date,
             'booking_time' => $booking->booking_time,
             'duration' => $booking->total_duration,
-            'session_id' => WC()->session->get_customer_id(),
+            'session_id' => $session_id,
             'expires_at' => date('Y-m-d H:i:s', strtotime("+{$hold_duration} minutes"))
         );
         
         $wpdb->insert($slot_holds_table, $hold_data);
+        
+        // Store the session ID in WooCommerce session for later release
+        WC()->session->set('cb_slot_session_id', $session_id);
     }
     
     public function process_booking_checkout() {
@@ -746,16 +777,27 @@ class CB_WooCommerce {
         $slot_holds_table = $wpdb->prefix . 'cb_slot_holds';
         $bookings_table = $wpdb->prefix . 'cb_bookings';
         
-        // Check for existing bookings
+        // Check for existing bookings (include buffer time in conflict detection)
+        $buffer_time = get_option('cb_buffer_time', 15);
         $existing_booking = $wpdb->get_var($wpdb->prepare(
             "SELECT COUNT(*) FROM $bookings_table 
              WHERE booking_date = %s 
-             AND booking_time = %s 
              AND status IN ('confirmed', 'paid') 
-             AND id != %d",
+             AND id != %d
+             AND (
+                 (booking_time <= %s AND ADDTIME(booking_time, SEC_TO_TIME((total_duration + %d) * 60)) > %s) OR
+                 (booking_time < ADDTIME(%s, SEC_TO_TIME(%d * 60)) AND ADDTIME(booking_time, SEC_TO_TIME((total_duration + %d) * 60)) >= ADDTIME(%s, SEC_TO_TIME(%d * 60)))
+             )",
             $booking->booking_date,
+            $booking->id,
             $booking->booking_time,
-            $booking->id
+            $buffer_time,
+            $booking->booking_time,
+            $booking->booking_time,
+            $booking->total_duration,
+            $buffer_time,
+            $booking->booking_time,
+            $booking->total_duration
         ));
         
         if ($existing_booking > 0) {
@@ -763,6 +805,8 @@ class CB_WooCommerce {
         }
         
         // Check for active holds (excluding current session)
+        $current_session_id = WC()->session->get('cb_slot_session_id');
+        $buffer_time = get_option('cb_buffer_time', 15);
         $active_hold = $wpdb->get_var($wpdb->prepare(
             "SELECT COUNT(*) FROM $slot_holds_table 
              WHERE booking_date = %s 
@@ -771,7 +815,7 @@ class CB_WooCommerce {
              AND session_id != %s",
             $booking->booking_date,
             $booking->booking_time,
-            WC()->session->get_customer_id()
+            $current_session_id ?: ''
         ));
         
         return $active_hold == 0;
@@ -782,9 +826,17 @@ class CB_WooCommerce {
         
         $slot_holds_table = $wpdb->prefix . 'cb_slot_holds';
         
-        $wpdb->delete($slot_holds_table, array(
-            'session_id' => WC()->session->get_customer_id()
-        ));
+        // Get the session ID from WooCommerce session
+        $session_id = WC()->session->get('cb_slot_session_id');
+        
+        if ($session_id) {
+            $wpdb->delete($slot_holds_table, array(
+                'session_id' => $session_id
+            ));
+            
+            // Clear the session ID from WooCommerce session
+            WC()->session->set('cb_slot_session_id', null);
+        }
     }
     
     public function display_booking_details($order) {
@@ -808,18 +860,36 @@ class CB_WooCommerce {
         global $wpdb;
         
         $service = $wpdb->get_row($wpdb->prepare(
-            "SELECT name FROM {$wpdb->prefix}cb_services WHERE id = %d",
+            "SELECT name, default_area FROM {$wpdb->prefix}cb_services WHERE id = %d",
             $booking->service_id
         ));
         
         $service_name = $service ? $service->name : 'Unknown Service';
+        
+        // Calculate total space (base + additional)
+        $base_area = $service ? intval($service->default_area) : 0;
+        $additional_area = intval($booking->square_meters);
+        $total_space = $base_area + $additional_area;
+        
+        error_log("CB Debug - Square meters calculation: base_area={$base_area}, additional_area={$additional_area}, total_space={$total_space}");
+        
+        // If total_space is 0 but we have a base_area, show the base_area
+        if ($total_space == 0 && $base_area > 0) {
+            $total_space = $base_area;
+        }
         
         echo '<div class="cb-booking-details">';
         echo '<h3>' . __('Booking Details', 'cleaning-booking') . '</h3>';
         echo '<table class="widefat">';
         echo '<tr><td><strong>' . __('Booking Reference', 'cleaning-booking') . ':</strong></td><td>' . esc_html($booking->booking_reference) . '</td></tr>';
         echo '<tr><td><strong>' . __('Service', 'cleaning-booking') . ':</strong></td><td>' . esc_html($service_name) . '</td></tr>';
-        echo '<tr><td><strong>' . __('Square Meters', 'cleaning-booking') . ':</strong></td><td>' . esc_html($booking->square_meters) . '</td></tr>';
+        echo '<tr><td><strong>' . __('Square Meters', 'cleaning-booking') . ':</strong></td><td>' . esc_html($total_space) . ' m²';
+        if ($base_area > 0 && $additional_area > 0) {
+            echo ' (' . esc_html($base_area) . ' base + ' . esc_html($additional_area) . ' additional)';
+        } elseif ($base_area > 0) {
+            echo ' (' . esc_html($base_area) . ' base)';
+        }
+        echo '</td></tr>';
         echo '<tr><td><strong>' . __('Date', 'cleaning-booking') . ':</strong></td><td>' . esc_html($booking->booking_date) . '</td></tr>';
         echo '<tr><td><strong>' . __('Time', 'cleaning-booking') . ':</strong></td><td>' . esc_html($booking->booking_time) . '</td></tr>';
         echo '<tr><td><strong>' . __('Duration', 'cleaning-booking') . ':</strong></td><td>' . esc_html($booking->total_duration) . ' ' . __('minutes', 'cleaning-booking') . '</td></tr>';
@@ -830,10 +900,12 @@ class CB_WooCommerce {
         
         if ($booking->extras_data) {
             $extras = json_decode($booking->extras_data, true);
-            if (!empty($extras)) {
+            if (!empty($extras) && is_array($extras)) {
                 echo '<tr><td><strong>' . __('Additional Services', 'cleaning-booking') . ':</strong></td><td>';
                 foreach ($extras as $extra) {
-                    echo esc_html($extra['name']) . ' (x' . esc_html($extra['quantity']) . ')<br>';
+                    if (is_array($extra) && isset($extra['name']) && isset($extra['quantity'])) {
+                        echo esc_html($extra['name']) . ' (x' . esc_html($extra['quantity']) . ')<br>';
+                    }
                 }
                 echo '</td></tr>';
             }
@@ -856,30 +928,46 @@ class CB_WooCommerce {
         // Check if any payment gateways are enabled
         $available_gateways = WC()->payment_gateways()->get_available_payment_gateways();
         
-        if (empty($available_gateways)) {
-            // Enable Cash on Delivery if available
-            $gateways = WC()->payment_gateways()->payment_gateways();
+        // Always ensure our required payment gateways are enabled
+        $gateways = WC()->payment_gateways()->payment_gateways();
+        
+        // Enable Cash on Delivery if available
+        if (isset($gateways['cod'])) {
+            $gateway_settings = get_option('woocommerce_cod_settings', array());
+            $gateway_settings['enabled'] = 'yes';
+            $gateway_settings['title'] = __('Cash on Delivery', 'cleaning-booking');
+            $gateway_settings['description'] = __('Pay when service is completed', 'cleaning-booking');
+            update_option('woocommerce_cod_settings', $gateway_settings);
             
-            if (isset($gateways['cod'])) {
-                // Enable Cash on Delivery
-                $gateway_settings = get_option('woocommerce_cod_settings', array());
-                $gateway_settings['enabled'] = 'yes';
-                $gateway_settings['title'] = __('Cash on Delivery', 'cleaning-booking');
-                $gateway_settings['description'] = __('Pay when service is completed', 'cleaning-booking');
-                update_option('woocommerce_cod_settings', $gateway_settings);
-                
-                error_log('CB Debug - Enabled Cash on Delivery payment gateway');
-            }
+            error_log('CB Debug - Enabled Cash on Delivery payment gateway');
+        }
+        
+        // Enable Bank Transfer if available
+        if (isset($gateways['bacs'])) {
+            $gateway_settings = get_option('woocommerce_bacs_settings', array());
+            $gateway_settings['enabled'] = 'yes';
+            $gateway_settings['title'] = __('Bank Transfer', 'cleaning-booking');
+            update_option('woocommerce_bacs_settings', $gateway_settings);
             
-            // Also try to enable Bank Transfer if available
-            if (isset($gateways['bacs'])) {
-                $gateway_settings = get_option('woocommerce_bacs_settings', array());
-                $gateway_settings['enabled'] = 'yes';
-                $gateway_settings['title'] = __('Bank Transfer', 'cleaning-booking');
-                update_option('woocommerce_bacs_settings', $gateway_settings);
-                
-                error_log('CB Debug - Enabled Bank Transfer payment gateway');
-            }
+            error_log('CB Debug - Enabled Bank Transfer payment gateway');
+        }
+        
+        // Disable Stripe if available (as per user request)
+        if (isset($gateways['stripe'])) {
+            $gateway_settings = get_option('woocommerce_stripe_settings', array());
+            $gateway_settings['enabled'] = 'no'; // Disable
+            update_option('woocommerce_stripe_settings', $gateway_settings);
+            
+            error_log('CB Debug - Disabled Stripe payment gateway');
+        }
+        
+        // Disable PayPal if available (as per user request)
+        if (isset($gateways['ppec_paypal'])) {
+            $gateway_settings = get_option('woocommerce_ppec_paypal_settings', array());
+            $gateway_settings['enabled'] = 'no'; // Disable
+            update_option('woocommerce_ppec_paypal_settings', $gateway_settings);
+            
+            error_log('CB Debug - Disabled PayPal payment gateway');
         }
     }
     

@@ -266,7 +266,6 @@ class CB_Database {
         
         if (empty($column_exists)) {
             $wpdb->query("ALTER TABLE $services_table ADD COLUMN default_area int(11) NOT NULL DEFAULT 0 AFTER sqm_duration_multiplier");
-            error_log("CB Debug - Added default_area column to services table");
         }
     }
     
@@ -477,7 +476,13 @@ class CB_Database {
                 // Simple ID format: [2, 3, 4]
                 $extra_id = intval($extra);
                 $quantity = 1; // Default quantity
-                $price = 0; // Will be calculated later
+                
+                // Fetch the actual price from service_extras table
+                $extra_data = $wpdb->get_row($wpdb->prepare(
+                    "SELECT price FROM {$wpdb->prefix}cb_service_extras WHERE id = %d",
+                    $extra_id
+                ));
+                $price = $extra_data ? floatval($extra_data->price) : 0;
             } else {
                 // Object format: [{'id': 2, 'quantity': 1, 'price': 25.00}]
                 $extra_id = intval($extra['id']);
@@ -521,7 +526,11 @@ class CB_Database {
             $data['payment_method'] = sanitize_text_field($payment_method);
         }
         
-        return $wpdb->update($table, $data, array('id' => $booking_id));
+        $result = $wpdb->update($table, $data, array('id' => $booking_id));
+        
+        // $wpdb->update returns false on error, 0 if no rows affected, or number of affected rows
+        // We consider it successful if it's not false (even if 0 rows affected)
+        return $result !== false;
     }
     
     public static function update_booking($booking_id, $data) {
@@ -740,21 +749,25 @@ class CB_Database {
         foreach ($trucks as $truck) {
             // Check if this truck is available for the requested time slot
             // One truck = one slot, so we just check if truck has any conflicting bookings
+            // Include buffer time in conflict detection
+            $buffer_time = get_option('cb_buffer_time', 15);
             $conflicting_bookings = $wpdb->get_var($wpdb->prepare(
                 "SELECT COUNT(*) FROM $bookings_table 
                  WHERE truck_id = %d 
                  AND booking_date = %s 
                  AND status IN ('pending', 'confirmed', 'paid', 'on-hold')
                  AND (
-                     (booking_time <= %s AND ADDTIME(booking_time, SEC_TO_TIME(total_duration * 60)) > %s) OR
-                     (booking_time < ADDTIME(%s, SEC_TO_TIME(%d * 60)) AND ADDTIME(booking_time, SEC_TO_TIME(total_duration * 60)) >= ADDTIME(%s, SEC_TO_TIME(%d * 60)))
+                     (booking_time <= %s AND ADDTIME(booking_time, SEC_TO_TIME((total_duration + %d) * 60)) > %s) OR
+                     (booking_time < ADDTIME(%s, SEC_TO_TIME(%d * 60)) AND ADDTIME(booking_time, SEC_TO_TIME((total_duration + %d) * 60)) >= ADDTIME(%s, SEC_TO_TIME(%d * 60)))
                  )",
                 $truck->id,
                 $booking_date,
                 $booking_time,
+                $buffer_time,
                 $booking_time,
                 $booking_time,
                 $duration,
+                $buffer_time,
                 $booking_time,
                 $duration
             ));
