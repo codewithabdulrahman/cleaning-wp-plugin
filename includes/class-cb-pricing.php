@@ -203,6 +203,9 @@ class CB_Pricing {
      * Format duration for display
      */
     public static function format_duration($minutes) {
+        // Convert to integer to avoid precision issues
+        $minutes = (int) round($minutes);
+        
         if ($minutes < 60) {
             return $minutes . ' min';
         } else {

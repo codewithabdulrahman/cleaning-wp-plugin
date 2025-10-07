@@ -131,8 +131,6 @@ class CB_Frontend {
                 
                 WC()->customer->save();
             }
-            
-            error_log("CB Debug - Cleared WooCommerce session and customer data on booking widget load");
         }
     }
     
@@ -294,7 +292,17 @@ class CB_Frontend {
                 'rest_url' => rest_url('cleaning-booking/v1/'),
                 'nonce' => wp_create_nonce('cb_frontend_nonce'),
                 'current_language' => $this->get_current_language(),
+                'booking_hold_time' => get_option('cb_booking_hold_time', 15), // Add booking hold time setting
                 'translations' => $this->get_translations(),
+                'colors' => array(
+                    'primary' => get_option('cb_primary_color', '#0073aa'),
+                    'secondary' => get_option('cb_secondary_color', '#00a0d2'),
+                    'background' => get_option('cb_background_color', '#ffffff'),
+                    'text' => get_option('cb_text_color', '#333333'),
+                    'border' => get_option('cb_border_color', '#dddddd'),
+                    'success' => get_option('cb_success_color', '#46b450'),
+                    'error' => get_option('cb_error_color', '#dc3232'),
+                ),
                 'strings' => array(
                     'loading' => __('Loading...', 'cleaning-booking'),
                     'error' => __('An error occurred. Please try again.', 'cleaning-booking'),
@@ -386,7 +394,7 @@ class CB_Frontend {
             wp_send_json_error(array('message' => __('Please select a service.', 'cleaning-booking')));
         }
         
-        if (empty($data['square_meters']) || $data['square_meters'] <= 0) {
+        if ($data['square_meters'] < 0) {
             wp_send_json_error(array('message' => __('Please enter a valid square meter value.', 'cleaning-booking')));
         }
         
@@ -409,7 +417,6 @@ class CB_Frontend {
         $available_truck = CB_Database::get_available_truck($data['booking_date'], $data['booking_time'], $total_duration);
         if ($available_truck) {
             $data['truck_id'] = $available_truck->id;
-            error_log("CB Debug - Assigned truck {$available_truck->id} ({$available_truck->truck_name}) to booking");
         } else {
             error_log("CB Debug - No available truck found for booking on {$data['booking_date']} at {$data['booking_time']}");
             wp_send_json_error(array('message' => __('No trucks available for the selected time slot. Please choose another time.', 'cleaning-booking')));
@@ -752,21 +759,18 @@ class CB_Frontend {
             
             // Require nonce for price calculation
             if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'cb_frontend_nonce')) {
-                error_log('CB Debug - Nonce verification failed');
                 wp_send_json_error(array('message' => __('Security ticket expired. Please refresh the page.', 'cleaning-booking')));
             }
             
             $service_id = intval($_POST['service_id']);
-            $additional_area = intval($_POST['square_meters']); // This is now additional area
+            $additional_area = intval($_POST['square_meters'], 10); // Force base 10 to prevent octal interpretation
             $use_smart_area = isset($_POST['use_smart_area']) && $_POST['use_smart_area'] === '1';
             
             // Handle extras properly - it might be an empty string or array
             $extras = array();
-            error_log('CB Debug - Raw $_POST[extras]: ' . print_r($_POST['extras'], true));
             if (isset($_POST['extras']) && !empty($_POST['extras'])) {
                 if (is_array($_POST['extras'])) {
                     $extras = array_map('intval', $_POST['extras']);
-                    error_log('CB Debug - Extras parsed as array: ' . print_r($extras, true));
                 } else {
                     // If it's a string, try to decode it as JSON or split by comma
                     $extras_string = trim($_POST['extras']);
@@ -776,7 +780,6 @@ class CB_Frontend {
                         $decoded = json_decode($extras_string, true);
                         if (is_array($decoded)) {
                             $extras = array_map('intval', $decoded);
-                            error_log('CB Debug - Extras decoded from JSON: ' . print_r($extras, true));
                         } else {
                             // Fallback: split by comma
                             $extras = array_map('intval', explode(',', $extras_string));
@@ -792,13 +795,11 @@ class CB_Frontend {
 
             // Validate required fields
             if (empty($service_id)) {
-                error_log('CB Debug - Validation failed: service_id=' . $service_id);
                 wp_send_json_error(array('message' => __('Service is required for price calculation.', 'cleaning-booking')));
             }
             
             // Check if CB_Pricing class exists
             if (!class_exists('CB_Pricing')) {
-                error_log('CB Debug - CB_Pricing class not found!');
                 wp_send_json_error(array('message' => __('Pricing system not available.', 'cleaning-booking')));
             }
             
@@ -815,11 +816,7 @@ class CB_Frontend {
                 // Smart area calculation: base area + additional area
                 $base_area_included = $service->default_area;
                 $total_area = $base_area_included + $additional_area;
-                
-                error_log("CB Debug - Smart area calculation: Base={$base_area_included}m², Additional={$additional_area}m², Total={$total_area}m²");
             }
-            
-            error_log('CB Debug - About to call get_pricing_breakdown with additional_area=' . $additional_area . ', extras=' . print_r($extras, true));
             
             // Calculate pricing breakdown using ONLY additional area (not total area)
             // The base service is handled separately in smart_area calculation
@@ -840,13 +837,18 @@ class CB_Frontend {
             // Override pricing for smart area calculation
             if ($use_smart_area && $service->default_area > 0) {
                 // For smart area, we want base service + additional area pricing
-                $pricing['service_price'] = floatval($service->base_price) + ($additional_area * floatval($service->sqm_multiplier));
-                $pricing['service_duration'] = intval($service->base_duration) + ($additional_area * floatval($service->sqm_duration_multiplier));
+                // Only add additional area pricing if additional_area > 0
+                if ($additional_area > 0) {
+                    $pricing['service_price'] = floatval($service->base_price) + ($additional_area * floatval($service->sqm_multiplier));
+                    $pricing['service_duration'] = intval($service->base_duration) + ($additional_area * floatval($service->sqm_duration_multiplier));
+                } else {
+                    // When additional_area is 0, use base service only
+                    $pricing['service_price'] = floatval($service->base_price);
+                    $pricing['service_duration'] = intval($service->base_duration);
+                }
                 $pricing['total_price'] = $pricing['service_price'] + $pricing['extras_price'] + $pricing['zip_surcharge'];
                 $pricing['total_duration'] = max($pricing['service_duration'] + $pricing['extras_duration'], 30);
             }
-            
-            error_log('CB Debug - Price calculation result: ' . print_r($pricing, true));
             
             wp_send_json_success(array(
                 'pricing' => $pricing,
@@ -904,6 +906,27 @@ class CB_Frontend {
             --cb-admin-border: {$border_color};
             --cb-admin-success: {$success_color};
             --cb-admin-error: {$error_color};
+        }
+        
+        /* Debug: Force apply border colors */
+        .cb-input {
+            border-color: {$border_color} !important;
+        }
+        
+        .cb-input:focus {
+            border-color: {$primary_color} !important;
+        }
+        
+        .cb-service-card {
+            border-color: {$border_color} !important;
+        }
+        
+        .cb-time-slot {
+            border-color: {$border_color} !important;
+        }
+        
+        .cb-payment-option {
+            border-color: {$border_color} !important;
         }
         </style>";
         

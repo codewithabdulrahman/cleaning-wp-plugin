@@ -102,7 +102,7 @@ if (!defined('ABSPATH')) {
                         
                         <div class="cb-form-group">
                             <label for="cb-square-meters"><?php _e('Additional Space (m²)', 'cleaning-booking'); ?></label>
-                            <input type="number" id="cb-square-meters" name="square_meters" class="cb-input" min="0" max="1000" placeholder="0" required>
+                            <input type="number" id="cb-square-meters" name="square_meters" class="cb-input" min="0" max="1000" placeholder="0" value="0">
                             <div class="cb-field-hint" id="cb-sqm-hint" style="display: none;">
                                 <small><?php _e('Enter additional space beyond the default area, or leave as 0 to skip', 'cleaning-booking'); ?></small>
                             </div>
@@ -274,30 +274,6 @@ if (!defined('ABSPATH')) {
                                     </div>
                                 </div>
                                 
-                                <div class="cb-payment-option" data-payment="card">
-                                    <div class="cb-payment-icon">
-                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <rect x="1" y="4" width="22" height="16" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
-                                            <line x1="1" y1="10" x2="23" y2="10" stroke="currentColor" stroke-width="2"/>
-                                        </svg>
-                                    </div>
-                                    <div class="cb-payment-info">
-                                        <h4><?php _e('Credit/Debit Card', 'cleaning-booking'); ?></h4>
-                                        <p><?php _e('Visa, Mastercard, American Express', 'cleaning-booking'); ?></p>
-                                    </div>
-                                </div>
-                                
-                                <div class="cb-payment-option" data-payment="paypal">
-                                    <div class="cb-payment-icon">
-                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 0 0-.105-.725c-1.33-5.452-5.83-7.203-10.34-7.203H3.28a1.28 1.28 0 0 0-1.27 1.48L4.49 20.117a1.28 1.28 0 0 0 1.27 1.48h2.19c.524 0 .968-.382 1.05-.9l1.12-7.106h2.19c.524 0 .968-.382 1.05-.9l1.12-7.106h2.19c.524 0 .968-.382 1.05-.9l1.12-7.106z" fill="currentColor"/>
-                                        </svg>
-                                    </div>
-                                    <div class="cb-payment-info">
-                                        <h4><?php _e('PayPal', 'cleaning-booking'); ?></h4>
-                                        <p><?php _e('Pay with PayPal account', 'cleaning-booking'); ?></p>
-                                    </div>
-                                </div>
                                 
                                 <div class="cb-payment-option" data-payment="bank_transfer">
                                     <div class="cb-payment-icon">
