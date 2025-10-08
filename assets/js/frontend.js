@@ -1674,9 +1674,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Update button states
         updateButtonStates();
-        
-        // Auto-scroll to top
-        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
     
     function updateButtonStates() {
