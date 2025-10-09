@@ -69,7 +69,7 @@
   "Security ticket expired. Please refresh the page.": "Security ticket expired. Please refresh the page.",
   "Failed to create booking. Please try again.": "Failed to create booking. Please try again.",
   "Language switched successfully": "Language switched successfully",
-  "Additional Space (m²)": "Additional Space (m²)",
+  "Space (m²)": "Space (m²)",
   "Enter additional space beyond the default area, or leave as 0 to skip": "Enter additional space beyond the default area, or leave as 0 to skip",
   "Base Service Included": "Base Service Included",
   "Company Name": "Company Name",

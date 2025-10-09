@@ -65,8 +65,44 @@ class CB_Frontend {
         
         // Clear WooCommerce session data when booking widget is loaded
         add_action('wp_footer', array($this, 'clear_woocommerce_session_on_widget_load'));
+        // Add this with your other AJAX handlers:
+add_action('wp_ajax_cb_store_booking_session', array($this, 'ajax_store_booking_session'));
+add_action('wp_ajax_nopriv_cb_store_booking_session', array($this, 'ajax_store_booking_session'));
     }
     
+
+    public function ajax_store_booking_session() {
+    // Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'cb_frontend_nonce')) {
+        wp_send_json_error(array('message' => 'Invalid nonce'));
+        return;
+    }
+
+    // Store booking data in WooCommerce session
+    if (!WC()->session) {
+        WC()->session = new WC_Session_Handler();
+        WC()->session->init();
+    }
+
+    $booking_data = json_decode(stripslashes($_POST['booking_data']), true);
+    
+    // Store in WooCommerce session
+    WC()->session->set('cb_booking_data', $booking_data);
+    WC()->session->set('cb_booking_timestamp', time());
+    
+    // Generate checkout URL (this will create the product and get checkout URL)
+    $woocommerce = new CB_WooCommerce();
+    $checkout_url = $woocommerce->generate_checkout_url_from_session();
+    
+    if ($checkout_url) {
+        wp_send_json_success(array(
+            'message' => 'Booking data stored successfully',
+            'checkout_url' => $checkout_url
+        ));
+    } else {
+        wp_send_json_error(array('message' => 'Failed to generate checkout URL'));
+    }
+}
     /**
      * Clear WooCommerce session data when booking widget is loaded
      * This ensures fresh data for each new booking
