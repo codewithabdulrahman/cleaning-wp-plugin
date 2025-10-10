@@ -33,6 +33,38 @@
     --cb-info: #17a2b8;
 }
 
+.elementor-kit-88 .cb-widget .cb-btn,
+.elementor-kit-88 .cb-widget-container .cb-btn,
+.cb-widget .cb-btn {
+    background-color: var(--cb-primary-color) !important;
+    border-color: var(--cb-primary-color) !important;
+    color: var(--cb-text-color) !important;
+}
+
+.elementor-kit-88 .cb-widget .cb-btn:hover,
+.elementor-kit-88 .cb-widget-container .cb-btn:hover,
+.cb-widget .cb-btn:hover {
+    background-color: var(--cb-secondary-color) !important;
+    border-color: var(--cb-secondary-color) !important;
+    color: var(--cb-text-color) !important;
+}
+
+.elementor-kit-88 .cb-widget .cb-btn-secondary,
+.elementor-kit-88 .cb-widget-container .cb-btn-secondary,
+.cb-widget .cb-btn-secondary {
+    background-color: transparent !important;
+    border-color: var(--cb-primary-color) !important;
+    color: var(--cb-primary-color) !important;
+}
+
+.elementor-kit-88 .cb-widget .cb-btn-secondary:hover,
+.elementor-kit-88 .cb-widget-container .cb-btn-secondary:hover,
+.cb-widget .cb-btn-secondary:hover {
+    background-color: var(--cb-primary-color) !important;
+    border-color: var(--cb-primary-color) !important;
+    color: var(--cb-text-color) !important;
+}
+
 .cb-container {
     width: 100%;
     max-width: 100%;
@@ -45,6 +77,7 @@
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    border-radius: 10px;
 }
 
 .cb-header {
@@ -52,6 +85,7 @@
     color: white;
     padding: 24px;
     text-align: left;
+    border-radius: 10px;
 }
 
 .cb-header-top {
@@ -225,7 +259,7 @@
 }
 
 .cb-main-content {
-    padding: 16px;
+    padding: 10px;
     border-right: 1px solid var(--cb-border-color);
     background: var(--cb-background-color);
     color: var(--cb-text-color);
@@ -235,7 +269,7 @@
 }
 
 .cb-checkout-sidebar {
-    padding: 24px 15px;
+    padding: 16px 8px;
     background: var(--cb-background-color);
     display: flex;
     flex-direction: column;
@@ -472,37 +506,13 @@
     100% { transform: rotate(360deg); }
 }
 
-.cb-btn-primary {
-    background: #2962ff;
-    color: white;
-}
-
-.cb-btn-primary:hover:not(:disabled) {
-    background: #1e88e5;
-    transform: translateY(-1px);
-    box-shadow: 0 8px 25px rgba(41, 98, 255, 0.3);
-}
-
-.cb-btn-secondary {
-    background: #ffffff;
-    color: #666;
-    border: 2px solid #e8e8e8;
-}
-
-.cb-btn-secondary:hover:not(:disabled) {
-    background: #f8f9fc;
-    border-color: #2962ff;
-    color: #2962ff;
-}
-
 .cb-btn-checkout {
-    background: #2962ff;
+    background: var(--cb-primary-color);
     color: white;
     font-size: 10px;
     padding: 14px 19px;
     border-radius: 8px;
     width: 100%;
-    margin-top: auto;
     margin-bottom: 0;
     border: none;
     font-weight: 600;
@@ -522,7 +532,7 @@
 }
 
 .cb-btn-checkout:hover:not(:disabled) {
-    background: #1e88e5;
+    background: var(--cb-secondary-color);
     transform: translateY(-1px);
     box-shadow: 0 8px 25px rgba(41, 98, 255, 0.4);
 }
@@ -592,7 +602,7 @@
 
 .cb-service-card h4 {
     margin: 0 0 4px 0;
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 600;
     color: var(--cb-text-color);
 }
@@ -612,7 +622,7 @@
 }
 
 .cb-price-current {
-    font-size: 18px;
+    font-size: 15px;
     font-weight: 700;
     color: #2962ff;
 }
@@ -774,7 +784,6 @@
     padding: 12px 10px 15px 12px;
     margin-bottom: 0;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-    flex: 1;
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -836,7 +845,7 @@
 }
 
 .cb-duration-value {
-    font-size: 18px;
+    font-size: 12px;
     font-weight: 700;
     color: #1a1a1a;
     display: block;
@@ -928,7 +937,7 @@
 }
 
 .cb-price-current {
-    font-size: 28px;
+    font-size: 15px;
     font-weight: 700;
     color: #1a1a1a;
 }
@@ -982,7 +991,7 @@
 }
 
 .cb-time-slot.unavailable::after {
-    content: "Booked";
+    content: "Κρατημένο";
     position: absolute;
     top: 50%;
     left: 50%;
@@ -1097,7 +1106,7 @@ body {
     }
     
     .cb-checkout-sidebar {
-        padding: 24px 15px;
+        padding: 16px 8px;
         grid-area: sidebar;
         min-height: auto;
     }
@@ -1132,7 +1141,7 @@ body {
     }
     
     .cb-checkout-sidebar {
-        padding: 24px 15px;
+        padding: 16px 8px;
         grid-area: sidebar;
         min-height: auto;
     }
@@ -1230,7 +1239,7 @@ body {
     }
     
     .cb-service-card {
-        padding: 12px;
+        padding: 15px;
     }
     
     .cb-service-icon {
@@ -1241,7 +1250,7 @@ body {
     }
     
     .cb-service-card h4 {
-        font-size: 14px;
+        font-size: 15px;
         margin-bottom: 4px;
     }
     
@@ -1251,7 +1260,7 @@ body {
     }
     
     .cb-price-current {
-        font-size: 18px;
+        font-size: 15px;
     }
     
     .cb-service-duration,

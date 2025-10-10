@@ -12,7 +12,7 @@
         tools: {},
         ajax_url: '',
         nonce: '',
-        current_language: 'en',
+        current_language: 'el',
         translations: {},
         strings: {},
         // Add all possible properties that Elementor might expect

@@ -21,6 +21,9 @@ class CB_Database {
         // Run migrations first for existing installations
         self::run_migrations();
         
+        // Update existing data to Greek if needed
+        self::update_existing_data_to_greek();
+        
         // Services table
         $services_table = $wpdb->prefix . 'cb_services';
         $services_sql = "CREATE TABLE $services_table (
@@ -169,6 +172,7 @@ class CB_Database {
         self::check_service_extras_table();
         self::check_payment_method_column();
         self::check_default_area_column();
+        self::check_slot_holds_truck_column();
     }
     
     private static function check_service_extras_table() {
@@ -269,6 +273,17 @@ class CB_Database {
         }
     }
     
+    private static function check_slot_holds_truck_column() {
+        global $wpdb;
+        
+        $slot_holds_table = $wpdb->prefix . 'cb_slot_holds';
+        $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $slot_holds_table LIKE 'truck_id'");
+        
+        if (empty($column_exists)) {
+            $wpdb->query("ALTER TABLE $slot_holds_table ADD COLUMN truck_id mediumint(9) DEFAULT NULL AFTER duration");
+        }
+    }
+    
     private static function insert_default_data() {
         global $wpdb;
         
@@ -276,8 +291,8 @@ class CB_Database {
         $services_table = $wpdb->prefix . 'cb_services';
         $default_services = array(
             array(
-                'name' => 'House Cleaning',
-                'description' => 'Complete house cleaning service',
+                'name' => 'Καθαρισμός Σπιτιού',
+                'description' => 'Πλήρης υπηρεσία καθαρισμού σπιτιού',
                 'base_price' => 80.00,
                 'base_duration' => 120,
                 'sqm_multiplier' => 0.50,
@@ -285,8 +300,8 @@ class CB_Database {
                 'sort_order' => 1
             ),
             array(
-                'name' => 'Apartment Cleaning',
-                'description' => 'Apartment cleaning service',
+                'name' => 'Καθαρισμός Διαμερίσματος',
+                'description' => 'Υπηρεσία καθαρισμού διαμερίσματος',
                 'base_price' => 60.00,
                 'base_duration' => 90,
                 'sqm_multiplier' => 0.40,
@@ -294,8 +309,8 @@ class CB_Database {
                 'sort_order' => 2
             ),
             array(
-                'name' => 'Office Cleaning',
-                'description' => 'Office and workspace cleaning',
+                'name' => 'Καθαρισμός Γραφείου',
+                'description' => 'Καθαρισμός γραφείου και χώρου εργασίας',
                 'base_price' => 100.00,
                 'base_duration' => 150,
                 'sqm_multiplier' => 0.60,
@@ -319,10 +334,10 @@ class CB_Database {
         // Insert default extras for each service
         $service_extras_table = $wpdb->prefix . 'cb_service_extras';
         $default_extras = array(
-            array('name' => 'Dishwashing', 'description' => 'Wash and put away dishes', 'price' => 15.00, 'duration' => 30, 'sort_order' => 1),
-            array('name' => 'Ironing', 'description' => 'Iron clothes and linens', 'price' => 20.00, 'duration' => 45, 'sort_order' => 2),
-            array('name' => 'Cooking', 'description' => 'Prepare simple meals', 'price' => 25.00, 'duration' => 60, 'sort_order' => 3),
-            array('name' => 'Window Cleaning', 'description' => 'Clean interior and exterior windows', 'price' => 30.00, 'duration' => 45, 'sort_order' => 4)
+            array('name' => 'Πλύσιμο Πιάτων', 'description' => 'Πλύσιμο και τακτοποίηση πιάτων', 'price' => 15.00, 'duration' => 30, 'sort_order' => 1),
+            array('name' => 'Σιδέρωμα', 'description' => 'Σιδέρωμα ρούχων και λινών', 'price' => 20.00, 'duration' => 45, 'sort_order' => 2),
+            array('name' => 'Μαγείρεμα', 'description' => 'Προετοιμασία απλών γευμάτων', 'price' => 25.00, 'duration' => 60, 'sort_order' => 3),
+            array('name' => 'Καθαρισμός Παραθύρων', 'description' => 'Καθαρισμός εσωτερικών και εξωτερικών παραθύρων', 'price' => 30.00, 'duration' => 45, 'sort_order' => 4)
         );
         
         // Get default services to assign extras to
@@ -349,11 +364,11 @@ class CB_Database {
         // Insert some default ZIP codes
         $zip_codes_table = $wpdb->prefix . 'cb_zip_codes';
         $default_zips = array(
-            array('zip_code' => '10001', 'city' => 'New York', 'surcharge' => 0.00),
-            array('zip_code' => '10002', 'city' => 'New York', 'surcharge' => 0.00),
-            array('zip_code' => '10003', 'city' => 'New York', 'surcharge' => 0.00),
-            array('zip_code' => '90210', 'city' => 'Beverly Hills', 'surcharge' => 20.00),
-            array('zip_code' => '90211', 'city' => 'Beverly Hills', 'surcharge' => 20.00)
+            array('zip_code' => '10431', 'city' => 'Αθήνα', 'surcharge' => 0.00),
+            array('zip_code' => '10432', 'city' => 'Αθήνα', 'surcharge' => 0.00),
+            array('zip_code' => '10433', 'city' => 'Αθήνα', 'surcharge' => 0.00),
+            array('zip_code' => '54621', 'city' => 'Θεσσαλονίκη', 'surcharge' => 0.00),
+            array('zip_code' => '54622', 'city' => 'Θεσσαλονίκη', 'surcharge' => 0.00)
         );
         
         foreach ($default_zips as $zip) {
@@ -366,6 +381,82 @@ class CB_Database {
             if (!$existing) {
             $wpdb->insert($zip_codes_table, $zip);
             }
+        }
+    }
+    
+    private static function update_existing_data_to_greek() {
+        global $wpdb;
+        
+        // Update existing services to Greek names
+        $services_table = $wpdb->prefix . 'cb_services';
+        $service_updates = array(
+            'House Cleaning' => 'Καθαρισμός Σπιτιού',
+            'Apartment Cleaning' => 'Καθαρισμός Διαμερίσματος',
+            'Office Cleaning' => 'Καθαρισμός Γραφείου'
+        );
+        
+        foreach ($service_updates as $english_name => $greek_name) {
+            $wpdb->update(
+                $services_table,
+                array('name' => $greek_name),
+                array('name' => $english_name),
+                array('%s'),
+                array('%s')
+            );
+        }
+        
+        // Update service descriptions
+        $description_updates = array(
+            'Complete house cleaning service' => 'Πλήρης υπηρεσία καθαρισμού σπιτιού',
+            'Apartment cleaning service' => 'Υπηρεσία καθαρισμού διαμερίσματος',
+            'Office and workspace cleaning' => 'Καθαρισμός γραφείου και χώρου εργασίας'
+        );
+        
+        foreach ($description_updates as $english_desc => $greek_desc) {
+            $wpdb->update(
+                $services_table,
+                array('description' => $greek_desc),
+                array('description' => $english_desc),
+                array('%s'),
+                array('%s')
+            );
+        }
+        
+        // Update existing extras to Greek names
+        $service_extras_table = $wpdb->prefix . 'cb_service_extras';
+        $extra_updates = array(
+            'Dishwashing' => 'Πλύσιμο Πιάτων',
+            'Ironing' => 'Σιδέρωμα',
+            'Cooking' => 'Μαγείρεμα',
+            'Window Cleaning' => 'Καθαρισμός Παραθύρων'
+        );
+        
+        foreach ($extra_updates as $english_name => $greek_name) {
+            $wpdb->update(
+                $service_extras_table,
+                array('name' => $greek_name),
+                array('name' => $english_name),
+                array('%s'),
+                array('%s')
+            );
+        }
+        
+        // Update extra descriptions
+        $extra_description_updates = array(
+            'Wash and put away dishes' => 'Πλύσιμο και τακτοποίηση πιάτων',
+            'Iron clothes and linens' => 'Σιδέρωμα ρούχων και λινών',
+            'Prepare simple meals' => 'Προετοιμασία απλών γευμάτων',
+            'Clean interior and exterior windows' => 'Καθαρισμός εσωτερικών και εξωτερικών παραθύρων'
+        );
+        
+        foreach ($extra_description_updates as $english_desc => $greek_desc) {
+            $wpdb->update(
+                $service_extras_table,
+                array('description' => $greek_desc),
+                array('description' => $english_desc),
+                array('%s'),
+                array('%s')
+            );
         }
     }
     
@@ -738,6 +829,7 @@ class CB_Database {
         global $wpdb;
         $trucks_table = $wpdb->prefix . 'cb_trucks';
         $bookings_table = $wpdb->prefix . 'cb_bookings';
+        $slot_holds_table = $wpdb->prefix . 'cb_slot_holds';
         
         // Get all active trucks
         $trucks = $wpdb->get_results(
@@ -748,9 +840,10 @@ class CB_Database {
         
         foreach ($trucks as $truck) {
             // Check if this truck is available for the requested time slot
-            // One truck = one slot, so we just check if truck has any conflicting bookings
             // Include buffer time in conflict detection
             $buffer_time = get_option('cb_buffer_time', 15);
+            
+            // Check for conflicting bookings
             $conflicting_bookings = $wpdb->get_var($wpdb->prepare(
                 "SELECT COUNT(*) FROM $bookings_table 
                  WHERE truck_id = %d 
@@ -772,7 +865,29 @@ class CB_Database {
                 $duration
             ));
             
-            if ($conflicting_bookings == 0) {
+            // Check for conflicting slot holds
+            $conflicting_holds = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM $slot_holds_table 
+                 WHERE truck_id = %d 
+                 AND booking_date = %s 
+                 AND expires_at > NOW()
+                 AND (
+                     (booking_time <= %s AND ADDTIME(booking_time, SEC_TO_TIME((duration + %d) * 60)) > %s) OR
+                     (booking_time < ADDTIME(%s, SEC_TO_TIME(%d * 60)) AND ADDTIME(booking_time, SEC_TO_TIME((duration + %d) * 60)) >= ADDTIME(%s, SEC_TO_TIME(%d * 60)))
+                 )",
+                $truck->id,
+                $booking_date,
+                $booking_time,
+                $buffer_time,
+                $booking_time,
+                $booking_time,
+                $duration,
+                $buffer_time,
+                $booking_time,
+                $duration
+            ));
+            
+            if ($conflicting_bookings == 0 && $conflicting_holds == 0) {
                 return $truck;
             }
         }

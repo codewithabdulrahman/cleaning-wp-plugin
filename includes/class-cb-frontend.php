@@ -65,6 +65,42 @@ class CB_Frontend {
         
         // Clear WooCommerce session data when booking widget is loaded
         add_action('wp_footer', array($this, 'clear_woocommerce_session_on_widget_load'));
+        // Add this with your other AJAX handlers:
+        add_action('wp_ajax_cb_store_booking_session', array($this, 'ajax_store_booking_session'));
+        add_action('wp_ajax_nopriv_cb_store_booking_session', array($this, 'ajax_store_booking_session'));
+    }
+
+    public function ajax_store_booking_session() {
+        // Verify nonce
+        if (!wp_verify_nonce($_POST['nonce'], 'cb_frontend_nonce')) {
+            wp_send_json_error(array('message' => 'Invalid nonce'));
+            return;
+        }
+    
+        // Store booking data in WooCommerce session
+        if (!WC()->session) {
+            WC()->session = new WC_Session_Handler();
+            WC()->session->init();
+        }
+    
+        $booking_data = json_decode(stripslashes($_POST['booking_data']), true);
+    
+        // Store in WooCommerce session
+        WC()->session->set('cb_booking_data', $booking_data);
+        WC()->session->set('cb_booking_timestamp', time());
+    
+        // Generate checkout URL (this will create the product and get checkout URL)
+        $woocommerce = new CB_WooCommerce();
+        $checkout_url = $woocommerce->generate_checkout_url_from_session();
+    
+        if ($checkout_url) {
+            wp_send_json_success(array(
+                'message' => 'Booking data stored successfully',
+                'checkout_url' => $checkout_url
+            ));
+        } else {
+            wp_send_json_error(array('message' => 'Failed to generate checkout URL'));
+        }
     }
     
     /**
@@ -168,7 +204,7 @@ class CB_Frontend {
                 },
                 ajax_url: '',
                 nonce: '',
-                current_language: 'en',
+                current_language: 'el',
                 translations: {},
                 strings: {},
                 init: function() {},
@@ -518,8 +554,11 @@ class CB_Frontend {
         header('Access-Control-Allow-Origin: *');
         
         try {
-            // Get active services from database
-            $services = CB_Database::get_services(true);
+            // Get current language
+            $language = $this->get_current_language();
+            
+            // Get translated services
+            $services = $this->get_translated_services($language);
             
             if ($services === false || empty($services)) {
                 wp_send_json_success(array('services' => array(), 'message' => 'No services found'));
@@ -540,10 +579,16 @@ class CB_Frontend {
             wp_send_json_error(array('message' => __('Please select a service first.', 'cleaning-booking')));
         }
         
+        // Get current language
+        $language = $this->get_current_language();
+        
         // Get active extras for the selected service
         $extras = CB_Database::get_service_extras($service_id, true);
         
-        wp_send_json_success(array('extras' => $extras));
+        // Translate extras
+        $translated_extras = $this->get_translated_extras($extras, $language);
+        
+        wp_send_json_success(array('extras' => $translated_extras));
     }
     
     private function generate_time_slots($date, $duration = 120) {
@@ -575,8 +620,16 @@ class CB_Frontend {
     }
     
     private function get_current_language() {
+        // Default to Greek (el) instead of English
         $locale = get_locale();
-        return substr($locale, 0, 2); // Get language code (en, el)
+        $language = substr($locale, 0, 2); // Get language code (en, el)
+        
+        // If no specific locale is set, default to Greek
+        if (empty($language) || $language === 'en') {
+            return 'el'; // Default to Greek
+        }
+        
+        return $language;
     }
     
     private function get_translations() {
@@ -618,23 +671,87 @@ class CB_Frontend {
         
         // Translate service names and descriptions
         $translated_services = array();
+        $new_translations = array();
+        
         foreach ($services as $service) {
             $translated_service = (array) $service; // Convert object to array
             
             // Translate service name
             if (isset($service_translations[$service->name])) {
                 $translated_service['name'] = $service_translations[$service->name];
+            } else {
+                // Auto-translate new services (fallback to original if no translation)
+                $translated_service['name'] = $service->name;
+                // Store for potential future translation
+                $new_translations[$service->name] = $service->name;
             }
             
             // Translate service description
             if (isset($service_translations[$service->description])) {
                 $translated_service['description'] = $service_translations[$service->description];
+            } else {
+                // Auto-translate new descriptions (fallback to original if no translation)
+                $translated_service['description'] = $service->description;
+                // Store for potential future translation
+                $new_translations[$service->description] = $service->description;
             }
             
             $translated_services[] = (object) $translated_service;
         }
         
+        // Log new services that need translation (for admin notification)
+        if (!empty($new_translations) && $language === 'el') {
+            error_log('CB Plugin: New services need Greek translation: ' . implode(', ', array_keys($new_translations)));
+        }
+        
         return $translated_services;
+    }
+    
+    private function get_translated_extras($extras, $language) {
+        if (!$extras) {
+            return array();
+        }
+        
+        // Load service translations
+        $translations = $this->get_translations_for_language($language);
+        $service_translations = isset($translations['services']) ? $translations['services'] : array();
+        
+        // Translate extra names and descriptions
+        $translated_extras = array();
+        $new_translations = array();
+        
+        foreach ($extras as $extra) {
+            $translated_extra = (array) $extra; // Convert object to array
+            
+            // Translate extra name
+            if (isset($service_translations[$extra->name])) {
+                $translated_extra['name'] = $service_translations[$extra->name];
+            } else {
+                // Auto-translate new extras (fallback to original if no translation)
+                $translated_extra['name'] = $extra->name;
+                // Store for potential future translation
+                $new_translations[$extra->name] = $extra->name;
+            }
+            
+            // Translate extra description
+            if (isset($service_translations[$extra->description])) {
+                $translated_extra['description'] = $service_translations[$extra->description];
+            } else {
+                // Auto-translate new descriptions (fallback to original if no translation)
+                $translated_extra['description'] = $extra->description;
+                // Store for potential future translation
+                $new_translations[$extra->description] = $extra->description;
+            }
+            
+            $translated_extras[] = (object) $translated_extra;
+        }
+        
+        // Log new extras that need translation (for admin notification)
+        if (!empty($new_translations) && $language === 'el') {
+            error_log('CB Plugin: New extras need Greek translation: ' . implode(', ', array_keys($new_translations)));
+        }
+        
+        return $translated_extras;
     }
     
     public function ajax_switch_language() {

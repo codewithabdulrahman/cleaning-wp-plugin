@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
             <div class="cb-language-widget">
                 <select class="cb-language-selector">
                     <option value="en">English</option>
-                    <option value="el">Ελληνικά</option>
+                    <option value="el" selected>Ελληνικά</option>
                 </select>
             </div>
         </div>
@@ -101,7 +101,7 @@ if (!defined('ABSPATH')) {
                         </div>
                         
                         <div class="cb-form-group">
-                            <label for="cb-square-meters"><?php _e('Additional Space (m²)', 'cleaning-booking'); ?></label>
+                            <label for="cb-square-meters"><?php _e('Space (m²)', 'cleaning-booking'); ?></label>
                             <input type="number" id="cb-square-meters" name="square_meters" class="cb-input" min="0" max="1000" placeholder="0" value="0">
                             <div class="cb-field-hint" id="cb-sqm-hint" style="display: none;">
                                 <small><?php _e('Enter additional space beyond the default area, or leave as 0 to skip', 'cleaning-booking'); ?></small>
@@ -131,15 +131,15 @@ if (!defined('ABSPATH')) {
                             <div class="cb-price-breakdown">
                                 <div class="cb-price-item">
                                     <span><?php _e('Service Price:', 'cleaning-booking'); ?></span>
-                                    <span id="cb-step3-service-price">$0.00</span>
+                                    <span id="cb-step3-service-price">€0.00</span>
                                 </div>
                                 <div class="cb-price-item">
                                     <span><?php _e('Extras:', 'cleaning-booking'); ?></span>
-                                    <span id="cb-step3-extras-price">$0.00</span>
+                                    <span id="cb-step3-extras-price">€0.00</span>
                                 </div>
                                 <div class="cb-price-item cb-price-total">
                                     <span><?php _e('Total:', 'cleaning-booking'); ?></span>
-                                    <span id="cb-step3-total-price">$0.00</span>
+                                    <span id="cb-step3-total-price">€0.00</span>
                                 </div>
                             </div>
                             <div class="cb-duration-breakdown">
@@ -193,134 +193,6 @@ if (!defined('ABSPATH')) {
                             <button type="button" class="cb-btn cb-btn-secondary cb-prev-step" data-prev="3">
                                 <?php _e('Back', 'cleaning-booking'); ?>
                             </button>
-                            <button type="button" class="cb-btn cb-btn-primary cb-next-step" data-next="5" disabled>
-                                <?php _e('Continue', 'cleaning-booking'); ?>
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- Step 5: Customer Details & Checkout -->
-                    <div class="cb-step-content cb-step-5">
-                        <div class="cb-step-header">
-                            <h2><?php _e('Your Details', 'cleaning-booking'); ?></h2>
-                            <p><?php _e('Please provide your contact information to complete the booking', 'cleaning-booking'); ?></p>
-                        </div>
-                        
-                        <div class="cb-form-row">
-                            <div class="cb-form-group">
-                                <label for="cb-customer-name"><?php _e('Full Name', 'cleaning-booking'); ?> *</label>
-                                <input type="text" id="cb-customer-name" name="customer_name" class="cb-input" required>
-                                <div class="cb-error-message" id="cb-name-error"></div>
-                            </div>
-                            
-                            <div class="cb-form-group">
-                                <label for="cb-customer-email"><?php _e('Email Address', 'cleaning-booking'); ?> *</label>
-                                <input type="email" id="cb-customer-email" name="customer_email" class="cb-input" required>
-                                <div class="cb-error-message" id="cb-email-error"></div>
-                            </div>
-                        </div>
-                        
-                        <div class="cb-form-row">
-                            <div class="cb-form-group">
-                                <label for="cb-customer-phone"><?php _e('Phone Number', 'cleaning-booking'); ?> *</label>
-                                <input type="tel" id="cb-customer-phone" name="customer_phone" class="cb-input" required>
-                                <div class="cb-error-message" id="cb-phone-error"></div>
-                            </div>
-                            
-                            <div class="cb-form-group">
-                                <label for="cb-customer-company"><?php _e('Company Name', 'cleaning-booking'); ?></label>
-                                <input type="text" id="cb-customer-company" name="customer_company" class="cb-input" placeholder="<?php _e('Optional', 'cleaning-booking'); ?>">
-                            </div>
-                        </div>
-                        
-                        <div class="cb-form-group">
-                            <label for="cb-customer-address"><?php _e('Full Address', 'cleaning-booking'); ?> *</label>
-                            <textarea id="cb-customer-address" name="address" class="cb-input" rows="3" placeholder="<?php _e('Street address, apartment, city, state, etc.', 'cleaning-booking'); ?>" required></textarea>
-                            <div class="cb-error-message" id="cb-address-error"></div>
-                        </div>
-                        
-                        <div class="cb-form-row">
-                            <div class="cb-form-group">
-                                <label for="cb-customer-city"><?php _e('City', 'cleaning-booking'); ?></label>
-                                <input type="text" id="cb-customer-city" name="customer_city" class="cb-input" placeholder="<?php _e('Auto-filled from address', 'cleaning-booking'); ?>">
-                            </div>
-                            
-                            <div class="cb-form-group">
-                                <label for="cb-customer-state"><?php _e('State/Province', 'cleaning-booking'); ?></label>
-                                <input type="text" id="cb-customer-state" name="customer_state" class="cb-input" placeholder="<?php _e('Auto-filled from address', 'cleaning-booking'); ?>">
-                            </div>
-                        </div>
-                        
-                        <div class="cb-form-group">
-                            <label for="cb-notes"><?php _e('Special Instructions', 'cleaning-booking'); ?></label>
-                            <textarea id="cb-notes" name="notes" class="cb-input" rows="3" placeholder="<?php _e('Any special requests or instructions...', 'cleaning-booking'); ?>"></textarea>
-                        </div>
-                        
-                        <!-- Payment Method Selection -->
-                        <div class="cb-form-group">
-                            <label><?php _e('Select Payment Method', 'cleaning-booking'); ?> *</label>
-                            <div class="cb-payment-methods">
-                                <div class="cb-payment-option" data-payment="cash">
-                                    <div class="cb-payment-icon">
-                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M2 8H22V16H2V8Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                            <path d="M4 12H6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                            <path d="M18 12H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                        </svg>
-                                    </div>
-                                    <div class="cb-payment-info">
-                                        <h4><?php _e('Cash on Delivery', 'cleaning-booking'); ?></h4>
-                                        <p><?php _e('Pay when service is completed', 'cleaning-booking'); ?></p>
-                                    </div>
-                                </div>
-                                
-                                
-                                <div class="cb-payment-option" data-payment="bank_transfer">
-                                    <div class="cb-payment-icon">
-                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="2"/>
-                                            <path d="M2 10h20" stroke="currentColor" stroke-width="2"/>
-                                            <path d="M6 16h4" stroke="currentColor" stroke-width="2"/>
-                                        </svg>
-                                    </div>
-                                    <div class="cb-payment-info">
-                                        <h4><?php _e('Bank Transfer', 'cleaning-booking'); ?></h4>
-                                        <p><?php _e('Direct bank transfer', 'cleaning-booking'); ?></p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="cb-error-message" id="cb-payment-error"></div>
-                        </div>
-                        
-                        <div class="cb-booking-summary">
-                            <h4><?php _e('Booking Summary', 'cleaning-booking'); ?></h4>
-                            <div class="cb-summary-item">
-                                <span><?php _e('Service:', 'cleaning-booking'); ?></span>
-                                <span id="cb-summary-service" class="cb-summary-value">-</span>
-                            </div>
-                            <div class="cb-summary-item">
-                                <span><?php _e('Date:', 'cleaning-booking'); ?></span>
-                                <span id="cb-summary-date" class="cb-summary-value">-</span>
-                            </div>
-                            <div class="cb-summary-item">
-                                <span><?php _e('Time:', 'cleaning-booking'); ?></span>
-                                <span id="cb-summary-time" class="cb-summary-value">-</span>
-                            </div>
-                            <div class="cb-summary-item">
-                                <span><?php _e('Duration:', 'cleaning-booking'); ?></span>
-                                <span id="cb-summary-duration" class="cb-summary-value">-</span>
-                            </div>
-                            <div class="cb-summary-item cb-summary-total">
-                                <span><?php _e('Pricing:', 'cleaning-booking'); ?></span>
-                                <span id="cb-summary-price" class="cb-summary-value">$0.00</span>
-                            </div>
-                        </div>
-                        
-                        <div class="cb-form-actions">
-                            <button type="button" class="cb-btn cb-btn-secondary cb-prev-step" data-prev="4">
-                                <?php _e('Back', 'cleaning-booking'); ?>
-                            </button>
-                            <!-- Checkout button removed from form as requested -->
                         </div>
                     </div>
                 </form>
@@ -340,7 +212,7 @@ if (!defined('ABSPATH')) {
                     
                     <div class="cb-duration-section">
                         <span class="cb-duration-label"><?php _e('Approximate working time', 'cleaning-booking'); ?></span>
-                        <span class="cb-duration-value" id="cb-sidebar-duration">-<?php _e('hours', 'cleaning-booking'); ?></span>
+                        <span class="cb-duration-value" id="cb-sidebar-duration">-<?php _e('λεπτά', 'cleaning-booking'); ?></span>
                     </div>
                     
                     <div class="cb-selected-extras-section" id="cb-selected-extras" style="display: none;">
@@ -351,12 +223,12 @@ if (!defined('ABSPATH')) {
                     <div class="cb-price-section">
                         <div class="cb-price-label"><?php _e('Pricing:', 'cleaning-booking'); ?></div>
                         <div class="cb-price-display">
-                            <span class="cb-price-current" id="cb-sidebar-total">Price will be calculated</span>
+                            <span class="cb-price-current" id="cb-sidebar-total"><?php _e('Price will be calculated', 'cleaning-booking'); ?></span>
                         </div>
                     </div>
                     
                     <button type="button" class="cb-btn cb-btn-checkout" disabled id="cb-sidebar-checkout">
-                        <span id="cb-checkout-price">$0.00</span> - <?php _e('Proceed to Checkout', 'cleaning-booking'); ?>
+                        <span id="cb-checkout-price">€0.00</span> - <?php _e('Proceed to Checkout', 'cleaning-booking'); ?>
                     </button>
                 </div>
             </div>
