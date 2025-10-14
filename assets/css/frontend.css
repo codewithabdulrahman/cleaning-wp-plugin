@@ -38,7 +38,6 @@
 .cb-widget .cb-btn {
     background-color: var(--cb-primary-color) !important;
     border-color: var(--cb-primary-color) !important;
-    color: var(--cb-text-color) !important;
 }
 
 .elementor-kit-88 .cb-widget .cb-btn:hover,
@@ -46,7 +45,6 @@
 .cb-widget .cb-btn:hover {
     background-color: var(--cb-secondary-color) !important;
     border-color: var(--cb-secondary-color) !important;
-    color: var(--cb-text-color) !important;
 }
 
 .elementor-kit-88 .cb-widget .cb-btn-secondary,
@@ -54,7 +52,6 @@
 .cb-widget .cb-btn-secondary {
     background-color: transparent !important;
     border-color: var(--cb-primary-color) !important;
-    color: var(--cb-primary-color) !important;
 }
 
 .elementor-kit-88 .cb-widget .cb-btn-secondary:hover,
@@ -62,7 +59,6 @@
 .cb-widget .cb-btn-secondary:hover {
     background-color: var(--cb-primary-color) !important;
     border-color: var(--cb-primary-color) !important;
-    color: var(--cb-text-color) !important;
 }
 
 .cb-container {
