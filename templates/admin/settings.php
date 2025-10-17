@@ -18,6 +18,109 @@ $days = array(
 );
 ?>
 
+<style>
+.cb-admin-section {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 8px;
+    margin: 30px 0;
+    padding: 25px;
+    box-shadow: 0 2px 4px rgba(0,0,0,.1);
+}
+
+.cb-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 25px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #f0f0f1;
+}
+
+.cb-section-title h2 {
+    margin: 0 0 10px 0;
+    color: #1d2327;
+    font-size: 24px;
+    font-weight: 600;
+}
+
+.cb-section-title .description {
+    margin: 0;
+    color: #646970;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.cb-section-preview {
+    text-align: center;
+    min-width: 300px;
+}
+
+.cb-preview-placeholder {
+    border: 2px solid #e0e0e0;
+    box-shadow: 0 2px 8px rgba(0,0,0,.1);
+}
+
+.cb-preview-caption {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #646970;
+    font-style: italic;
+}
+
+.color-picker {
+    width: 60px;
+    height: 40px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.form-table th {
+    width: 200px;
+    font-weight: 600;
+}
+
+.form-table td {
+    padding: 15px 10px;
+}
+
+.form-table input[type="text"],
+.form-table input[type="color"] {
+    margin-right: 10px;
+}
+
+.description {
+    display: block;
+    margin-top: 5px;
+    font-size: 13px;
+    color: #646970;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .cb-section-header {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    
+    .cb-section-preview {
+        margin-top: 20px;
+        min-width: auto;
+    }
+    
+    .cb-section-preview .cb-preview-placeholder {
+        width: 100%;
+        max-width: 300px;
+    }
+    
+    .form-table th {
+        width: auto;
+    }
+}
+</style>
+
 <div class="wrap">
     <h1><?php _e('Cleaning Booking Settings', 'cleaning-booking'); ?></h1>
     
@@ -173,6 +276,512 @@ $days = array(
                 </div>
             </div>
         </div>
+    </div>
+    
+    <!-- Widget Title Section -->
+    <div class="cb-admin-section">
+        <div class="cb-section-header">
+            <div class="cb-section-title">
+                <h2><?php _e('Widget Title', 'cleaning-booking'); ?></h2>
+                <p class="description"><?php _e('Customize the main title text, font size, and color of the booking widget.', 'cleaning-booking'); ?></p>
+            </div>
+            <div class="cb-section-preview">
+                <img src="<?php echo plugins_url('assets/images/title-image.png', dirname(dirname(__FILE__))); ?>" alt="Booking Widget Preview" style="max-width: 300px; border: 2px solid #e0e0e0; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
+                <p class="cb-preview-caption"><?php _e('Preview: Booking widget with title customization', 'cleaning-booking'); ?></p>
+            </div>
+        </div>
+        
+        <table class="form-table">
+            <tr>
+                <th scope="row">
+                    <label for="widget-title"><?php _e('Title Text', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                     <input type="text" id="widget-title" name="widget_title" value="<?php echo esc_attr(get_option('cb_widget_title', 'Book Your Cleaning Service')); ?>" class="regular-text">
+                    <span class="description"><?php _e('Main title displayed at the top of the booking widget', 'cleaning-booking'); ?></span>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">
+                    <label for="title-font-size"><?php _e('Font Size', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                    <input type="text" id="title-font-size" name="title_font_size" value="<?php echo esc_attr(get_option('cb_title_font_size', '24px')); ?>" class="regular-text">
+                    <span class="description"><?php _e('Font size for the widget title (e.g., 24px, 1.5rem)', 'cleaning-booking'); ?></span>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">
+                    <label for="title-font-color"><?php _e('Font Color', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                    <input type="color" id="title-font-color" name="title_font_color" value="<?php echo esc_attr(get_option('cb_title_font_color', '#ffffff')); ?>" class="color-picker">
+                    <span class="description"><?php _e('Color for the widget title', 'cleaning-booking'); ?></span>
+                </td>
+            </tr>
+        </table>
+    </div>
+    
+    <!-- Dynamic Text Content Section -->
+    <div class="cb-admin-section">
+        <h2><?php _e('Dynamic Text Content', 'cleaning-booking'); ?></h2>
+        <p class="description"><?php _e('Customize the text content displayed in the booking widget. You can change titles, descriptions, and messages.', 'cleaning-booking'); ?></p>
+        
+        <table class="form-table">
+            <tr>
+                <th scope="row">
+                    <label for="step1-title"><?php _e('Step 1 Title', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                     <input type="text" id="step1-title" name="step1_title" value="<?php echo esc_attr(get_option('cb_step1_title', 'Enter Your ZIP Code')); ?>" class="regular-text">
+                    <span class="description"><?php _e('Title for the first step (ZIP code entry)', 'cleaning-booking'); ?></span>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">
+                    <label for="step1-description"><?php _e('Step 1 Description', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                     <textarea id="step1-description" name="step1_description" rows="3" class="large-text"><?php echo esc_textarea(get_option('cb_step1_description', 'Let us know your location to check availability')); ?></textarea>
+                    <span class="description"><?php _e('Description text for step 1', 'cleaning-booking'); ?></span>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">
+                    <label for="step2-title"><?php _e('Step 2 Title', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                     <input type="text" id="step2-title" name="step2_title" value="<?php echo esc_attr(get_option('cb_step2_title', 'Select Your Service')); ?>" class="regular-text">
+                    <span class="description"><?php _e('Title for the second step (service selection)', 'cleaning-booking'); ?></span>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">
+                    <label for="step2-description"><?php _e('Step 2 Description', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                     <textarea id="step2-description" name="step2_description" rows="3" class="large-text"><?php echo esc_textarea(get_option('cb_step2_description', 'Choose the type of cleaning service you need')); ?></textarea>
+                     <span class="description"><?php _e('Description text for step 2', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="step3-title"><?php _e('Step 3 Title', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="step3-title" name="step3_title" value="<?php echo esc_attr(get_option('cb_step3_title', 'Service Details')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Title for the third step (service details)', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="step3-description"><?php _e('Step 3 Description', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <textarea id="step3-description" name="step3_description" rows="3" class="large-text"><?php echo esc_textarea(get_option('cb_step3_description', 'Tell us about your space and any additional services')); ?></textarea>
+                     <span class="description"><?php _e('Description text for step 3', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="step4-title"><?php _e('Step 4 Title', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="step4-title" name="step4_title" value="<?php echo esc_attr(get_option('cb_step4_title', 'Select Date & Time')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Title for the fourth step (date and time selection)', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="step4-description"><?php _e('Step 4 Description', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <textarea id="step4-description" name="step4_description" rows="3" class="large-text"><?php echo esc_textarea(get_option('cb_step4_description', 'Choose your preferred date and time slot')); ?></textarea>
+                     <span class="description"><?php _e('Description text for step 4', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="sidebar-info-text"><?php _e('Sidebar Info Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <textarea id="sidebar-info-text" name="sidebar_info_text" rows="3" class="large-text"><?php echo esc_textarea(get_option('cb_sidebar_info_text', 'Our contractors have all the necessary cleaning products and equipment')); ?></textarea>
+                     <span class="description"><?php _e('Information text displayed in the sidebar', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="checkout-button-text"><?php _e('Checkout Button Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="checkout-button-text" name="checkout_button_text" value="<?php echo esc_attr(get_option('cb_checkout_button_text', 'Proceed to Checkout')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Text for the checkout button', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="continue-button-text"><?php _e('Continue Button Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="continue-button-text" name="continue_button_text" value="<?php echo esc_attr(get_option('cb_continue_button_text', 'Continue')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Text for the continue button', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="back-button-text"><?php _e('Back Button Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="back-button-text" name="back_button_text" value="<?php echo esc_attr(get_option('cb_back_button_text', 'Back')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Text for the back button', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="step1-label"><?php _e('Step 1 Label', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="step1-label" name="step1_label" value="<?php echo esc_attr(get_option('cb_step1_label', 'Location')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Label for step 1 in the progress indicator', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="step2-label"><?php _e('Step 2 Label', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="step2-label" name="step2_label" value="<?php echo esc_attr(get_option('cb_step2_label', 'Service')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Label for step 2 in the progress indicator', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="step3-label"><?php _e('Step 3 Label', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="step3-label" name="step3_label" value="<?php echo esc_attr(get_option('cb_step3_label', 'Details')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Label for step 3 in the progress indicator', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="step4-label"><?php _e('Step 4 Label', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="step4-label" name="step4_label" value="<?php echo esc_attr(get_option('cb_step4_label', 'Date & Time')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Label for step 4 in the progress indicator', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="step5-label"><?php _e('Step 5 Label', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="step5-label" name="step5_label" value="<?php echo esc_attr(get_option('cb_step5_label', 'Checkout')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Label for step 5 in the progress indicator', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="zip-code-label"><?php _e('ZIP Code Label', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="zip-code-label" name="zip_code_label" value="<?php echo esc_attr(get_option('cb_zip_code_label', 'ZIP Code')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Label for ZIP code field', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="space-label"><?php _e('Space Label', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="space-label" name="space_label" value="<?php echo esc_attr(get_option('cb_space_label', 'Space (m²)')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Label for space/square meters field', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="additional-services-label"><?php _e('Additional Services Label', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="additional-services-label" name="additional_services_label" value="<?php echo esc_attr(get_option('cb_additional_services_label', 'Additional Services')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Label for additional services section', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="date-label"><?php _e('Date Label', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="date-label" name="date_label" value="<?php echo esc_attr(get_option('cb_date_label', 'Date')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Label for date field', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="time-slots-label"><?php _e('Time Slots Label', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="time-slots-label" name="time_slots_label" value="<?php echo esc_attr(get_option('cb_time_slots_label', 'Available Time Slots')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Label for time slots section', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="sidebar-service-title"><?php _e('Sidebar Service Title', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="sidebar-service-title" name="sidebar_service_title" value="<?php echo esc_attr(get_option('cb_sidebar_service_title', 'Select a service to see pricing')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Title shown in sidebar when no service is selected', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="working-time-label"><?php _e('Working Time Label', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="working-time-label" name="working_time_label" value="<?php echo esc_attr(get_option('cb_working_time_label', 'Approximate working time')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Label for working time in sidebar', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="selected-services-label"><?php _e('Selected Services Label', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="selected-services-label" name="selected_services_label" value="<?php echo esc_attr(get_option('cb_selected_services_label', 'Selected Services:')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Label for selected services in sidebar', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="pricing-label"><?php _e('Pricing Label', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="pricing-label" name="pricing_label" value="<?php echo esc_attr(get_option('cb_pricing_label', 'Pricing:')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Label for pricing section in sidebar', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="price-calculated-text"><?php _e('Price Calculated Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="price-calculated-text" name="price_calculated_text" value="<?php echo esc_attr(get_option('cb_price_calculated_text', 'Price will be calculated')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Text shown when price is not yet calculated', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="space-hint-text"><?php _e('Space Hint Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="space-hint-text" name="space_hint_text" value="<?php echo esc_attr(get_option('cb_space_hint_text', 'Enter additional space beyond the default area, or leave as 0 to skip')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Hint text for space field', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="base-service-included"><?php _e('Base Service Included Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="base-service-included" name="base_service_included" value="<?php echo esc_attr(get_option('cb_base_service_included', 'Base Service Included')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Text for base service included section', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+         </table>
+         
+         <h3><?php _e('JavaScript Messages', 'cleaning-booking'); ?></h3>
+         <p class="description"><?php _e('Customize error messages and notifications shown to users', 'cleaning-booking'); ?></p>
+         
+         <table class="form-table">
+             <tr>
+                 <th scope="row">
+                     <label for="loading-text"><?php _e('Loading Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="loading-text" name="loading_text" value="<?php echo esc_attr(get_option('cb_loading_text', 'Loading...')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Text shown while loading', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="loading-services-text"><?php _e('Loading Services Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="loading-services-text" name="loading_services_text" value="<?php echo esc_attr(get_option('cb_loading_services_text', 'Loading services...')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Text shown while loading services', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="loading-extras-text"><?php _e('Loading Extras Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="loading-extras-text" name="loading_extras_text" value="<?php echo esc_attr(get_option('cb_loading_extras_text', 'Loading extras...')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Text shown while loading extras', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="loading-slots-text"><?php _e('Loading Slots Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="loading-slots-text" name="loading_slots_text" value="<?php echo esc_attr(get_option('cb_loading_slots_text', 'Loading available times...')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Text shown while loading time slots', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="error-text"><?php _e('Error Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="error-text" name="error_text" value="<?php echo esc_attr(get_option('cb_error_text', 'An error occurred. Please try again.')); ?>" class="regular-text">
+                     <span class="description"><?php _e('General error message', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="zip-required-text"><?php _e('ZIP Required Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="zip-required-text" name="zip_required_text" value="<?php echo esc_attr(get_option('cb_zip_required_text', 'Please enter a ZIP code.')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Message when ZIP code is required', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="zip-invalid-text"><?php _e('ZIP Invalid Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="zip-invalid-text" name="zip_invalid_text" value="<?php echo esc_attr(get_option('cb_zip_invalid_text', 'Please enter a valid 5-digit ZIP code.')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Message when ZIP code is invalid', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="zip-unavailable-text"><?php _e('ZIP Unavailable Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="zip-unavailable-text" name="zip_unavailable_text" value="<?php echo esc_attr(get_option('cb_zip_unavailable_text', 'Sorry, we don\'t provide services in this area yet.')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Message when service is not available in ZIP code', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="select-service-text"><?php _e('Select Service Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="select-service-text" name="select_service_text" value="<?php echo esc_attr(get_option('cb_select_service_text', 'Please select a service.')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Message when service selection is required', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="select-date-text"><?php _e('Select Date Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="select-date-text" name="select_date_text" value="<?php echo esc_attr(get_option('cb_select_date_text', 'Please select a date.')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Message when date selection is required', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="select-time-text"><?php _e('Select Time Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="select-time-text" name="select_time_text" value="<?php echo esc_attr(get_option('cb_select_time_text', 'Please select a time slot.')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Message when time selection is required', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="booking-success-text"><?php _e('Booking Success Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="booking-success-text" name="booking_success_text" value="<?php echo esc_attr(get_option('cb_booking_created_text', 'Booking created successfully!')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Message when booking is created successfully', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+         </table>
+         
+         <h3><?php _e('Price & Duration Labels', 'cleaning-booking'); ?></h3>
+         <p class="description"><?php _e('Customize labels for pricing and duration sections', 'cleaning-booking'); ?></p>
+         
+         <table class="form-table">
+             <tr>
+                 <th scope="row">
+                     <label for="service-price-text"><?php _e('Service Price Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="service-price-text" name="service_price_text" value="<?php echo esc_attr(get_option('cb_service_price_text', 'Service Price:')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Label for service price', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="extras-text"><?php _e('Extras Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="extras-text" name="extras_text" value="<?php echo esc_attr(get_option('cb_extras_text', 'Extras:')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Label for extras', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="total-text"><?php _e('Total Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="total-text" name="total_text" value="<?php echo esc_attr(get_option('cb_total_text', 'Total:')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Label for total', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="service-duration-text"><?php _e('Service Duration Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="service-duration-text" name="service_duration_text" value="<?php echo esc_attr(get_option('cb_service_duration_text', 'Service Duration:')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Label for service duration', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="extras-duration-text"><?php _e('Extras Duration Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="extras-duration-text" name="extras_duration_text" value="<?php echo esc_attr(get_option('cb_extras_duration_text', 'Extras Duration:')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Label for extras duration', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="total-duration-text"><?php _e('Total Duration Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="total-duration-text" name="total_duration_text" value="<?php echo esc_attr(get_option('cb_total_duration_text', 'Total Duration:')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Label for total duration', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="select-date-hint-text"><?php _e('Select Date Hint Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="select-date-hint-text" name="select_date_hint_text" value="<?php echo esc_attr(get_option('cb_select_date_hint_text', 'Select a date to see available times')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Hint text for date selection', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+             <tr>
+                 <th scope="row">
+                     <label for="minutes-greek-text"><?php _e('Minutes (Greek) Text', 'cleaning-booking'); ?></label>
+                 </th>
+                 <td>
+                     <input type="text" id="minutes-greek-text" name="minutes_greek_text" value="<?php echo esc_attr(get_option('cb_minutes_greek_text', 'λεπτά')); ?>" class="regular-text">
+                     <span class="description"><?php _e('Greek word for minutes', 'cleaning-booking'); ?></span>
+                 </td>
+             </tr>
+         </table>
     </div>
     
     <div class="cb-admin-section">

@@ -204,6 +204,76 @@ class CB_Admin {
                 update_option($key, $value);
             }
             
+            // Handle dynamic text settings
+            $text_settings = array(
+                'cb_widget_title' => sanitize_text_field($_POST['widget_title']),
+                'cb_step1_title' => sanitize_text_field($_POST['step1_title']),
+                'cb_step1_description' => sanitize_textarea_field($_POST['step1_description']),
+                'cb_step2_title' => sanitize_text_field($_POST['step2_title']),
+                'cb_step2_description' => sanitize_textarea_field($_POST['step2_description']),
+                'cb_step3_title' => sanitize_text_field($_POST['step3_title']),
+                'cb_step3_description' => sanitize_textarea_field($_POST['step3_description']),
+                'cb_step4_title' => sanitize_text_field($_POST['step4_title']),
+                'cb_step4_description' => sanitize_textarea_field($_POST['step4_description']),
+                'cb_sidebar_info_text' => sanitize_textarea_field($_POST['sidebar_info_text']),
+                'cb_checkout_button_text' => sanitize_text_field($_POST['checkout_button_text']),
+                'cb_continue_button_text' => sanitize_text_field($_POST['continue_button_text']),
+                'cb_back_button_text' => sanitize_text_field($_POST['back_button_text']),
+                'cb_step1_label' => sanitize_text_field($_POST['step1_label']),
+                'cb_step2_label' => sanitize_text_field($_POST['step2_label']),
+                'cb_step3_label' => sanitize_text_field($_POST['step3_label']),
+                'cb_step4_label' => sanitize_text_field($_POST['step4_label']),
+                'cb_step5_label' => sanitize_text_field($_POST['step5_label']),
+                'cb_zip_code_label' => sanitize_text_field($_POST['zip_code_label']),
+                'cb_space_label' => sanitize_text_field($_POST['space_label']),
+                'cb_additional_services_label' => sanitize_text_field($_POST['additional_services_label']),
+                'cb_date_label' => sanitize_text_field($_POST['date_label']),
+                'cb_time_slots_label' => sanitize_text_field($_POST['time_slots_label']),
+                'cb_sidebar_service_title' => sanitize_text_field($_POST['sidebar_service_title']),
+                'cb_working_time_label' => sanitize_text_field($_POST['working_time_label']),
+                'cb_selected_services_label' => sanitize_text_field($_POST['selected_services_label']),
+                'cb_pricing_label' => sanitize_text_field($_POST['pricing_label']),
+                'cb_price_calculated_text' => sanitize_text_field($_POST['price_calculated_text']),
+                'cb_space_hint_text' => sanitize_text_field($_POST['space_hint_text']),
+                'cb_base_service_included' => sanitize_text_field($_POST['base_service_included']),
+                'cb_loading_services_text' => sanitize_text_field($_POST['loading_services_text']),
+                'cb_loading_extras_text' => sanitize_text_field($_POST['loading_extras_text']),
+                'cb_loading_slots_text' => sanitize_text_field($_POST['loading_slots_text']),
+                'cb_loading_text' => sanitize_text_field($_POST['loading_text']),
+                'cb_error_text' => sanitize_text_field($_POST['error_text']),
+                'cb_zip_required_text' => sanitize_text_field($_POST['zip_required_text']),
+                'cb_zip_invalid_text' => sanitize_text_field($_POST['zip_invalid_text']),
+                'cb_zip_unavailable_text' => sanitize_text_field($_POST['zip_unavailable_text']),
+                'cb_select_service_text' => sanitize_text_field($_POST['select_service_text']),
+                'cb_select_date_text' => sanitize_text_field($_POST['select_date_text']),
+                'cb_select_time_text' => sanitize_text_field($_POST['select_time_text']),
+                'cb_booking_created_text' => sanitize_text_field($_POST['booking_success_text']),
+                'cb_service_price_text' => sanitize_text_field($_POST['service_price_text']),
+                'cb_extras_text' => sanitize_text_field($_POST['extras_text']),
+                'cb_total_text' => sanitize_text_field($_POST['total_text']),
+                'cb_service_duration_text' => sanitize_text_field($_POST['service_duration_text']),
+                'cb_extras_duration_text' => sanitize_text_field($_POST['extras_duration_text']),
+                'cb_total_duration_text' => sanitize_text_field($_POST['total_duration_text']),
+                'cb_select_date_hint_text' => sanitize_text_field($_POST['select_date_hint_text']),
+                'cb_minutes_greek_text' => sanitize_text_field($_POST['minutes_greek_text'])
+            );
+            
+            foreach ($text_settings as $key => $value) {
+                update_option($key, $value);
+            }
+
+            // Handle typography settings
+            $typography_settings = array(
+                'cb_title_font_size' => sanitize_text_field(isset($_POST['title_font_size']) ? $_POST['title_font_size'] : ''),
+                'cb_title_font_color' => sanitize_hex_color(isset($_POST['title_font_color']) ? $_POST['title_font_color'] : '')
+            );
+
+            foreach ($typography_settings as $key => $value) {
+                if (!empty($value)) {
+                    update_option($key, $value);
+                }
+            }
+            
             echo '<div class="notice notice-success"><p>' . __('Settings saved!', 'cleaning-booking') . '</p></div>';
         }
         
