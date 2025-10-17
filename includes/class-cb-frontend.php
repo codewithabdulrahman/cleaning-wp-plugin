@@ -9,6 +9,22 @@ if (!defined('ABSPATH')) {
 
 class CB_Frontend {
     
+    /**
+     * Get dynamic text with fallback to translation
+     */
+    public static function get_dynamic_text($option_name, $default_translation_key, $domain = 'cleaning-booking') {
+        // First try to get the dynamic setting
+        $dynamic_text = get_option($option_name);
+        
+        // If dynamic text exists and is not empty, use it
+        if (!empty($dynamic_text)) {
+            return $dynamic_text;
+        }
+        
+        // Otherwise, fall back to translation
+        return __($default_translation_key, $domain);
+    }
+    
     public function __construct() {
         // Add inline script to head IMMEDIATELY to prevent Elementor conflicts
         add_action('wp_head', array($this, 'add_early_cb_frontend_init'), 1);
@@ -372,6 +388,10 @@ class CB_Frontend {
                     'minutes' => __('minutes', 'cleaning-booking'),
                     'hours' => __('hours', 'cleaning-booking'),
                     'hour' => __('hour', 'cleaning-booking')
+                ),
+                'typography' => array(
+                    'cb_title_font_size' => get_option('cb_title_font_size', '24px'),
+                    'cb_title_font_color' => get_option('cb_title_font_color', '#ffffff')
                 )
             ));
         }

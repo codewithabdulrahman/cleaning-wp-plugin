@@ -795,66 +795,62 @@ document.addEventListener('DOMContentLoaded', function() {
             if (step5Label) step5Label.textContent = translations['Checkout'];
         }
         
-        // Update step headers
-        if (translations['Enter Your ZIP Code']) {
-            const step1Header = document.querySelector('.cb-step-1 .cb-step-header h2');
-            if (step1Header) step1Header.textContent = translations['Enter Your ZIP Code'];
+        // Update step headers - dynamic text with translation fallback
+        const step1Header = document.querySelector('.cb-step-1 .cb-step-header h2');
+        if (step1Header) {
+            step1Header.textContent = cb_frontend.dynamic_texts?.cb_step1_title || translations['Enter Your ZIP Code'] || step1Header.textContent;
         }
-        if (translations['Let us know your location to check availability']) {
-            const step1Desc = document.querySelector('.cb-step-1 .cb-step-header p');
-            if (step1Desc) step1Desc.textContent = translations['Let us know your location to check availability'];
+        const step1Desc = document.querySelector('.cb-step-1 .cb-step-header p');
+        if (step1Desc) {
+            step1Desc.textContent = cb_frontend.dynamic_texts?.cb_step1_description || translations['Let us know your location to check availability'] || step1Desc.textContent;
         }
-        if (translations['Select Your Service']) {
-            const step2Header = document.querySelector('.cb-step-2 .cb-step-header h2');
-            if (step2Header) step2Header.textContent = translations['Select Your Service'];
+        const step2Header = document.querySelector('.cb-step-2 .cb-step-header h2');
+        if (step2Header) {
+            step2Header.textContent = cb_frontend.dynamic_texts?.cb_step2_title || translations['Select Your Service'] || step2Header.textContent;
         }
-        if (translations['Choose the type of cleaning service you need']) {
-            const step2Desc = document.querySelector('.cb-step-2 .cb-step-header p');
-            if (step2Desc) step2Desc.textContent = translations['Choose the type of cleaning service you need'];
-        }
-        
-        // Update step 3 headers
-        if (translations['Service Details']) {
-            const step3Header = document.querySelector('.cb-step-3 .cb-step-header h2');
-            if (step3Header) step3Header.textContent = translations['Service Details'];
-        }
-        if (translations['Tell us about your space and any additional services']) {
-            const step3Desc = document.querySelector('.cb-step-3 .cb-step-header p');
-            if (step3Desc) step3Desc.textContent = translations['Tell us about your space and any additional services'];
+        const step2Desc = document.querySelector('.cb-step-2 .cb-step-header p');
+        if (step2Desc) {
+            step2Desc.textContent = cb_frontend.dynamic_texts?.cb_step2_description || translations['Choose the type of cleaning service you need'] || step2Desc.textContent;
         }
         
-        // Update step 4 headers
-        if (translations['Select Date & Time']) {
-            const step4Header = document.querySelector('.cb-step-4 .cb-step-header h2');
-            if (step4Header) step4Header.textContent = translations['Select Date & Time'];
+        // Update step 3 and 4 headers - dynamic text with translation fallback
+        const step3Header = document.querySelector('.cb-step-3 .cb-step-header h2');
+        if (step3Header) {
+            step3Header.textContent = cb_frontend.dynamic_texts?.cb_step3_title || translations['Service Details'] || step3Header.textContent;
         }
-        if (translations['Choose your preferred date and time slot']) {
-            const step4Desc = document.querySelector('.cb-step-4 .cb-step-header p');
-            if (step4Desc) step4Desc.textContent = translations['Choose your preferred date and time slot'];
+        const step3Desc = document.querySelector('.cb-step-3 .cb-step-header p');
+        if (step3Desc) {
+            step3Desc.textContent = cb_frontend.dynamic_texts?.cb_step3_description || translations['Tell us about your space and any additional services'] || step3Desc.textContent;
+        }
+        const step4Header = document.querySelector('.cb-step-4 .cb-step-header h2');
+        if (step4Header) {
+            step4Header.textContent = cb_frontend.dynamic_texts?.cb_step4_title || translations['Select Date & Time'] || step4Header.textContent;
+        }
+        const step4Desc = document.querySelector('.cb-step-4 .cb-step-header p');
+        if (step4Desc) {
+            step4Desc.textContent = cb_frontend.dynamic_texts?.cb_step4_description || translations['Choose your preferred date and time slot'] || step4Desc.textContent;
         }
         
-        // Update form labels
-        if (translations['ZIP Code']) {
-            const zipLabel = document.querySelector('label[for="cb-zip-code"]');
-            if (zipLabel) zipLabel.textContent = translations['ZIP Code'];
+        // Update form labels - dynamic text with translation fallback
+        const zipLabel = document.querySelector('label[for="cb-zip-code"]');
+        if (zipLabel) {
+            zipLabel.textContent = cb_frontend.dynamic_texts?.cb_zip_code_label || translations['ZIP Code'] || zipLabel.textContent;
         }
-        if (translations['Space (m²)']) {
-            const spaceLabel = document.querySelector('label[for="cb-square-meters"]');
-            if (spaceLabel) spaceLabel.textContent = translations['Space (m²)'];
+        const spaceLabel = document.querySelector('label[for="cb-square-meters"]');
+        if (spaceLabel) {
+            spaceLabel.textContent = cb_frontend.dynamic_texts?.cb_space_label || translations['Space (m²)'] || spaceLabel.textContent;
         }
-        if (translations['Additional Services']) {
-            const extrasLabel = document.querySelector('.cb-step-3 label');
-            if (extrasLabel && extrasLabel.textContent.includes('Additional Services')) {
-                extrasLabel.textContent = translations['Additional Services'];
-            }
+        const extrasLabel = document.querySelector('.cb-step-3 label');
+        if (extrasLabel) {
+            extrasLabel.textContent = cb_frontend.dynamic_texts?.cb_additional_services_label || translations['Additional Services'] || extrasLabel.textContent;
         }
-        if (translations['Date']) {
-            const dateLabel = document.querySelector('label[for="cb-booking-date"]');
-            if (dateLabel) dateLabel.textContent = translations['Date'];
+        const dateLabel = document.querySelector('label[for="cb-booking-date"]');
+        if (dateLabel) {
+            dateLabel.textContent = cb_frontend.dynamic_texts?.cb_date_label || translations['Date'] || dateLabel.textContent;
         }
-        if (translations['Available Time Slots']) {
-            const timeLabel = document.querySelector('.cb-step-4 .cb-form-group:last-child label');
-            if (timeLabel) timeLabel.textContent = translations['Available Time Slots'];
+        const timeLabel = document.querySelector('.cb-step-4 .cb-form-group:last-child label');
+        if (timeLabel) {
+            timeLabel.textContent = cb_frontend.dynamic_texts?.cb_time_slots_label || translations['Available Time Slots'] || timeLabel.textContent;
         }
         
         // Update info banner
@@ -863,101 +859,138 @@ document.addEventListener('DOMContentLoaded', function() {
             if (infoBanner) infoBanner.textContent = translations['Our contractors have all the necessary cleaning products and equipment'];
         }
         
-        // Update buttons
-        if (translations['Check Availability']) {
-            const checkBtn = document.querySelector('.cb-next-step[data-next="2"]');
-            if (checkBtn) checkBtn.textContent = translations['Check Availability'];
+        // Update buttons - dynamic text with translation fallback
+        const checkBtn = document.querySelector('.cb-next-step[data-next="2"]');
+        if (checkBtn) {
+            checkBtn.textContent = cb_frontend.dynamic_texts?.cb_continue_button_text || translations['Check Availability'] || checkBtn.textContent;
         }
-        if (translations['Back']) {
-            const backBtns = document.querySelectorAll('.cb-prev-step');
-            backBtns.forEach(btn => {
-                if (btn.textContent.trim() === 'Back' || btn.textContent.trim() === 'Πίσω') {
-                    btn.textContent = translations['Back'];
-                }
-            });
+        const backBtns = document.querySelectorAll('.cb-prev-step');
+        backBtns.forEach(btn => {
+            btn.textContent = cb_frontend.dynamic_texts?.cb_back_button_text || translations['Back'] || btn.textContent;
+        });
+        const continueBtns = document.querySelectorAll('.cb-next-step');
+        continueBtns.forEach(btn => {
+            btn.textContent = cb_frontend.dynamic_texts?.cb_continue_button_text || translations['Continue'] || btn.textContent;
+        });
+        const checkoutBtn = document.querySelector('#cb-sidebar-checkout');
+        if (checkoutBtn) {
+            const priceSpan = checkoutBtn.querySelector('#cb-checkout-price');
+            const price = priceSpan ? priceSpan.textContent : '€0.00';
+            const checkoutText = cb_frontend.dynamic_texts?.cb_checkout_button_text || translations['Proceed to Checkout'] || 'Proceed to Checkout';
+            checkoutBtn.innerHTML = `<span id="cb-checkout-price">${price}</span> - ${checkoutText}`;
         }
-        if (translations['Proceed to Checkout']) {
-            const checkoutBtn = document.querySelector('#cb-sidebar-checkout');
-            if (checkoutBtn) {
-                const priceSpan = checkoutBtn.querySelector('#cb-checkout-price');
-                const price = priceSpan ? priceSpan.textContent : '€0.00';
-                checkoutBtn.innerHTML = `<span id="cb-checkout-price">${price}</span> - ${translations['Proceed to Checkout']}`;
+        
+        // Update sidebar content - dynamic text with translation fallback
+        const sidebarTitle = document.querySelector('#cb-sidebar-service-title');
+        if (sidebarTitle) {
+            sidebarTitle.textContent = cb_frontend.dynamic_texts?.cb_sidebar_service_title || translations['Select a service to see pricing'] || sidebarTitle.textContent;
+        }
+        const infoBanner = document.querySelector('.cb-info-text');
+        if (infoBanner) {
+            infoBanner.textContent = cb_frontend.dynamic_texts?.cb_sidebar_info_text || translations['Our contractors have all the necessary cleaning products and equipment'] || infoBanner.textContent;
+        }
+        const durationLabel = document.querySelector('.cb-duration-label');
+        if (durationLabel) {
+            durationLabel.textContent = cb_frontend.dynamic_texts?.cb_working_time_label || translations['Approximate working time'] || durationLabel.textContent;
+        }
+        const selectedLabel = document.querySelector('.cb-selected-extras-label');
+        if (selectedLabel) {
+            selectedLabel.textContent = cb_frontend.dynamic_texts?.cb_selected_services_label || translations['Selected Services:'] || selectedLabel.textContent;
+        }
+        const pricingLabel = document.querySelector('.cb-price-label');
+        if (pricingLabel) {
+            pricingLabel.textContent = cb_frontend.dynamic_texts?.cb_pricing_label || translations['Pricing:'] || pricingLabel.textContent;
+        }
+        
+        // Update placeholders and pricing labels - dynamic text with translation fallback
+        const spacePlaceholder = document.querySelector('#cb-square-meters + small');
+        if (spacePlaceholder) {
+            spacePlaceholder.textContent = cb_frontend.dynamic_texts?.cb_space_hint_text || translations['Enter additional space beyond the default area, or leave as 0 to skip'] || spacePlaceholder.textContent;
+        }
+        const servicePriceLabel = document.querySelector('.cb-step-3 .cb-price-item:first-child span:first-child');
+        if (servicePriceLabel) {
+            servicePriceLabel.textContent = cb_frontend.dynamic_texts?.cb_service_price_text || translations['Service Price:'] || servicePriceLabel.textContent;
+        }
+        const extrasPriceLabel = document.querySelector('.cb-step-3 .cb-price-item:nth-child(2) span:first-child');
+        if (extrasPriceLabel) {
+            extrasPriceLabel.textContent = cb_frontend.dynamic_texts?.cb_extras_text || translations['Extras:'] || extrasPriceLabel.textContent;
+        }
+        const totalPriceLabel = document.querySelector('.cb-step-3 .cb-price-total span:first-child');
+        if (totalPriceLabel) {
+            totalPriceLabel.textContent = cb_frontend.dynamic_texts?.cb_total_text || translations['Total:'] || totalPriceLabel.textContent;
+        }
+        const serviceDurationLabel = document.querySelector('.cb-step-3 .cb-duration-item:first-child span:first-child');
+        if (serviceDurationLabel) {
+            serviceDurationLabel.textContent = cb_frontend.dynamic_texts?.cb_service_duration_text || translations['Service Duration:'] || serviceDurationLabel.textContent;
+        }
+        const extrasDurationLabel = document.querySelector('.cb-step-3 .cb-duration-item:nth-child(2) span:first-child');
+        if (extrasDurationLabel) {
+            extrasDurationLabel.textContent = cb_frontend.dynamic_texts?.cb_extras_duration_text || translations['Extras Duration:'] || extrasDurationLabel.textContent;
+        }
+        const totalDurationLabel = document.querySelector('.cb-step-3 .cb-duration-total span:first-child');
+        if (totalDurationLabel) {
+            totalDurationLabel.textContent = cb_frontend.dynamic_texts?.cb_total_duration_text || translations['Total Duration:'] || totalDurationLabel.textContent;
+        }
+        
+        // Apply typography settings
+        applyTypographySettings();
+    }
+    
+    function applyTypographySettings() {
+        if (!cb_frontend.typography) return;
+        
+        // Apply widget title typography
+        const widgetTitle = document.querySelector('.cb-title');
+        if (widgetTitle && cb_frontend.typography.cb_title_font_size) {
+            widgetTitle.style.fontSize = cb_frontend.typography.cb_title_font_size;
+        }
+        if (widgetTitle && cb_frontend.typography.cb_title_font_color) {
+            widgetTitle.style.color = cb_frontend.typography.cb_title_font_color;
+        }
+        
+        // Apply step titles typography
+        const stepTitles = document.querySelectorAll('.cb-step-header h2');
+        stepTitles.forEach(title => {
+            if (cb_frontend.typography.cb_step_title_font_size) {
+                title.style.fontSize = cb_frontend.typography.cb_step_title_font_size;
             }
-        }
-        if (translations['Continue']) {
-            const continueBtns = document.querySelectorAll('.cb-next-step');
-            continueBtns.forEach(btn => {
-                if (btn.textContent.trim() === 'Continue' || btn.textContent.trim() === 'Συνέχεια') {
-                    btn.textContent = translations['Continue'];
-                }
-            });
-        }
-        if (translations['Proceed to Checkout']) {
-            const checkoutBtn = document.querySelector('.cb-checkout-btn');
-            if (checkoutBtn) checkoutBtn.textContent = translations['Proceed to Checkout'];
-        }
+            if (cb_frontend.typography.cb_step_title_font_color) {
+                title.style.color = cb_frontend.typography.cb_step_title_font_color;
+            }
+        });
         
-        // Update sidebar content
-        if (translations['Select a service to see pricing']) {
-            const sidebarTitle = document.querySelector('#cb-sidebar-service-title');
-            if (sidebarTitle) sidebarTitle.textContent = translations['Select a service to see pricing'];
-        }
-        if (translations['Base Service Included']) {
-            const baseServiceLabel = document.querySelector('.cb-sidebar-base-service .cb-sidebar-label');
-            if (baseServiceLabel) baseServiceLabel.textContent = translations['Base Service Included'];
-        }
-        if (translations['Additional Services']) {
-            const additionalServicesLabel = document.querySelector('.cb-sidebar-extras .cb-sidebar-label');
-            if (additionalServicesLabel) additionalServicesLabel.textContent = translations['Additional Services'];
-        }
-        if (translations['Our contractors have all the necessary cleaning products and equipment']) {
-            const infoText = document.querySelector('.cb-info-box p');
-            if (infoText) infoText.textContent = translations['Our contractors have all the necessary cleaning products and equipment'];
-        }
-        if (translations['Approximate working time']) {
-            const durationLabel = document.querySelector('.cb-duration-label');
-            if (durationLabel) durationLabel.textContent = translations['Approximate working time'];
-        }
-        if (translations['Selected Services:']) {
-            const selectedLabel = document.querySelector('.cb-selected-extras-label');
-            if (selectedLabel) selectedLabel.textContent = translations['Selected Services:'];
-        }
-        if (translations['Pricing:']) {
-            const pricingLabel = document.querySelector('.cb-price-label');
-            if (pricingLabel) pricingLabel.textContent = translations['Pricing:'];
-        }
+        // Apply button typography
+        const buttons = document.querySelectorAll('.cb-next-step, .cb-prev-step, #cb-sidebar-checkout');
+        buttons.forEach(button => {
+            if (cb_frontend.typography.cb_button_font_size) {
+                button.style.fontSize = cb_frontend.typography.cb_button_font_size;
+            }
+            if (cb_frontend.typography.cb_button_font_color) {
+                button.style.color = cb_frontend.typography.cb_button_font_color;
+            }
+        });
         
-        // Update placeholders
-        if (translations['Enter additional space beyond the default area, or leave as 0 to skip']) {
-            const spacePlaceholder = document.querySelector('#cb-square-meters + small');
-            if (spacePlaceholder) spacePlaceholder.textContent = translations['Enter additional space beyond the default area, or leave as 0 to skip'];
-        }
+        // Apply label typography
+        const labels = document.querySelectorAll('label');
+        labels.forEach(label => {
+            if (cb_frontend.typography.cb_label_font_size) {
+                label.style.fontSize = cb_frontend.typography.cb_label_font_size;
+            }
+            if (cb_frontend.typography.cb_label_font_color) {
+                label.style.color = cb_frontend.typography.cb_label_font_color;
+            }
+        });
         
-        // Update Step 3 pricing labels
-        if (translations['Service Price:']) {
-            const servicePriceLabel = document.querySelector('.cb-step-3 .cb-price-item:first-child span:first-child');
-            if (servicePriceLabel) servicePriceLabel.textContent = translations['Service Price:'];
-        }
-        if (translations['Extras:']) {
-            const extrasLabel = document.querySelector('.cb-step-3 .cb-price-item:nth-child(2) span:first-child');
-            if (extrasLabel) extrasLabel.textContent = translations['Extras:'];
-        }
-        if (translations['Total:']) {
-            const totalLabel = document.querySelector('.cb-step-3 .cb-price-total span:first-child');
-            if (totalLabel) totalLabel.textContent = translations['Total:'];
-        }
-        if (translations['Service Duration:']) {
-            const serviceDurationLabel = document.querySelector('.cb-step-3 .cb-duration-item:first-child span:first-child');
-            if (serviceDurationLabel) serviceDurationLabel.textContent = translations['Service Duration:'];
-        }
-        if (translations['Extras Duration:']) {
-            const extrasDurationLabel = document.querySelector('.cb-step-3 .cb-duration-item:nth-child(2) span:first-child');
-            if (extrasDurationLabel) extrasDurationLabel.textContent = translations['Extras Duration:'];
-        }
-        if (translations['Total Duration:']) {
-            const totalDurationLabel = document.querySelector('.cb-step-3 .cb-duration-total span:first-child');
-            if (totalDurationLabel) totalDurationLabel.textContent = translations['Total Duration:'];
-        }
+        // Apply description typography
+        const descriptions = document.querySelectorAll('.cb-step-header p, .description, small');
+        descriptions.forEach(desc => {
+            if (cb_frontend.typography.cb_description_font_size) {
+                desc.style.fontSize = cb_frontend.typography.cb_description_font_size;
+            }
+            if (cb_frontend.typography.cb_description_font_color) {
+                desc.style.color = cb_frontend.typography.cb_description_font_color;
+            }
+        });
     }
     
     function proceedToCheckout() {
