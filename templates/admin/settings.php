@@ -175,6 +175,274 @@ $days = array(
         </div>
     </div>
     
+    <!-- Typography Settings Section -->
+    <div class="cb-admin-section">
+        <h2><?php _e('Typography Settings', 'cleaning-booking'); ?></h2>
+        <p class="description"><?php _e('Customize fonts and text styling for your booking widget.', 'cleaning-booking'); ?></p>
+        
+        <table class="form-table">
+            <tr>
+                <th scope="row">
+                    <label for="heading-font-family"><?php _e('Heading Font Family', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                    <select id="heading-font-family" name="heading_font_family" class="cb-font-selector">
+                        <?php 
+                        $google_fonts = CB_Style_Manager::get_google_fonts();
+                        $current_heading_font = CB_Style_Manager::get_setting('heading_font_family', 'Inter, sans-serif');
+                        ?>
+                        <option value="Inter, sans-serif" <?php selected($current_heading_font, 'Inter, sans-serif'); ?>>Inter (Default)</option>
+                        <option value="Arial, sans-serif" <?php selected($current_heading_font, 'Arial, sans-serif'); ?>>Arial</option>
+                        <option value="Helvetica, sans-serif" <?php selected($current_heading_font, 'Helvetica, sans-serif'); ?>>Helvetica</option>
+                        <option value="Georgia, serif" <?php selected($current_heading_font, 'Georgia, serif'); ?>>Georgia</option>
+                        <option value="Times New Roman, serif" <?php selected($current_heading_font, 'Times New Roman, serif'); ?>>Times New Roman</option>
+                        <?php foreach ($google_fonts as $font_name => $font_value): ?>
+                            <option value="Google:<?php echo esc_attr($font_value); ?>" <?php selected($current_heading_font, 'Google:' . $font_value); ?>><?php echo esc_html($font_name); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <p class="description"><?php _e('Font family for headings and titles', 'cleaning-booking'); ?></p>
+                </td>
+            </tr>
+            
+            <tr>
+                <th scope="row">
+                    <label for="body-font-family"><?php _e('Body Font Family', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                    <select id="body-font-family" name="body_font_family" class="cb-font-selector">
+                        <?php 
+                        $current_body_font = CB_Style_Manager::get_setting('body_font_family', 'Inter, sans-serif');
+                        ?>
+                        <option value="Inter, sans-serif" <?php selected($current_body_font, 'Inter, sans-serif'); ?>>Inter (Default)</option>
+                        <option value="Arial, sans-serif" <?php selected($current_body_font, 'Arial, sans-serif'); ?>>Arial</option>
+                        <option value="Helvetica, sans-serif" <?php selected($current_body_font, 'Helvetica, sans-serif'); ?>>Helvetica</option>
+                        <option value="Georgia, serif" <?php selected($current_body_font, 'Georgia, serif'); ?>>Georgia</option>
+                        <option value="Times New Roman, serif" <?php selected($current_body_font, 'Times New Roman, serif'); ?>>Times New Roman</option>
+                        <?php foreach ($google_fonts as $font_name => $font_value): ?>
+                            <option value="Google:<?php echo esc_attr($font_value); ?>" <?php selected($current_body_font, 'Google:' . $font_value); ?>><?php echo esc_html($font_name); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <p class="description"><?php _e('Font family for body text and content', 'cleaning-booking'); ?></p>
+                </td>
+            </tr>
+            
+            <tr>
+                <th scope="row">
+                    <label for="heading-font-size"><?php _e('Heading Font Size', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                    <input type="text" id="heading-font-size" name="heading_font_size" value="<?php echo esc_attr(CB_Style_Manager::get_setting('heading_font_size', '28px')); ?>" class="regular-text">
+                    <p class="description"><?php _e('Font size for main headings (e.g., 28px, 2rem)', 'cleaning-booking'); ?></p>
+                </td>
+            </tr>
+            
+            <tr>
+                <th scope="row">
+                    <label for="body-font-size"><?php _e('Body Font Size', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                    <input type="text" id="body-font-size" name="body_font_size" value="<?php echo esc_attr(CB_Style_Manager::get_setting('body_font_size', '16px')); ?>" class="regular-text">
+                    <p class="description"><?php _e('Font size for body text (e.g., 16px, 1rem)', 'cleaning-booking'); ?></p>
+                </td>
+            </tr>
+            
+            <tr>
+                <th scope="row">
+                    <label for="label-font-size"><?php _e('Label Font Size', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                    <input type="text" id="label-font-size" name="label_font_size" value="<?php echo esc_attr(CB_Style_Manager::get_setting('label_font_size', '14px')); ?>" class="regular-text">
+                    <p class="description"><?php _e('Font size for form labels (e.g., 14px, 0.875rem)', 'cleaning-booking'); ?></p>
+                </td>
+            </tr>
+            
+            <tr>
+                <th scope="row">
+                    <label for="button-font-size"><?php _e('Button Font Size', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                    <input type="text" id="button-font-size" name="button_font_size" value="<?php echo esc_attr(CB_Style_Manager::get_setting('button_font_size', '16px')); ?>" class="regular-text">
+                    <p class="description"><?php _e('Font size for buttons (e.g., 16px, 1rem)', 'cleaning-booking'); ?></p>
+                </td>
+            </tr>
+            
+            <tr>
+                <th scope="row">
+                    <label for="font-weight-heading"><?php _e('Heading Font Weight', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                    <select id="font-weight-heading" name="font_weight_heading">
+                        <?php 
+                        $font_weights = CB_Style_Manager::get_font_weights();
+                        $current_weight = CB_Style_Manager::get_setting('font_weight_heading', '700');
+                        ?>
+                        <?php foreach ($font_weights as $weight => $label): ?>
+                            <option value="<?php echo esc_attr($weight); ?>" <?php selected($current_weight, $weight); ?>><?php echo esc_html($label); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <p class="description"><?php _e('Font weight for headings', 'cleaning-booking'); ?></p>
+                </td>
+            </tr>
+            
+            <tr>
+                <th scope="row">
+                    <label for="font-weight-body"><?php _e('Body Font Weight', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                    <select id="font-weight-body" name="font_weight_body">
+                        <?php 
+                        $current_body_weight = CB_Style_Manager::get_setting('font_weight_body', '400');
+                        ?>
+                        <?php foreach ($font_weights as $weight => $label): ?>
+                            <option value="<?php echo esc_attr($weight); ?>" <?php selected($current_body_weight, $weight); ?>><?php echo esc_html($label); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <p class="description"><?php _e('Font weight for body text', 'cleaning-booking'); ?></p>
+                </td>
+            </tr>
+        </table>
+    </div>
+    
+    <!-- Spacing & Layout Settings Section -->
+    <div class="cb-admin-section">
+        <h2><?php _e('Spacing & Layout Settings', 'cleaning-booking'); ?></h2>
+        <p class="description"><?php _e('Customize spacing, padding, and layout options for your booking widget.', 'cleaning-booking'); ?></p>
+        
+        <table class="form-table">
+            <tr>
+                <th scope="row">
+                    <label for="form-padding"><?php _e('Form Padding', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                    <input type="text" id="form-padding" name="form_padding" value="<?php echo esc_attr(CB_Style_Manager::get_setting('form_padding', '24px')); ?>" class="regular-text">
+                    <p class="description"><?php _e('Padding for form containers (e.g., 24px, 1.5rem)', 'cleaning-booking'); ?></p>
+                </td>
+            </tr>
+            
+            <tr>
+                <th scope="row">
+                    <label for="field-spacing"><?php _e('Field Spacing', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                    <input type="text" id="field-spacing" name="field_spacing" value="<?php echo esc_attr(CB_Style_Manager::get_setting('field_spacing', '20px')); ?>" class="regular-text">
+                    <p class="description"><?php _e('Spacing between form fields (e.g., 20px, 1.25rem)', 'cleaning-booking'); ?></p>
+                </td>
+            </tr>
+            
+            <tr>
+                <th scope="row">
+                    <label for="button-padding"><?php _e('Button Padding', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                    <input type="text" id="button-padding" name="button_padding" value="<?php echo esc_attr(CB_Style_Manager::get_setting('button_padding', '16px 32px')); ?>" class="regular-text">
+                    <p class="description"><?php _e('Padding for buttons (e.g., 16px 32px)', 'cleaning-booking'); ?></p>
+                </td>
+            </tr>
+            
+            <tr>
+                <th scope="row">
+                    <label for="container-max-width"><?php _e('Container Max Width', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                    <input type="text" id="container-max-width" name="container_max_width" value="<?php echo esc_attr(CB_Style_Manager::get_setting('container_max_width', '1200px')); ?>" class="regular-text">
+                    <p class="description"><?php _e('Maximum width of the booking widget (e.g., 1200px, 75rem)', 'cleaning-booking'); ?></p>
+                </td>
+            </tr>
+            
+            <tr>
+                <th scope="row">
+                    <label for="sidebar-position"><?php _e('Sidebar Position', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                    <select id="sidebar-position" name="sidebar_position">
+                        <?php 
+                        $sidebar_positions = CB_Style_Manager::get_sidebar_positions();
+                        $current_position = CB_Style_Manager::get_setting('sidebar_position', 'right');
+                        ?>
+                        <?php foreach ($sidebar_positions as $position => $label): ?>
+                            <option value="<?php echo esc_attr($position); ?>" <?php selected($current_position, $position); ?>><?php echo esc_html($label); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <p class="description"><?php _e('Position of the checkout sidebar', 'cleaning-booking'); ?></p>
+                </td>
+            </tr>
+            
+            <tr>
+                <th scope="row">
+                    <label for="step-indicator-style"><?php _e('Step Indicator Style', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                    <select id="step-indicator-style" name="step_indicator_style">
+                        <?php 
+                        $step_styles = CB_Style_Manager::get_step_indicator_styles();
+                        $current_style = CB_Style_Manager::get_setting('step_indicator_style', 'numbered');
+                        ?>
+                        <?php foreach ($step_styles as $style => $label): ?>
+                            <option value="<?php echo esc_attr($style); ?>" <?php selected($current_style, $style); ?>><?php echo esc_html($label); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <p class="description"><?php _e('Style of step indicators', 'cleaning-booking'); ?></p>
+                </td>
+            </tr>
+            
+            <tr>
+                <th scope="row">
+                    <label for="mobile-breakpoint"><?php _e('Mobile Breakpoint', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                    <input type="text" id="mobile-breakpoint" name="mobile_breakpoint" value="<?php echo esc_attr(CB_Style_Manager::get_setting('mobile_breakpoint', '768px')); ?>" class="regular-text">
+                    <p class="description"><?php _e('Mobile breakpoint for responsive design (e.g., 768px)', 'cleaning-booking'); ?></p>
+                </td>
+            </tr>
+        </table>
+    </div>
+    
+    <!-- Language Settings Section -->
+    <div class="cb-admin-section">
+        <h2><?php _e('Language Settings', 'cleaning-booking'); ?></h2>
+        <p class="description"><?php _e('Configure language detection and default language settings.', 'cleaning-booking'); ?></p>
+        
+        <table class="form-table">
+            <tr>
+                <th scope="row">
+                    <label for="default-language"><?php _e('Default Language', 'cleaning-booking'); ?></label>
+                </th>
+                <td>
+                    <select id="default-language" name="default_language">
+                        <?php 
+                        $current_language = CB_Style_Manager::get_setting('default_language', 'el');
+                        ?>
+                        <option value="en" <?php selected($current_language, 'en'); ?>><?php _e('English', 'cleaning-booking'); ?></option>
+                        <option value="el" <?php selected($current_language, 'el'); ?>><?php _e('Greek', 'cleaning-booking'); ?></option>
+                    </select>
+                    <p class="description"><?php _e('Default language for the booking form', 'cleaning-booking'); ?></p>
+                </td>
+            </tr>
+            
+            <tr>
+                <th scope="row"><?php _e('Language Detection', 'cleaning-booking'); ?></th>
+                <td>
+                    <label>
+                        <input type="checkbox" id="auto-detect-language" name="auto_detect_language" value="1" <?php checked(CB_Style_Manager::get_setting('auto_detect_language', '1'), '1'); ?>>
+                        <?php _e('Automatically detect user language from browser', 'cleaning-booking'); ?>
+                    </label>
+                    <p class="description"><?php _e('When enabled, the system will try to detect the user\'s preferred language from their browser settings.', 'cleaning-booking'); ?></p>
+                </td>
+            </tr>
+            
+            <tr>
+                <th scope="row"><?php _e('Geolocation Detection', 'cleaning-booking'); ?></th>
+                <td>
+                    <label>
+                        <input type="checkbox" id="geolocation-detection" name="geolocation_detection" value="1" <?php checked(CB_Style_Manager::get_setting('geolocation_detection', '0'), '1'); ?>>
+                        <?php _e('Use geolocation for language detection', 'cleaning-booking'); ?>
+                    </label>
+                    <p class="description"><?php _e('When enabled, the system will use the user\'s location to determine the appropriate language. This requires user permission.', 'cleaning-booking'); ?></p>
+                </td>
+            </tr>
+        </table>
+    </div>
+    
     <div class="cb-admin-section">
             <h2><?php _e('Business Hours', 'cleaning-booking'); ?></h2>
             

@@ -78,6 +78,11 @@ class CB_Frontend {
         }
     
         // Store booking data in WooCommerce session
+        if (!function_exists('WC') || !WC()) {
+            wp_send_json_error(array('message' => 'WooCommerce is not active'));
+            return;
+        }
+        
         if (!WC()->session) {
             WC()->session = new WC_Session_Handler();
             WC()->session->init();
@@ -109,7 +114,7 @@ class CB_Frontend {
      */
     public function clear_woocommerce_session_on_widget_load() {
         // Only run if WooCommerce is active and we're on a page with the booking widget
-        if (!class_exists('WooCommerce') || !WC()->session) {
+        if (!class_exists('WooCommerce') || !function_exists('WC') || !WC() || !WC()->session) {
             return;
         }
         
@@ -330,6 +335,8 @@ class CB_Frontend {
                 'current_language' => $this->get_current_language(),
                 'booking_hold_time' => get_option('cb_booking_hold_time', 15), // Add booking hold time setting
                 'translations' => $this->get_translations(),
+                'form_fields' => CB_Form_Fields::get_frontend_fields($this->get_current_language()),
+                'style_settings' => CB_Style_Manager::get_all_settings(),
                 'colors' => array(
                     'primary' => get_option('cb_primary_color', '#0073aa'),
                     'secondary' => get_option('cb_secondary_color', '#00a0d2'),
@@ -586,7 +593,7 @@ class CB_Frontend {
         $extras = CB_Database::get_service_extras($service_id, true);
         
         // Translate extras
-        $translated_extras = $this->get_translated_extras($extras, $language);
+        $translated_extras = $this->get_translated_extras($language);
         
         wp_send_json_success(array('extras' => $translated_extras));
     }
@@ -620,16 +627,142 @@ class CB_Frontend {
     }
     
     private function get_current_language() {
-        // Default to Greek (el) instead of English
-        $locale = get_locale();
-        $language = substr($locale, 0, 2); // Get language code (en, el)
-        
-        // If no specific locale is set, default to Greek
-        if (empty($language) || $language === 'en') {
-            return 'el'; // Default to Greek
+        // Priority 1: Check if user has manually selected a language (stored in cookie)
+        if (isset($_COOKIE['cb_language'])) {
+            $cookie_language = sanitize_text_field($_COOKIE['cb_language']);
+            if (in_array($cookie_language, array('en', 'el'))) {
+                return $cookie_language;
+            }
         }
         
-        return $language;
+        // Priority 2: Location-based detection (Greece = Greek, others = English)
+        $geo_language = $this->detect_geolocation_language();
+        if ($geo_language) {
+            return $geo_language;
+        }
+        
+        // Priority 3: Check browser language
+        if (isset($_SERVER['HTTP_ACCEPT_LANGUAGE'])) {
+            $browser_language = $this->detect_browser_language($_SERVER['HTTP_ACCEPT_LANGUAGE']);
+            if ($browser_language) {
+                return $browser_language;
+            }
+        }
+        
+        // Priority 4: Check WordPress locale
+        $locale = get_locale();
+        $language = substr($locale, 0, 2);
+        if (in_array($language, array('en', 'el'))) {
+            return $language;
+        }
+        
+        // Priority 5: Default to English (changed from Greek)
+        return 'en';
+    }
+    
+    private function detect_browser_language($accept_language) {
+        // Parse Accept-Language header
+        $languages = array();
+        $accept_language = strtolower($accept_language);
+        
+        // Split by comma and parse each language
+        $parts = explode(',', $accept_language);
+        foreach ($parts as $part) {
+            $part = trim($part);
+            if (strpos($part, ';') !== false) {
+                list($lang, $q) = explode(';', $part, 2);
+                $q = floatval(str_replace('q=', '', $q));
+            } else {
+                $lang = $part;
+                $q = 1.0;
+            }
+            
+            $lang = trim($lang);
+            if (strlen($lang) >= 2) {
+                $languages[substr($lang, 0, 2)] = $q;
+            }
+        }
+        
+        // Sort by quality score
+        arsort($languages);
+        
+        // Check for supported languages
+        foreach ($languages as $lang => $q) {
+            if ($lang === 'en') {
+                return 'en';
+            } elseif ($lang === 'el') {
+                return 'el';
+            }
+        }
+        
+        return null;
+    }
+    
+    private function detect_geolocation_language() {
+        // Get user's IP address
+        $ip = $this->get_user_ip();
+        if (!$ip) {
+            return 'en'; // Default to English if IP not available
+        }
+        
+        // Use a free geolocation service
+        $geo_data = $this->get_geolocation_data($ip);
+        if ($geo_data && isset($geo_data['country_code'])) {
+            $country_code = strtoupper($geo_data['country_code']);
+            
+            // Map country codes to languages
+            $country_language_map = array(
+                'GR' => 'el',  // Greece
+                'CY' => 'el',  // Cyprus
+                // All other countries default to English
+            );
+            
+            if (isset($country_language_map[$country_code])) {
+                return $country_language_map[$country_code];
+            }
+        }
+        
+        // Default to English for all other countries
+        return 'en';
+    }
+    
+    private function get_user_ip() {
+        $ip_keys = array('HTTP_CLIENT_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR');
+        foreach ($ip_keys as $key) {
+            if (array_key_exists($key, $_SERVER) === true) {
+                foreach (explode(',', $_SERVER[$key]) as $ip) {
+                    $ip = trim($ip);
+                    if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false) {
+                        return $ip;
+                    }
+                }
+            }
+        }
+        return isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : null;
+    }
+    
+    private function get_geolocation_data($ip) {
+        // Use a free geolocation service
+        // Note: In production, you might want to use a more reliable service
+        $url = "http://ip-api.com/json/{$ip}";
+        
+        $response = wp_remote_get($url, array(
+            'timeout' => 5,
+            'user-agent' => 'Cleaning Booking Plugin'
+        ));
+        
+        if (is_wp_error($response)) {
+            return null;
+        }
+        
+        $body = wp_remote_retrieve_body($response);
+        $data = json_decode($body, true);
+        
+        if ($data && $data['status'] === 'success') {
+            return $data;
+        }
+        
+        return null;
     }
     
     private function get_translations() {
@@ -639,7 +772,14 @@ class CB_Frontend {
     }
     
     private function get_translations_for_language($language) {
-        // Map language codes to actual filenames
+        // Try to get translations from database first
+        $db_translations = CB_Translations::get_all_translations($language);
+        
+        if (!empty($db_translations)) {
+            return $db_translations;
+        }
+        
+        // Fallback to JSON files if database is empty
         $file_mapping = array(
             'en' => 'cleaning-booking-en.json',
             'el' => 'cleaning-booking-el_GR.json'
@@ -665,93 +805,78 @@ class CB_Frontend {
             return array();
         }
         
-        // Load service translations
-        $translations = $this->get_translations_for_language($language);
-        $service_translations = isset($translations['services']) ? $translations['services'] : array();
-        
-        // Translate service names and descriptions
+        // Fetch translations from db keyed by our stable keys
         $translated_services = array();
-        $new_translations = array();
-        
         foreach ($services as $service) {
-            $translated_service = (array) $service; // Convert object to array
-            
-            // Translate service name
-            if (isset($service_translations[$service->name])) {
-                $translated_service['name'] = $service_translations[$service->name];
-            } else {
-                // Auto-translate new services (fallback to original if no translation)
-                $translated_service['name'] = $service->name;
-                // Store for potential future translation
-                $new_translations[$service->name] = $service->name;
-            }
-            
-            // Translate service description
-            if (isset($service_translations[$service->description])) {
-                $translated_service['description'] = $service_translations[$service->description];
-            } else {
-                // Auto-translate new descriptions (fallback to original if no translation)
-                $translated_service['description'] = $service->description;
-                // Store for potential future translation
-                $new_translations[$service->description] = $service->description;
-            }
-            
-            $translated_services[] = (object) $translated_service;
-        }
-        
-        // Log new services that need translation (for admin notification)
-        if (!empty($new_translations) && $language === 'el') {
-            error_log('CB Plugin: New services need Greek translation: ' . implode(', ', array_keys($new_translations)));
+            $service_id = intval($service->id);
+            $translated_services[] = (object) array(
+                'id' => $service_id,
+                'name' => CB_Translations::get_translation('service_name_' . $service_id, $language, 'services') ?: $service->name,
+                'description' => CB_Translations::get_translation('service_desc_' . $service_id, $language, 'services') ?: $service->description,
+                'base_price' => $service->base_price,
+                'base_duration' => $service->base_duration,
+                'sqm_multiplier' => $service->sqm_multiplier,
+                'sqm_duration_multiplier' => $service->sqm_duration_multiplier,
+                'default_area' => isset($service->default_area) ? $service->default_area : 0,
+                'is_active' => $service->is_active,
+                'sort_order' => $service->sort_order
+            );
         }
         
         return $translated_services;
     }
     
-    private function get_translated_extras($extras, $language) {
-        if (!$extras) {
-            return array();
-        }
-        
-        // Load service translations
-        $translations = $this->get_translations_for_language($language);
-        $service_translations = isset($translations['services']) ? $translations['services'] : array();
-        
-        // Translate extra names and descriptions
+    private function get_translated_extras($language = 'en') {
+        $extras = CB_Database::get_all_extras(true);
         $translated_extras = array();
-        $new_translations = array();
         
         foreach ($extras as $extra) {
-            $translated_extra = (array) $extra; // Convert object to array
-            
-            // Translate extra name
-            if (isset($service_translations[$extra->name])) {
-                $translated_extra['name'] = $service_translations[$extra->name];
-            } else {
-                // Auto-translate new extras (fallback to original if no translation)
-                $translated_extra['name'] = $extra->name;
-                // Store for potential future translation
-                $new_translations[$extra->name] = $extra->name;
-            }
-            
-            // Translate extra description
-            if (isset($service_translations[$extra->description])) {
-                $translated_extra['description'] = $service_translations[$extra->description];
-            } else {
-                // Auto-translate new descriptions (fallback to original if no translation)
-                $translated_extra['description'] = $extra->description;
-                // Store for potential future translation
-                $new_translations[$extra->description] = $extra->description;
-            }
-            
-            $translated_extras[] = (object) $translated_extra;
-        }
-        
-        // Log new extras that need translation (for admin notification)
-        if (!empty($new_translations) && $language === 'el') {
-            error_log('CB Plugin: New extras need Greek translation: ' . implode(', ', array_keys($new_translations)));
+            $extra_id = intval($extra->id);
+            $translated_extras[] = array(
+                'id' => $extra_id,
+                'service_id' => intval($extra->service_id),
+                'name' => CB_Translations::get_translation('extra_name_' . $extra_id, $language, 'extras') ?: $extra->name,
+                'description' => CB_Translations::get_translation('extra_desc_' . $extra_id, $language, 'extras') ?: $extra->description,
+                'price' => $extra->price,
+                'duration' => isset($extra->duration) ? intval($extra->duration) : 0,
+                'is_active' => isset($extra->is_active) ? intval($extra->is_active) : 1,
+                'sort_order' => isset($extra->sort_order) ? intval($extra->sort_order) : 0
+            );
         }
         
         return $translated_extras;
+    }
+    
+    private function get_available_slots_data() {
+        // This method provides sample slot data - in real implementation, 
+        // this would generate actual available slots
+        $current_date = date('Y-m-d');
+        $next_date = date('Y-m-d', strtotime('+1 day'));
+        
+        return array(
+            'today' => array(
+                'date' => $current_date,
+                'slots' => array(
+                    array('time' => '09:00', 'available' => true),
+                    array('time' => '10:00', 'available' => true),
+                    array('time' => '11:00', 'available' => true),
+                    array('time' => '14:00', 'available' => true),
+                    array('time' => '15:00', 'available' => true),
+                    array('time' => '16:00', 'available' => true)
+                )
+            ),
+            'tomorrow' => array(
+                'date' => $next_date,
+                'slots' => array(
+                    array('time' => '09:00', 'available' => true),
+                    array('time' => '10:00', 'available' => true),
+                    array('time' => '11:00', 'available' => true),
+                    array('time' => '14:00', 'available' => true),
+                    array('time' => '15:00', 'available' => true),
+                    array('time' => '16:00', 'available' => true)
+                )
+            )
+        );
     }
     
     public function ajax_switch_language() {
@@ -763,18 +888,33 @@ class CB_Frontend {
             $language = 'en';
         }
         
-        // Load translations directly from JSON files
-        $translations = $this->get_translations_for_language($language);
+        // Set cookie to remember user's language preference
+        setcookie('cb_language', $language, time() + (365 * 24 * 60 * 60), '/'); // 1 year
+        
+        // Load translations from database
+        $translations = CB_Translations::get_all_translations($language);
         
         // Get translated services data
         $translated_services = $this->get_translated_services($language);
         
-        // Return updated translations
+        // Get translated extras data
+        $translated_extras = $this->get_translated_extras($language);
+        
+        // Get form fields in the selected language
+        $form_fields = CB_Form_Fields::get_frontend_fields($language);
+        
+        // Get all available slots (this will use the new language for messages)
+        $available_slots = $this->get_available_slots_data();
+        
+        // Return comprehensive updated data
         wp_send_json_success(array(
             'language' => $language,
             'translations' => $translations,
             'services' => $translated_services,
-            'message' => $translations['Language switched successfully'] ?? 'Language switched successfully'
+            'extras' => $translated_extras,
+            'form_fields' => $form_fields,
+            'available_slots' => $available_slots,
+            'message' => isset($translations['Language switched successfully']) ? $translations['Language switched successfully'] : 'Language switched successfully'
         ));
     }
     
@@ -1005,6 +1145,7 @@ class CB_Frontend {
      * Add dynamic CSS for admin color customization
      */
     private function add_dynamic_css() {
+        // Get color settings
         $primary_color = get_option('cb_primary_color', '#0073aa');
         $secondary_color = get_option('cb_secondary_color', '#00a0d2');
         $background_color = get_option('cb_background_color', '#ffffff');
@@ -1013,37 +1154,159 @@ class CB_Frontend {
         $success_color = get_option('cb_success_color', '#46b450');
         $error_color = get_option('cb_error_color', '#dc3232');
         
+        // Get style settings from database
+        $style_settings = CB_Style_Manager::get_all_settings();
+        
+        // Generate CSS variables
+        $css_vars = CB_Style_Manager::generate_css_variables();
+        
+        // Get Google Fonts URL if needed
+        $google_fonts_url = CB_Style_Manager::get_google_fonts_url();
+        
         $css = "
-        <style id='cb-dynamic-colors'>
+        <style id='cb-dynamic-styles'>
         :root {
-            --cb-admin-primary: {$primary_color};
-            --cb-admin-secondary: {$secondary_color};
-            --cb-admin-background: {$background_color};
-            --cb-admin-text: {$text_color};
-            --cb-admin-border: {$border_color};
-            --cb-admin-success: {$success_color};
-            --cb-admin-error: {$error_color};
+            /* Color Variables */
+            --cb-primary-color: {$primary_color};
+            --cb-secondary-color: {$secondary_color};
+            --cb-background-color: {$background_color};
+            --cb-text-color: {$text_color};
+            --cb-border-color: {$border_color};
+            --cb-success-color: {$success_color};
+            --cb-error-color: {$error_color};
+            
+            /* Typography Variables */
+            --cb-heading-font-family: " . CB_Style_Manager::get_setting('heading_font_family', 'Inter, sans-serif') . ";
+            --cb-body-font-family: " . CB_Style_Manager::get_setting('body_font_family', 'Inter, sans-serif') . ";
+            --cb-heading-font-size: " . CB_Style_Manager::get_setting('heading_font_size', '28px') . ";
+            --cb-body-font-size: " . CB_Style_Manager::get_setting('body_font_size', '16px') . ";
+            --cb-label-font-size: " . CB_Style_Manager::get_setting('label_font_size', '14px') . ";
+            --cb-button-font-size: " . CB_Style_Manager::get_setting('button_font_size', '16px') . ";
+            --cb-font-weight-heading: " . CB_Style_Manager::get_setting('font_weight_heading', '700') . ";
+            --cb-font-weight-body: " . CB_Style_Manager::get_setting('font_weight_body', '400') . ";
+            
+            /* Spacing Variables */
+            --cb-form-padding: " . CB_Style_Manager::get_setting('form_padding', '24px') . ";
+            --cb-field-spacing: " . CB_Style_Manager::get_setting('field_spacing', '20px') . ";
+            --cb-button-padding: " . CB_Style_Manager::get_setting('button_padding', '16px 32px') . ";
+            --cb-container-max-width: " . CB_Style_Manager::get_setting('container_max_width', '1200px') . ";
+            
+            /* Layout Variables */
+            --cb-sidebar-position: " . CB_Style_Manager::get_setting('sidebar_position', 'right') . ";
+            --cb-step-indicator-style: " . CB_Style_Manager::get_setting('step_indicator_style', 'numbered') . ";
+            --cb-mobile-breakpoint: " . CB_Style_Manager::get_setting('mobile_breakpoint', '768px') . ";
         }
         
-        /* Debug: Force apply border colors */
+        /* Google Fonts */
+        @import url('{$google_fonts_url}');
+        
+        /* Typography Styles */
+        .cb-widget h1, .cb-widget h2, .cb-widget h3, .cb-widget h4, .cb-widget h5, .cb-widget h6 {
+            font-family: var(--cb-heading-font-family);
+            font-size: var(--cb-heading-font-size);
+            font-weight: var(--cb-font-weight-heading);
+        }
+        
+        .cb-widget, .cb-widget p, .cb-widget span, .cb-widget div {
+            font-family: var(--cb-body-font-family);
+            font-size: var(--cb-body-font-size);
+            font-weight: var(--cb-font-weight-body);
+        }
+        
+        .cb-widget label {
+            font-size: var(--cb-label-font-size);
+        }
+        
+        .cb-widget .cb-btn {
+            font-size: var(--cb-button-font-size);
+            padding: var(--cb-button-padding);
+        }
+        
+        /* Spacing Styles */
+        .cb-widget .cb-form-group {
+            padding: var(--cb-form-padding);
+            margin-bottom: var(--cb-field-spacing);
+        }
+        
+        .cb-widget-container {
+            max-width: var(--cb-container-max-width);
+        }
+        
+        /* Layout Styles */
+        .cb-content {
+            display: grid;
+            gap: var(--cb-field-spacing);
+        }
+        /* Default: sidebar on the right */
+        .cb-content.cb-sidebar-right {
+            grid-template-columns: 2fr 1fr;
+            grid-template-areas: \"main sidebar\";
+        }
+        .cb-main-content.cb-sidebar-right {
+            border-right: 1px solid var(--cb-border-color);
+            border-left: none;
+        }
+        /* Sidebar on the left */
+        .cb-content.cb-sidebar-left {
+            grid-template-columns: 1fr 2fr;
+            grid-template-areas: \"sidebar main\";
+        }
+        .cb-main-content.cb-sidebar-left {
+            border-left: 1px solid var(--cb-border-color);
+            border-right: none;
+        }
+        /* Add breathing room */
+        .cb-main-content,
+        .cb-checkout-sidebar {
+            padding: var(--cb-form-padding);
+        }
+        
+        /* Mobile Responsive */
+        @media (max-width: var(--cb-mobile-breakpoint)) {
+            .cb-content,
+            .cb-content.cb-sidebar-right,
+            .cb-content.cb-sidebar-left {
+                grid-template-columns: 1fr;
+                grid-template-areas: \"main\" \"sidebar\";
+            }
+        }
+        
+        /* Color Styles */
         .cb-input {
-            border-color: {$border_color} !important;
+            border-color: var(--cb-border-color);
         }
         
         .cb-input:focus {
-            border-color: {$primary_color} !important;
+            border-color: var(--cb-primary-color);
         }
         
         .cb-service-card {
-            border-color: {$border_color} !important;
+            border-color: var(--cb-border-color);
         }
         
         .cb-time-slot {
-            border-color: {$border_color} !important;
+            border-color: var(--cb-border-color);
         }
         
         .cb-payment-option {
-            border-color: {$border_color} !important;
+            border-color: var(--cb-border-color);
+        }
+        
+        .cb-btn-primary {
+            background-color: var(--cb-primary-color);
+            color: white;
+        }
+        
+        .cb-btn-primary:hover {
+            background-color: var(--cb-secondary-color);
+        }
+        
+        .cb-success-message {
+            color: var(--cb-success-color);
+        }
+        
+        .cb-error-message {
+            color: var(--cb-error-color);
         }
         </style>";
         

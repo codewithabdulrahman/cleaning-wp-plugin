@@ -153,6 +153,66 @@ class CB_Database {
             KEY sort_order (sort_order)
         ) $charset_collate;";
         
+        // Form fields table for dynamic field configuration
+        $form_fields_table = $wpdb->prefix . 'cb_form_fields';
+        $form_fields_sql = "CREATE TABLE $form_fields_table (
+            id mediumint(9) NOT NULL AUTO_INCREMENT,
+            field_key varchar(100) NOT NULL,
+            field_type varchar(50) NOT NULL DEFAULT 'text',
+            label_en varchar(255) NOT NULL,
+            label_el varchar(255) NOT NULL,
+            placeholder_en varchar(255),
+            placeholder_el varchar(255),
+            is_required tinyint(1) NOT NULL DEFAULT 0,
+            is_visible tinyint(1) NOT NULL DEFAULT 1,
+            sort_order int(11) NOT NULL DEFAULT 0,
+            validation_rules text,
+            field_options text,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY field_key (field_key),
+            KEY field_type (field_type),
+            KEY is_visible (is_visible),
+            KEY sort_order (sort_order)
+        ) $charset_collate;";
+        
+        // Translations table for dynamic content management
+        $translations_table = $wpdb->prefix . 'cb_translations';
+        $translations_sql = "CREATE TABLE $translations_table (
+            id mediumint(9) NOT NULL AUTO_INCREMENT,
+            string_key varchar(255) NOT NULL,
+            category varchar(100) NOT NULL DEFAULT 'general',
+            text_en text NOT NULL,
+            text_el text NOT NULL,
+            context varchar(255),
+            is_active tinyint(1) NOT NULL DEFAULT 1,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY string_key_category (string_key, category),
+            KEY category (category),
+            KEY is_active (is_active)
+        ) $charset_collate;";
+        
+        // Style settings table for enhanced customization
+        $style_settings_table = $wpdb->prefix . 'cb_style_settings';
+        $style_settings_sql = "CREATE TABLE $style_settings_table (
+            id mediumint(9) NOT NULL AUTO_INCREMENT,
+            setting_key varchar(100) NOT NULL,
+            setting_value text NOT NULL,
+            setting_type varchar(50) NOT NULL DEFAULT 'text',
+            category varchar(100) NOT NULL DEFAULT 'general',
+            description text,
+            is_active tinyint(1) NOT NULL DEFAULT 1,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY setting_key (setting_key),
+            KEY category (category),
+            KEY is_active (is_active)
+        ) $charset_collate;";
+        
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         
         dbDelta($services_sql);
@@ -162,6 +222,9 @@ class CB_Database {
         dbDelta($booking_extras_sql);
         dbDelta($slot_holds_sql);
         dbDelta($trucks_sql);
+        dbDelta($form_fields_sql);
+        dbDelta($translations_sql);
+        dbDelta($style_settings_sql);
         
         // Insert default data
         self::insert_default_data();
@@ -173,6 +236,9 @@ class CB_Database {
         self::check_payment_method_column();
         self::check_default_area_column();
         self::check_slot_holds_truck_column();
+        self::check_form_fields_table();
+        self::check_translations_table();
+        self::check_style_settings_table();
     }
     
     private static function check_service_extras_table() {
@@ -284,6 +350,110 @@ class CB_Database {
         }
     }
     
+    private static function check_form_fields_table() {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'cb_form_fields';
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'") == $table_name;
+        
+        if (!$table_exists) {
+            $charset_collate = $wpdb->get_charset_collate();
+            
+            $form_fields_sql = "CREATE TABLE $table_name (
+                id mediumint(9) NOT NULL AUTO_INCREMENT,
+                field_key varchar(100) NOT NULL,
+                field_type varchar(50) NOT NULL DEFAULT 'text',
+                label_en varchar(255) NOT NULL,
+                label_el varchar(255) NOT NULL,
+                placeholder_en varchar(255),
+                placeholder_el varchar(255),
+                is_required tinyint(1) NOT NULL DEFAULT 0,
+                is_visible tinyint(1) NOT NULL DEFAULT 1,
+                sort_order int(11) NOT NULL DEFAULT 0,
+                validation_rules text,
+                field_options text,
+                created_at datetime DEFAULT CURRENT_TIMESTAMP,
+                updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                UNIQUE KEY field_key (field_key),
+                KEY field_type (field_type),
+                KEY is_visible (is_visible),
+                KEY sort_order (sort_order)
+            ) $charset_collate;";
+            
+            require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+            dbDelta($form_fields_sql);
+            
+            // Insert default form fields
+            self::insert_default_form_fields();
+        }
+    }
+    
+    private static function check_translations_table() {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'cb_translations';
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'") == $table_name;
+        
+        if (!$table_exists) {
+            $charset_collate = $wpdb->get_charset_collate();
+            
+            $translations_sql = "CREATE TABLE $table_name (
+                id mediumint(9) NOT NULL AUTO_INCREMENT,
+                string_key varchar(255) NOT NULL,
+                category varchar(100) NOT NULL DEFAULT 'general',
+                text_en text NOT NULL,
+                text_el text NOT NULL,
+                context varchar(255),
+                is_active tinyint(1) NOT NULL DEFAULT 1,
+                created_at datetime DEFAULT CURRENT_TIMESTAMP,
+                updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                UNIQUE KEY string_key_category (string_key, category),
+                KEY category (category),
+                KEY is_active (is_active)
+            ) $charset_collate;";
+            
+            require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+            dbDelta($translations_sql);
+            
+            // JSON seed removed; translations will be added via admin UI
+        }
+    }
+    
+    private static function check_style_settings_table() {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'cb_style_settings';
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'") == $table_name;
+        
+        if (!$table_exists) {
+            $charset_collate = $wpdb->get_charset_collate();
+            
+            $style_settings_sql = "CREATE TABLE $table_name (
+                id mediumint(9) NOT NULL AUTO_INCREMENT,
+                setting_key varchar(100) NOT NULL,
+                setting_value text NOT NULL,
+                setting_type varchar(50) NOT NULL DEFAULT 'text',
+                category varchar(100) NOT NULL DEFAULT 'general',
+                description text,
+                is_active tinyint(1) NOT NULL DEFAULT 1,
+                created_at datetime DEFAULT CURRENT_TIMESTAMP,
+                updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                UNIQUE KEY setting_key (setting_key),
+                KEY category (category),
+                KEY is_active (is_active)
+            ) $charset_collate;";
+            
+            require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+            dbDelta($style_settings_sql);
+            
+            // Insert default style settings
+            self::insert_default_style_settings();
+        }
+    }
+    
     private static function insert_default_data() {
         global $wpdb;
         
@@ -380,6 +550,313 @@ class CB_Database {
             
             if (!$existing) {
             $wpdb->insert($zip_codes_table, $zip);
+            }
+        }
+    }
+    
+    private static function insert_default_form_fields() {
+        global $wpdb;
+        
+        $form_fields_table = $wpdb->prefix . 'cb_form_fields';
+        $default_fields = array(
+            array(
+                'field_key' => 'zip_code',
+                'field_type' => 'text',
+                'label_en' => 'ZIP Code',
+                'label_el' => 'Ταχυδρομικός Κώδικας',
+                'placeholder_en' => '12345',
+                'placeholder_el' => '12345',
+                'is_required' => 1,
+                'is_visible' => 1,
+                'sort_order' => 1,
+                'validation_rules' => json_encode(array('required' => true, 'pattern' => '^[0-9]{5}$'))
+            ),
+            array(
+                'field_key' => 'service_selection',
+                'field_type' => 'select',
+                'label_en' => 'Select Your Service',
+                'label_el' => 'Επιλέξτε την Υπηρεσία σας',
+                'placeholder_en' => 'Choose a service',
+                'placeholder_el' => 'Επιλέξτε υπηρεσία',
+                'is_required' => 1,
+                'is_visible' => 1,
+                'sort_order' => 2,
+                'validation_rules' => json_encode(array('required' => true))
+            ),
+            array(
+                'field_key' => 'square_meters',
+                'field_type' => 'number',
+                'label_en' => 'Space (m²)',
+                'label_el' => 'Χώρος (m²)',
+                'placeholder_en' => '0',
+                'placeholder_el' => '0',
+                'is_required' => 0,
+                'is_visible' => 1,
+                'sort_order' => 3,
+                'validation_rules' => json_encode(array('min' => 0, 'max' => 1000))
+            ),
+            array(
+                'field_key' => 'extras',
+                'field_type' => 'checkbox',
+                'label_en' => 'Additional Services',
+                'label_el' => 'Επιπλέον Υπηρεσίες',
+                'placeholder_en' => '',
+                'placeholder_el' => '',
+                'is_required' => 0,
+                'is_visible' => 1,
+                'sort_order' => 4,
+                'validation_rules' => json_encode(array())
+            ),
+            array(
+                'field_key' => 'booking_date',
+                'field_type' => 'date',
+                'label_en' => 'Date',
+                'label_el' => 'Ημερομηνία',
+                'placeholder_en' => '',
+                'placeholder_el' => '',
+                'is_required' => 1,
+                'is_visible' => 1,
+                'sort_order' => 5,
+                'validation_rules' => json_encode(array('required' => true))
+            ),
+            array(
+                'field_key' => 'booking_time',
+                'field_type' => 'select',
+                'label_en' => 'Available Time Slots',
+                'label_el' => 'Διαθέσιμες Χρονικές Περιόδους',
+                'placeholder_en' => 'Select time',
+                'placeholder_el' => 'Επιλέξτε ώρα',
+                'is_required' => 1,
+                'is_visible' => 1,
+                'sort_order' => 6,
+                'validation_rules' => json_encode(array('required' => true))
+            ),
+            array(
+                'field_key' => 'customer_name',
+                'field_type' => 'text',
+                'label_en' => 'Full Name',
+                'label_el' => 'Ονοματεπώνυμο',
+                'placeholder_en' => 'Enter your full name',
+                'placeholder_el' => 'Εισάγετε το ονοματεπώνυμό σας',
+                'is_required' => 1,
+                'is_visible' => 1,
+                'sort_order' => 7,
+                'validation_rules' => json_encode(array('required' => true, 'minlength' => 2))
+            ),
+            array(
+                'field_key' => 'customer_email',
+                'field_type' => 'email',
+                'label_en' => 'Email Address',
+                'label_el' => 'Διεύθυνση Email',
+                'placeholder_en' => 'your@email.com',
+                'placeholder_el' => 'το@email.com',
+                'is_required' => 1,
+                'is_visible' => 1,
+                'sort_order' => 8,
+                'validation_rules' => json_encode(array('required' => true, 'type' => 'email'))
+            ),
+            array(
+                'field_key' => 'customer_phone',
+                'field_type' => 'tel',
+                'label_en' => 'Phone Number',
+                'label_el' => 'Τηλεφωνικός Αριθμός',
+                'placeholder_en' => '+30 123 456 7890',
+                'placeholder_el' => '+30 123 456 7890',
+                'is_required' => 1,
+                'is_visible' => 1,
+                'sort_order' => 9,
+                'validation_rules' => json_encode(array('required' => true))
+            ),
+            array(
+                'field_key' => 'address',
+                'field_type' => 'textarea',
+                'label_en' => 'Address',
+                'label_el' => 'Διεύθυνση',
+                'placeholder_en' => 'Street address, apartment, etc.',
+                'placeholder_el' => 'Οδική διεύθυνση, διαμέρισμα, κλπ.',
+                'is_required' => 0,
+                'is_visible' => 1,
+                'sort_order' => 10,
+                'validation_rules' => json_encode(array())
+            ),
+            array(
+                'field_key' => 'notes',
+                'field_type' => 'textarea',
+                'label_en' => 'Special Instructions',
+                'label_el' => 'Ειδικές Οδηγίες',
+                'placeholder_en' => 'Any special requests or instructions...',
+                'placeholder_el' => 'Οποιεσδήποτε ειδικές αιτήσεις ή οδηγίες...',
+                'is_required' => 0,
+                'is_visible' => 1,
+                'sort_order' => 11,
+                'validation_rules' => json_encode(array())
+            )
+        );
+        
+        foreach ($default_fields as $field) {
+            // Check if field already exists
+            $existing = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM $form_fields_table WHERE field_key = %s",
+                $field['field_key']
+            ));
+            
+            if (!$existing) {
+                $wpdb->insert($form_fields_table, $field);
+            }
+        }
+    }
+    
+    // import_json_translations removed
+    
+    private static function insert_default_style_settings() {
+        global $wpdb;
+        
+        $style_settings_table = $wpdb->prefix . 'cb_style_settings';
+        $default_settings = array(
+            // Typography settings
+            array(
+                'setting_key' => 'heading_font_family',
+                'setting_value' => 'Inter, sans-serif',
+                'setting_type' => 'select',
+                'category' => 'typography',
+                'description' => 'Font family for headings'
+            ),
+            array(
+                'setting_key' => 'body_font_family',
+                'setting_value' => 'Inter, sans-serif',
+                'setting_type' => 'select',
+                'category' => 'typography',
+                'description' => 'Font family for body text'
+            ),
+            array(
+                'setting_key' => 'heading_font_size',
+                'setting_value' => '28px',
+                'setting_type' => 'text',
+                'category' => 'typography',
+                'description' => 'Font size for main headings'
+            ),
+            array(
+                'setting_key' => 'body_font_size',
+                'setting_value' => '16px',
+                'setting_type' => 'text',
+                'category' => 'typography',
+                'description' => 'Font size for body text'
+            ),
+            array(
+                'setting_key' => 'label_font_size',
+                'setting_value' => '14px',
+                'setting_type' => 'text',
+                'category' => 'typography',
+                'description' => 'Font size for form labels'
+            ),
+            array(
+                'setting_key' => 'button_font_size',
+                'setting_value' => '16px',
+                'setting_type' => 'text',
+                'category' => 'typography',
+                'description' => 'Font size for buttons'
+            ),
+            array(
+                'setting_key' => 'font_weight_heading',
+                'setting_value' => '700',
+                'setting_type' => 'select',
+                'category' => 'typography',
+                'description' => 'Font weight for headings'
+            ),
+            array(
+                'setting_key' => 'font_weight_body',
+                'setting_value' => '400',
+                'setting_type' => 'select',
+                'category' => 'typography',
+                'description' => 'Font weight for body text'
+            ),
+            
+            // Spacing settings
+            array(
+                'setting_key' => 'form_padding',
+                'setting_value' => '24px',
+                'setting_type' => 'text',
+                'category' => 'spacing',
+                'description' => 'Padding for form containers'
+            ),
+            array(
+                'setting_key' => 'field_spacing',
+                'setting_value' => '20px',
+                'setting_type' => 'text',
+                'category' => 'spacing',
+                'description' => 'Spacing between form fields'
+            ),
+            array(
+                'setting_key' => 'button_padding',
+                'setting_value' => '16px 32px',
+                'setting_type' => 'text',
+                'category' => 'spacing',
+                'description' => 'Padding for buttons'
+            ),
+            array(
+                'setting_key' => 'container_max_width',
+                'setting_value' => '1200px',
+                'setting_type' => 'text',
+                'category' => 'spacing',
+                'description' => 'Maximum width of the booking widget'
+            ),
+            
+            // Layout settings
+            array(
+                'setting_key' => 'sidebar_position',
+                'setting_value' => 'right',
+                'setting_type' => 'select',
+                'category' => 'layout',
+                'description' => 'Position of the checkout sidebar'
+            ),
+            array(
+                'setting_key' => 'step_indicator_style',
+                'setting_value' => 'numbered',
+                'setting_type' => 'select',
+                'category' => 'layout',
+                'description' => 'Style of step indicators'
+            ),
+            array(
+                'setting_key' => 'mobile_breakpoint',
+                'setting_value' => '768px',
+                'setting_type' => 'text',
+                'category' => 'layout',
+                'description' => 'Mobile breakpoint for responsive design'
+            ),
+            
+            // Language settings
+            array(
+                'setting_key' => 'default_language',
+                'setting_value' => 'el',
+                'setting_type' => 'select',
+                'category' => 'language',
+                'description' => 'Default language for the booking form'
+            ),
+            array(
+                'setting_key' => 'auto_detect_language',
+                'setting_value' => '1',
+                'setting_type' => 'checkbox',
+                'category' => 'language',
+                'description' => 'Automatically detect user language'
+            ),
+            array(
+                'setting_key' => 'geolocation_detection',
+                'setting_value' => '0',
+                'setting_type' => 'checkbox',
+                'category' => 'language',
+                'description' => 'Use geolocation for language detection'
+            )
+        );
+        
+        foreach ($default_settings as $setting) {
+            // Check if setting already exists
+            $existing = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM $style_settings_table WHERE setting_key = %s",
+                $setting['setting_key']
+            ));
+            
+            if (!$existing) {
+                $wpdb->insert($style_settings_table, $setting);
             }
         }
     }
@@ -656,6 +1133,14 @@ class CB_Database {
         return $wpdb->get_results("SELECT * FROM $table $where ORDER BY id DESC");
     }
     
+    public static function get_all_extras($active_only = false) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_service_extras';
+        $where = $active_only ? "WHERE is_active = 1" : "";
+        
+        return $wpdb->get_results("SELECT * FROM $table $where ORDER BY service_id, id DESC");
+    }
+    
     public static function get_available_extras_for_service($service_id) {
         global $wpdb;
         $table = $wpdb->prefix . 'cb_service_extras';
@@ -893,5 +1378,220 @@ class CB_Database {
         }
         
         return null; // No available truck
+    }
+    
+    // Form Fields Management Methods
+    public static function get_form_fields($visible_only = true) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_form_fields';
+        $where = $visible_only ? 'WHERE is_visible = 1' : '';
+        return $wpdb->get_results("SELECT * FROM $table $where ORDER BY sort_order, id");
+    }
+    
+    public static function get_form_field($field_key) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_form_fields';
+        return $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE field_key = %s", $field_key));
+    }
+    
+    public static function save_form_field($data) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_form_fields';
+        
+        $field_data = array(
+            'field_key' => sanitize_text_field($data['field_key']),
+            'field_type' => sanitize_text_field($data['field_type']),
+            'label_en' => sanitize_text_field($data['label_en']),
+            'label_el' => sanitize_text_field($data['label_el']),
+            'placeholder_en' => sanitize_text_field($data['placeholder_en']),
+            'placeholder_el' => sanitize_text_field($data['placeholder_el']),
+            'is_required' => isset($data['is_required']) ? intval($data['is_required']) : 0,
+            'is_visible' => isset($data['is_visible']) ? intval($data['is_visible']) : 1,
+            'sort_order' => intval($data['sort_order']),
+            'validation_rules' => isset($data['validation_rules']) ? json_encode($data['validation_rules']) : '',
+            'field_options' => isset($data['field_options']) ? json_encode($data['field_options']) : ''
+        );
+        
+        if (isset($data['id']) && !empty($data['id'])) {
+            return $wpdb->update($table, $field_data, array('id' => intval($data['id'])));
+        } else {
+            return $wpdb->insert($table, $field_data);
+        }
+    }
+    
+    public static function delete_form_field($field_id) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_form_fields';
+        return $wpdb->delete($table, array('id' => intval($field_id)));
+    }
+    
+    public static function update_field_order($field_orders) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_form_fields';
+        
+        foreach ($field_orders as $field_id => $order) {
+            $wpdb->update($table, array('sort_order' => intval($order)), array('id' => intval($field_id)));
+        }
+        
+        return true;
+    }
+    
+    // Translations Management Methods
+    public static function get_translations($category = null, $language = 'en') {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_translations';
+        
+        $where = "WHERE is_active = 1";
+        if ($category) {
+            $where .= $wpdb->prepare(" AND category = %s", $category);
+        }
+        
+        $results = $wpdb->get_results("SELECT * FROM $table $where ORDER BY category, string_key");
+        
+        $translations = array();
+        foreach ($results as $row) {
+            $translations[$row->string_key] = $language === 'el' ? $row->text_el : $row->text_en;
+        }
+        
+        return $translations;
+    }
+    
+    public static function get_translation($string_key, $language = 'en', $category = 'general') {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_translations';
+        
+        $result = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $table WHERE string_key = %s AND category = %s AND is_active = 1",
+            $string_key, $category
+        ));
+        
+        if ($result) {
+            return $language === 'el' ? $result->text_el : $result->text_en;
+        }
+        
+        return $string_key; // Fallback to key if translation not found
+    }
+    
+    public static function save_translation($data) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_translations';
+        
+        $translation_data = array(
+            'string_key' => sanitize_text_field($data['string_key']),
+            'category' => sanitize_text_field($data['category']),
+            'text_en' => sanitize_textarea_field($data['text_en']),
+            'text_el' => sanitize_textarea_field($data['text_el']),
+            'context' => sanitize_text_field($data['context']),
+            'is_active' => isset($data['is_active']) ? intval($data['is_active']) : 1
+        );
+        
+        if (isset($data['id']) && !empty($data['id'])) {
+            return $wpdb->update($table, $translation_data, array('id' => intval($data['id'])));
+        } else {
+            return $wpdb->insert($table, $translation_data);
+        }
+    }
+    
+    public static function delete_translation($translation_id) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_translations';
+        return $wpdb->delete($table, array('id' => intval($translation_id)));
+    }
+    
+    public static function get_translation_categories() {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_translations';
+        
+        $results = $wpdb->get_results("SELECT DISTINCT category FROM $table WHERE is_active = 1 ORDER BY category");
+        
+        $categories = array();
+        foreach ($results as $row) {
+            $categories[] = $row->category;
+        }
+        
+        return $categories;
+    }
+    
+    // Style Settings Management Methods
+    public static function get_style_settings($category = null) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_style_settings';
+        
+        $where = "WHERE is_active = 1";
+        if ($category) {
+            $where .= $wpdb->prepare(" AND category = %s", $category);
+        }
+        
+        $results = $wpdb->get_results("SELECT * FROM $table $where ORDER BY category, setting_key");
+        
+        $settings = array();
+        foreach ($results as $row) {
+            $settings[$row->setting_key] = array(
+                'value' => $row->setting_value,
+                'type' => $row->setting_type,
+                'category' => $row->category,
+                'description' => $row->description
+            );
+        }
+        
+        return $settings;
+    }
+    
+    public static function get_style_setting($setting_key, $default = '') {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_style_settings';
+        
+        $result = $wpdb->get_var($wpdb->prepare(
+            "SELECT setting_value FROM $table WHERE setting_key = %s AND is_active = 1",
+            $setting_key
+        ));
+        
+        return $result ?: $default;
+    }
+    
+    public static function save_style_setting($setting_key, $setting_value, $setting_type = 'text', $category = 'general', $description = '') {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_style_settings';
+        
+        $setting_data = array(
+            'setting_key' => sanitize_text_field($setting_key),
+            'setting_value' => sanitize_text_field($setting_value),
+            'setting_type' => sanitize_text_field($setting_type),
+            'category' => sanitize_text_field($category),
+            'description' => sanitize_text_field($description),
+            'is_active' => 1
+        );
+        
+        // Check if setting exists
+        $existing = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM $table WHERE setting_key = %s",
+            $setting_key
+        ));
+        
+        if ($existing) {
+            return $wpdb->update($table, $setting_data, array('setting_key' => $setting_key));
+        } else {
+            return $wpdb->insert($table, $setting_data);
+        }
+    }
+    
+    public static function delete_style_setting($setting_key) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_style_settings';
+        return $wpdb->delete($table, array('setting_key' => $setting_key));
+    }
+    
+    public static function get_style_categories() {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_style_settings';
+        
+        $results = $wpdb->get_results("SELECT DISTINCT category FROM $table WHERE is_active = 1 ORDER BY category");
+        
+        $categories = array();
+        foreach ($results as $row) {
+            $categories[] = $row->category;
+        }
+        
+        return $categories;
     }
 }

@@ -49,8 +49,8 @@ if (!defined('ABSPATH')) {
             <?php endif; ?>
         </div>
         
-        <div class="cb-content">
-            <div class="cb-main-content">
+        <div class="cb-content cb-sidebar-<?php echo esc_attr(CB_Style_Manager::get_setting('sidebar_position', 'right')); ?>">
+            <div class="cb-main-content cb-sidebar-<?php echo esc_attr(CB_Style_Manager::get_setting('sidebar_position', 'right')); ?>">
                 <form id="cb-booking-form" class="cb-form">
                     <!-- Step 1: ZIP Code Check -->
                     <div class="cb-step-content cb-step-1 cb-step-active">

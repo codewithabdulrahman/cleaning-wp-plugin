@@ -723,6 +723,33 @@ document.addEventListener('DOMContentLoaded', function() {
                         updateServiceTitle();
                     }
                     
+                    // Update extras with translated data
+                    if (response.data.extras) {
+                        // Update extras for currently selected service
+                        const selectedService = getSelectedService();
+                        if (selectedService) {
+                            const serviceExtras = response.data.extras.filter(extra => extra.service_id === selectedService.id);
+                            displayExtras(serviceExtras);
+                        }
+                    }
+                    
+                    // Update form fields with translated data
+                    if (response.data.form_fields) {
+                        cb_frontend.form_fields = response.data.form_fields;
+                        // Re-render form fields if we're on a form step
+                        if (currentStep >= 2) {
+                            updateFormFields();
+                        }
+                    }
+                    
+                    // Update available slots with translated data
+                    if (response.data.available_slots) {
+                        // Re-render time slots if we're on the time selection step
+                        if (currentStep >= 3) {
+                            displayTimeSlots(response.data.available_slots);
+                        }
+                    }
+                    
                     // Update UI text
                     updateUITranslations();
                     
@@ -2185,6 +2212,73 @@ document.addEventListener('DOMContentLoaded', function() {
         
         keysToRemove.forEach(key => {
             localStorage.removeItem(key);
+        });
+    }
+    
+    // Helper function to get currently selected service
+    function getSelectedService() {
+        const selectedServiceCard = document.querySelector('.cb-service-card.selected');
+        if (selectedServiceCard) {
+            const serviceId = parseInt(selectedServiceCard.dataset.serviceId);
+            return services.find(service => service.id === serviceId);
+        }
+        return null;
+    }
+    
+    // Helper function to update form fields with new translations
+    function updateFormFields() {
+        // Update field labels
+        const fieldLabels = document.querySelectorAll('.cb-form-group label');
+        fieldLabels.forEach(label => {
+            const fieldKey = label.dataset.fieldKey;
+            if (fieldKey && cb_frontend.form_fields && cb_frontend.form_fields[fieldKey]) {
+                label.textContent = cb_frontend.form_fields[fieldKey].label;
+            }
+        });
+        
+        // Update field placeholders
+        const fieldInputs = document.querySelectorAll('.cb-form-group input, .cb-form-group textarea, .cb-form-group select');
+        fieldInputs.forEach(input => {
+            const fieldKey = input.dataset.fieldKey;
+            if (fieldKey && cb_frontend.form_fields && cb_frontend.form_fields[fieldKey]) {
+                input.placeholder = cb_frontend.form_fields[fieldKey].placeholder;
+            }
+        });
+    }
+    
+    // Helper function to display time slots with new data
+    function displayTimeSlots(slotsData) {
+        if (!slotsData) {
+            return;
+        }
+        
+        const timeSlotsContainer = document.querySelector('.cb-time-slots');
+        if (!timeSlotsContainer) {
+            return;
+        }
+        
+        // Clear existing slots
+        timeSlotsContainer.innerHTML = '';
+        
+        // Display slots for each date
+        Object.keys(slotsData).forEach(dateKey => {
+            const dateData = slotsData[dateKey];
+            const dateElement = document.createElement('div');
+            dateElement.className = 'cb-date-group';
+            dateElement.innerHTML = `
+                <h4>${dateData.date}</h4>
+                <div class="cb-time-grid">
+                    ${dateData.slots.map(slot => `
+                        <button class="cb-time-slot ${slot.available ? 'available' : 'unavailable'}" 
+                                data-time="${slot.time}" 
+                                data-date="${dateData.date}"
+                                ${!slot.available ? 'disabled' : ''}>
+                            ${slot.time}
+                        </button>
+                    `).join('')}
+                </div>
+            `;
+            timeSlotsContainer.appendChild(dateElement);
         });
     }
 });

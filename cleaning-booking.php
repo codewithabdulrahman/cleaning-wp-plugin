@@ -64,6 +64,9 @@ class CleaningBooking {
         require_once CB_PLUGIN_DIR . 'includes/class-cb-frontend.php';
         require_once CB_PLUGIN_DIR . 'includes/class-cb-woocommerce.php';
         require_once CB_PLUGIN_DIR . 'includes/class-cb-slot-manager.php';
+        require_once CB_PLUGIN_DIR . 'includes/class-cb-translations.php';
+        require_once CB_PLUGIN_DIR . 'includes/class-cb-form-fields.php';
+        require_once CB_PLUGIN_DIR . 'includes/class-cb-style-manager.php';
     }
     
     private function init_hooks() {

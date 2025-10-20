@@ -98,7 +98,7 @@ class CB_WooCommerce {
      * Pre-fill WooCommerce checkout fields with customer details from booking
      */
     private function prefill_checkout_fields($booking) {
-        if (!WC()->session) {
+        if (!function_exists('WC') || !WC() || !WC()->session) {
             return;
         }
         

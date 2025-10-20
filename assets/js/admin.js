@@ -299,6 +299,295 @@ document.addEventListener('DOMContentLoaded', function() {
         // Reload the page to refresh the ZIP codes list
         location.reload();
     }
+
+    // =============================
+    // Form Fields Management (Admin)
+    // =============================
+
+    // Open Add Field modal
+    const addFieldBtn = document.getElementById('cb-add-field');
+    if (addFieldBtn) {
+        addFieldBtn.addEventListener('click', function() {
+            const modal = document.getElementById('cb-field-modal');
+            if (!modal) return;
+            const form = document.getElementById('cb-field-form');
+            if (form) form.reset();
+            const idInput = document.getElementById('cb-field-id');
+            if (idInput) idInput.value = '';
+            const title = document.getElementById('cb-field-modal-title');
+            if (title) title.textContent = 'Add New Field';
+            modal.style.display = 'block';
+        });
+    }
+
+    // Edit field
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.cb-edit-field')) {
+            const btn = e.target.closest('.cb-edit-field');
+            const row = btn.closest('tr');
+            if (!row) return;
+            const fieldId = btn.dataset.fieldId || row.dataset.fieldId;
+            const modal = document.getElementById('cb-field-modal');
+            if (!modal) return;
+            const title = document.getElementById('cb-field-modal-title');
+            if (title) title.textContent = 'Edit Field';
+
+            // Populate minimal fields from row (labels); field_key and type are static on list
+            const idInput = document.getElementById('cb-field-id');
+            const keyInput = document.getElementById('cb-field-key');
+            const typeSelect = document.getElementById('cb-field-type');
+            const labelEn = document.getElementById('cb-label-en');
+            const labelEl = document.getElementById('cb-label-el');
+            const requiredChk = document.getElementById('cb-is-required');
+            const visibleChk = document.getElementById('cb-is-visible');
+            const sortOrderInput = document.getElementById('cb-sort-order');
+
+            if (idInput) idInput.value = fieldId;
+            // Extract values from row cells
+            const cells = row.querySelectorAll('td');
+            if (cells[2] && keyInput) keyInput.value = cells[2].innerText.trim();
+            if (cells[3] && typeSelect) typeSelect.value = cells[3].innerText.trim().toLowerCase();
+            if (cells[4] && labelEn) labelEn.value = cells[4].innerText.trim();
+            if (cells[5] && labelEl) labelEl.value = cells[5].innerText.trim();
+            if (cells[6] && requiredChk) requiredChk.checked = cells[6].innerText.toLowerCase().indexOf('required') !== -1;
+            if (cells[7] && visibleChk) visibleChk.checked = cells[7].innerText.toLowerCase().indexOf('visible') !== -1;
+            if (sortOrderInput) sortOrderInput.value = row.dataset.sortOrder || 0;
+
+            modal.style.display = 'block';
+        }
+    });
+
+    // Close modal when clicking outside content
+    document.addEventListener('click', function(e) {
+        const modal = document.getElementById('cb-field-modal');
+        if (!modal) return;
+        if (e.target === modal) {
+            modal.style.display = 'none';
+        }
+    });
+
+    // Save (Add/Edit) field
+    const fieldForm = document.getElementById('cb-field-form');
+    if (fieldForm) {
+        fieldForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const submitBtn = fieldForm.querySelector('button[type="submit"], input[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+            }
+
+            const formData = new FormData(fieldForm);
+            formData.append('action', 'cb_save_form_field');
+            formData.append('nonce', cb_admin.nonce);
+
+            // Ensure these arrays are sent as JSON strings
+            const validationInput = fieldForm.querySelector('#cb-validation-rules');
+            const optionsInput = fieldForm.querySelector('#cb-field-options');
+            if (validationInput) {
+                formData.set('validation_rules', validationInput.value ? JSON.parseSafely(validationInput.value, []) : []);
+            }
+            if (optionsInput) {
+                formData.set('field_options', optionsInput.value ? JSON.parseSafely(optionsInput.value, []) : []);
+            }
+
+            fetch(cb_admin.ajax_url, { method: 'POST', body: formData })
+            .then(r=>r.json())
+            .then(res=>{
+                if (res.success) {
+                    showNotice(res.data.message || cb_admin.strings.saved, 'success');
+                    // Reload to reflect table changes
+                    location.reload();
+                } else {
+                    showNotice(res.data && res.data.message ? res.data.message : cb_admin.strings.error, 'error');
+                }
+            })
+            .catch(err=>{
+                console.error('Save field error:', err);
+                showNotice(cb_admin.strings.error, 'error');
+            })
+            .finally(()=>{
+                if (submitBtn) submitBtn.disabled = false;
+            });
+        });
+    }
+
+    // Delete field
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.cb-delete-field')) {
+            if (!confirm(cb_admin.strings.confirm_delete)) return;
+            const btn = e.target.closest('.cb-delete-field');
+            const fieldId = btn.dataset.fieldId;
+            const formData = new FormData();
+            formData.append('action', 'cb_delete_form_field');
+            formData.append('nonce', cb_admin.nonce);
+            formData.append('field_id', fieldId);
+            fetch(cb_admin.ajax_url, { method: 'POST', body: formData })
+            .then(r=>r.json())
+            .then(res=>{
+                if (res.success) {
+                    showNotice(res.data.message || cb_admin.strings.saved, 'success');
+                    const row = btn.closest('tr');
+                    if (row) row.remove();
+                } else {
+                    showNotice(res.data && res.data.message ? res.data.message : cb_admin.strings.error, 'error');
+                }
+            })
+            .catch(err=>{
+                console.error('Delete field error:', err);
+                showNotice(cb_admin.strings.error, 'error');
+            });
+        }
+    });
+
+    // Duplicate field
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.cb-duplicate-field')) {
+            const btn = e.target.closest('.cb-duplicate-field');
+            const fieldId = btn.dataset.fieldId;
+            const formData = new FormData();
+            formData.append('action', 'cb_duplicate_form_field');
+            formData.append('nonce', cb_admin.nonce);
+            formData.append('field_id', fieldId);
+            fetch(cb_admin.ajax_url, { method: 'POST', body: formData })
+            .then(r=>r.json())
+            .then(res=>{
+                if (res.success) {
+                    showNotice(res.data.message || cb_admin.strings.saved, 'success');
+                    location.reload();
+                } else {
+                    showNotice(res.data && res.data.message ? res.data.message : cb_admin.strings.error, 'error');
+                }
+            })
+            .catch(err=>{
+                console.error('Duplicate field error:', err);
+                showNotice(cb_admin.strings.error, 'error');
+            });
+        }
+    });
+
+    // Drag-sort field rows and persist order
+    const sortableTbody = document.getElementById('cb-sortable-fields');
+    if (sortableTbody) {
+        let dragSrcEl = null;
+        sortableTbody.querySelectorAll('tr').forEach(tr => {
+            tr.draggable = true;
+        });
+        sortableTbody.addEventListener('dragstart', function(e) {
+            const row = e.target.closest('tr');
+            if (!row) return;
+            dragSrcEl = row;
+            e.dataTransfer.effectAllowed = 'move';
+        });
+        sortableTbody.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const row = e.target.closest('tr');
+            if (!row || row === dragSrcEl) return;
+            const rect = row.getBoundingClientRect();
+            const next = (e.clientY - rect.top) / (rect.height) > 0.5;
+            sortableTbody.insertBefore(dragSrcEl, next && row.nextSibling || row);
+        });
+        sortableTbody.addEventListener('drop', function() {
+            // Build order map
+            const orders = {};
+            let idx = 1;
+            sortableTbody.querySelectorAll('tr').forEach(tr => {
+                const id = tr.dataset.fieldId;
+                if (id) orders[id] = idx++;
+            });
+            const formData = new FormData();
+            formData.append('action', 'cb_update_field_order');
+            formData.append('nonce', cb_admin.nonce);
+            // Append as JSON string; server reads $_POST['field_orders']
+            formData.append('field_orders', JSON.stringify(orders));
+            fetch(cb_admin.ajax_url, { method: 'POST', body: formData })
+            .then(r=>r.json())
+            .then(res=>{
+                if (res.success) {
+                    showNotice(res.data.message || cb_admin.strings.saved, 'success');
+                } else {
+                    showNotice(res.data && res.data.message ? res.data.message : cb_admin.strings.error, 'error');
+                }
+            })
+            .catch(err=>{
+                console.error('Update order error:', err);
+                showNotice(cb_admin.strings.error, 'error');
+            });
+        });
+    }
+
+    // Import fields
+    const importBtn = document.getElementById('cb-import-fields');
+    if (importBtn) {
+        importBtn.addEventListener('click', function() {
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = 'application/json';
+            fileInput.addEventListener('change', function() {
+                if (!fileInput.files.length) return;
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.enctype = 'multipart/form-data';
+                const actionInput = document.createElement('input');
+                actionInput.type = 'hidden';
+                actionInput.name = 'action';
+                actionInput.value = 'import_fields';
+                form.appendChild(actionInput);
+                const fileField = document.createElement('input');
+                fileField.type = 'file';
+                fileField.name = 'fields_file';
+                form.appendChild(fileField);
+                document.body.appendChild(form);
+                // Attach selected file and submit
+                const dt = new DataTransfer();
+                dt.items.add(fileInput.files[0]);
+                fileField.files = dt.files;
+                form.submit();
+            });
+            fileInput.click();
+        });
+    }
+
+    // Export fields (request server to respond with download if implemented)
+    const exportBtn = document.getElementById('cb-export-fields');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', function() {
+            // Submit a simple POST so PHP branch can output JSON download if available
+            const form = document.createElement('form');
+            form.method = 'POST';
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'action';
+            actionInput.value = 'export_fields';
+            form.appendChild(actionInput);
+            document.body.appendChild(form);
+            form.submit();
+        });
+    }
+
+    // Reset to default
+    const resetBtn = document.getElementById('cb-reset-fields');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', function() {
+            if (!confirm(cb_admin.strings.confirm_delete)) return;
+            const form = document.createElement('form');
+            form.method = 'POST';
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'action';
+            actionInput.value = 'reset_fields';
+            form.appendChild(actionInput);
+            document.body.appendChild(form);
+            form.submit();
+        });
+    }
+
+    // Safe JSON parse helper
+    if (!JSON.parseSafely) {
+        JSON.parseSafely = function(value, fallback) {
+            try { return JSON.parse(value); } catch(e) { return fallback; }
+        }
+    }
     
     // Service extras management
     let currentServiceId = null;
