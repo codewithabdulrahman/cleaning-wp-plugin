@@ -366,6 +366,24 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // Cancel field modal
+    const cancelFieldBtn = document.getElementById('cb-cancel-field');
+    if (cancelFieldBtn) {
+        cancelFieldBtn.addEventListener('click', function() {
+            const modal = document.getElementById('cb-field-modal');
+            if (modal) modal.style.display = 'none';
+        });
+    }
+
+    // Cancel import modal
+    const cancelImportBtn = document.getElementById('cb-cancel-import');
+    if (cancelImportBtn) {
+        cancelImportBtn.addEventListener('click', function() {
+            const modal = document.getElementById('cb-import-modal');
+            if (modal) modal.style.display = 'none';
+        });
+    }
+
     // Save (Add/Edit) field
     const fieldForm = document.getElementById('cb-field-form');
     if (fieldForm) {
@@ -439,31 +457,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Duplicate field
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.cb-duplicate-field')) {
-            const btn = e.target.closest('.cb-duplicate-field');
-            const fieldId = btn.dataset.fieldId;
-            const formData = new FormData();
-            formData.append('action', 'cb_duplicate_form_field');
-            formData.append('nonce', cb_admin.nonce);
-            formData.append('field_id', fieldId);
-            fetch(cb_admin.ajax_url, { method: 'POST', body: formData })
-            .then(r=>r.json())
-            .then(res=>{
-                if (res.success) {
-                    showNotice(res.data.message || cb_admin.strings.saved, 'success');
-                    location.reload();
-                } else {
-                    showNotice(res.data && res.data.message ? res.data.message : cb_admin.strings.error, 'error');
-                }
-            })
-            .catch(err=>{
-                console.error('Duplicate field error:', err);
-                showNotice(cb_admin.strings.error, 'error');
-            });
-        }
-    });
+    // Duplicate field functionality removed
 
     // Drag-sort field rows and persist order
     const sortableTbody = document.getElementById('cb-sortable-fields');
@@ -516,71 +510,38 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Import fields
-    const importBtn = document.getElementById('cb-import-fields');
-    if (importBtn) {
-        importBtn.addEventListener('click', function() {
-            const fileInput = document.createElement('input');
-            fileInput.type = 'file';
-            fileInput.accept = 'application/json';
-            fileInput.addEventListener('change', function() {
-                if (!fileInput.files.length) return;
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.enctype = 'multipart/form-data';
-                const actionInput = document.createElement('input');
-                actionInput.type = 'hidden';
-                actionInput.name = 'action';
-                actionInput.value = 'import_fields';
-                form.appendChild(actionInput);
-                const fileField = document.createElement('input');
-                fileField.type = 'file';
-                fileField.name = 'fields_file';
-                form.appendChild(fileField);
-                document.body.appendChild(form);
-                // Attach selected file and submit
-                const dt = new DataTransfer();
-                dt.items.add(fileInput.files[0]);
-                fileField.files = dt.files;
-                form.submit();
-            });
-            fileInput.click();
+    // Import/Export/Reset functionality removed
+
+    // Translation modal cancel buttons
+    const cancelTranslationBtn = document.getElementById('cb-cancel-translation');
+    if (cancelTranslationBtn) {
+        cancelTranslationBtn.addEventListener('click', function() {
+            const modal = document.getElementById('cb-translation-modal');
+            if (modal) modal.style.display = 'none';
         });
     }
 
-    // Export fields (request server to respond with download if implemented)
-    const exportBtn = document.getElementById('cb-export-fields');
-    if (exportBtn) {
-        exportBtn.addEventListener('click', function() {
-            // Submit a simple POST so PHP branch can output JSON download if available
-            const form = document.createElement('form');
-            form.method = 'POST';
-            const actionInput = document.createElement('input');
-            actionInput.type = 'hidden';
-            actionInput.name = 'action';
-            actionInput.value = 'export_fields';
-            form.appendChild(actionInput);
-            document.body.appendChild(form);
-            form.submit();
+    const cancelTranslationImportBtn = document.getElementById('cb-cancel-import');
+    if (cancelTranslationImportBtn) {
+        cancelTranslationImportBtn.addEventListener('click', function() {
+            const modal = document.getElementById('cb-import-modal');
+            if (modal) modal.style.display = 'none';
         });
     }
 
-    // Reset to default
-    const resetBtn = document.getElementById('cb-reset-fields');
-    if (resetBtn) {
-        resetBtn.addEventListener('click', function() {
-            if (!confirm(cb_admin.strings.confirm_delete)) return;
-            const form = document.createElement('form');
-            form.method = 'POST';
-            const actionInput = document.createElement('input');
-            actionInput.type = 'hidden';
-            actionInput.name = 'action';
-            actionInput.value = 'reset_fields';
-            form.appendChild(actionInput);
-            document.body.appendChild(form);
-            form.submit();
-        });
-    }
+    // Close translation modals when clicking outside
+    document.addEventListener('click', function(e) {
+        const translationModal = document.getElementById('cb-translation-modal');
+        const importModal = document.getElementById('cb-import-modal');
+        
+        if (translationModal && e.target === translationModal) {
+            translationModal.style.display = 'none';
+        }
+        
+        if (importModal && e.target === importModal) {
+            importModal.style.display = 'none';
+        }
+    });
 
     // Safe JSON parse helper
     if (!JSON.parseSafely) {

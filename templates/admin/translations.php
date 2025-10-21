@@ -333,16 +333,7 @@ jQuery(document).ready(function($) {
     
     // Import/Export removed
     
-    // Close modals
-    $('.cb-modal').on('click', function(e) {
-        if (e.target === this) {
-            $(this).hide();
-        }
-    });
-    
-    $('#cb-cancel-translation, #cb-cancel-import').on('click', function() {
-        $(this).closest('.cb-modal').hide();
-    });
+    // Modal handlers moved to admin.js (vanilla JS)
     
     // Filter functionality
     $('#cb-category-filter, #cb-search-translations').on('change keyup', function() {

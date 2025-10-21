@@ -13,33 +13,7 @@ $field_types = CB_Form_Fields::get_field_types();
 $validation_rules = CB_Form_Fields::get_validation_rules();
 $stats = CB_Form_Fields::get_field_stats();
 
-// Handle actions
-if (isset($_POST['action'])) {
-    $action = sanitize_text_field($_POST['action']);
-    
-    switch ($action) {
-        case 'import_fields':
-            if (isset($_FILES['fields_file']) && $_FILES['fields_file']['error'] === UPLOAD_ERR_OK) {
-                $json_data = file_get_contents($_FILES['fields_file']['tmp_name']);
-                $imported = CB_Form_Fields::import_fields($json_data);
-                
-                if ($imported !== false) {
-                    echo '<div class="notice notice-success"><p>' . sprintf(__('%d fields imported successfully!', 'cleaning-booking'), $imported) . '</p></div>';
-                } else {
-                    echo '<div class="notice notice-error"><p>' . __('Error importing fields.', 'cleaning-booking') . '</p></div>';
-                }
-            }
-            break;
-            
-        case 'reset_fields':
-            if (CB_Form_Fields::reset_to_default()) {
-                echo '<div class="notice notice-success"><p>' . __('Fields reset to default successfully!', 'cleaning-booking') . '</p></div>';
-            } else {
-                echo '<div class="notice notice-error"><p>' . __('Error resetting fields.', 'cleaning-booking') . '</p></div>';
-            }
-            break;
-    }
-}
+// Import/Export/Reset functionality removed
 ?>
 
 <div class="wrap">
@@ -67,18 +41,6 @@ if (isset($_POST['action'])) {
     <div class="cb-action-buttons" style="margin: 20px 0;">
         <button type="button" class="button button-primary" id="cb-add-field">
             <?php _e('Add New Field', 'cleaning-booking'); ?>
-        </button>
-        
-        <button type="button" class="button" id="cb-import-fields">
-            <?php _e('Import Fields', 'cleaning-booking'); ?>
-        </button>
-        
-        <button type="button" class="button" id="cb-export-fields">
-            <?php _e('Export Fields', 'cleaning-booking'); ?>
-        </button>
-        
-        <button type="button" class="button" id="cb-reset-fields">
-            <?php _e('Reset to Default', 'cleaning-booking'); ?>
         </button>
     </div>
     
@@ -140,9 +102,6 @@ if (isset($_POST['action'])) {
                         <td>
                             <button type="button" class="button button-small cb-edit-field" data-field-id="<?php echo $field->id; ?>">
                                 <?php _e('Edit', 'cleaning-booking'); ?>
-                            </button>
-                            <button type="button" class="button button-small cb-duplicate-field" data-field-id="<?php echo $field->id; ?>">
-                                <?php _e('Duplicate', 'cleaning-booking'); ?>
                             </button>
                             <button type="button" class="button button-small button-link-delete cb-delete-field" data-field-id="<?php echo $field->id; ?>">
                                 <?php _e('Delete', 'cleaning-booking'); ?>
@@ -270,31 +229,7 @@ if (isset($_POST['action'])) {
     </div>
 </div>
 
-<!-- Import Modal -->
-<div id="cb-import-modal" class="cb-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999;">
-    <div class="cb-modal-content" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 4px; width: 90%; max-width: 500px;">
-        <h2><?php _e('Import Fields', 'cleaning-booking'); ?></h2>
-        
-        <form id="cb-import-form" enctype="multipart/form-data">
-            <table class="form-table">
-                <tr>
-                    <th scope="row">
-                        <label for="cb-import-file"><?php _e('JSON File', 'cleaning-booking'); ?></label>
-                    </th>
-                    <td>
-                        <input type="file" id="cb-import-file" name="fields_file" accept=".json" required>
-                        <p class="description"><?php _e('Select a JSON file containing field configurations.', 'cleaning-booking'); ?></p>
-                    </td>
-                </tr>
-            </table>
-            
-            <div class="cb-modal-actions" style="margin-top: 20px; text-align: right;">
-                <button type="button" class="button" id="cb-cancel-import"><?php _e('Cancel', 'cleaning-booking'); ?></button>
-                <button type="submit" class="button button-primary"><?php _e('Import', 'cleaning-booking'); ?></button>
-            </div>
-        </form>
-    </div>
-</div>
+<!-- Import/Export/Reset functionality removed -->
 
 <script>
 jQuery(document).ready(function($) {
@@ -445,136 +380,11 @@ jQuery(document).ready(function($) {
         });
     });
     
-    // Delete field
-    $('.cb-delete-field').on('click', function() {
-        if (confirm('<?php _e('Are you sure you want to delete this field?', 'cleaning-booking'); ?>')) {
-            var fieldId = $(this).data('field-id');
-            
-            $.ajax({
-                url: ajaxurl,
-                type: 'POST',
-                data: {
-                    action: 'cb_delete_form_field',
-                    field_id: fieldId,
-                    nonce: '<?php echo wp_create_nonce('cb_admin_nonce'); ?>'
-                },
-                success: function(response) {
-                    if (response.success) {
-                        location.reload();
-                    } else {
-                        alert(response.data.message);
-                    }
-                }
-            });
-        }
-    });
+    // Delete and duplicate handlers moved to admin.js (vanilla JS)
     
-    // Duplicate field
-    $('.cb-duplicate-field').on('click', function() {
-        var fieldId = $(this).data('field-id');
-        
-        $.ajax({
-            url: ajaxurl,
-            type: 'POST',
-            data: {
-                action: 'cb_duplicate_form_field',
-                field_id: fieldId,
-                nonce: '<?php echo wp_create_nonce('cb_admin_nonce'); ?>'
-            },
-            success: function(response) {
-                if (response.success) {
-                    location.reload();
-                } else {
-                    alert(response.data.message);
-                }
-            }
-        });
-    });
+    // Import/Export/Reset handlers removed
     
-    // Import fields
-    $('#cb-import-fields').on('click', function() {
-        $('#cb-import-modal').show();
-    });
-    
-    $('#cb-import-form').on('submit', function(e) {
-        e.preventDefault();
-        
-        var formData = new FormData(this);
-        formData.append('action', 'cb_import_fields');
-        formData.append('nonce', '<?php echo wp_create_nonce('cb_admin_nonce'); ?>');
-        
-        $.ajax({
-            url: ajaxurl,
-            type: 'POST',
-            data: formData,
-            processData: false,
-            contentType: false,
-            success: function(response) {
-                if (response.success) {
-                    location.reload();
-                } else {
-                    alert(response.data.message);
-                }
-            }
-        });
-    });
-    
-    // Export fields
-    $('#cb-export-fields').on('click', function() {
-        $.ajax({
-            url: ajaxurl,
-            type: 'POST',
-            data: {
-                action: 'cb_export_fields',
-                nonce: '<?php echo wp_create_nonce('cb_admin_nonce'); ?>'
-            },
-            success: function(response) {
-                if (response.success) {
-                    var blob = new Blob([response.data.data], {type: 'application/json'});
-                    var url = window.URL.createObjectURL(blob);
-                    var a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'form-fields.json';
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                } else {
-                    alert(response.data.message);
-                }
-            }
-        });
-    });
-    
-    // Reset fields
-    $('#cb-reset-fields').on('click', function() {
-        if (confirm('<?php _e('Are you sure you want to reset all fields to default? This will delete all custom fields.', 'cleaning-booking'); ?>')) {
-            $.ajax({
-                url: ajaxurl,
-                type: 'POST',
-                data: {
-                    action: 'cb_reset_form_fields',
-                    nonce: '<?php echo wp_create_nonce('cb_admin_nonce'); ?>'
-                },
-                success: function(response) {
-                    if (response.success) {
-                        location.reload();
-                    } else {
-                        alert(response.data.message);
-                    }
-                }
-            });
-        }
-    });
-    
-    // Close modals
-    $('.cb-modal').on('click', function(e) {
-        if (e.target === this) {
-            $(this).hide();
-        }
-    });
-    
-    $('#cb-cancel-field, #cb-cancel-import').on('click', function() {
-        $(this).closest('.cb-modal').hide();
-    });
+    // Modal handlers moved to admin.js (vanilla JS)
     
     // Inline editing
     $('.cb-field-label').on('click', function() {

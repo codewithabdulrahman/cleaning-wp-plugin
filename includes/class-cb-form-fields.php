@@ -303,31 +303,7 @@ class CB_Form_Fields {
         return $wpdb->get_results("SELECT * FROM $table ORDER BY sort_order, id");
     }
     
-    /**
-     * Duplicate a field
-     */
-    public static function duplicate_field($field_id) {
-        $field = CB_Database::get_form_field($field_id);
-        if (!$field) {
-            return false;
-        }
-        
-        $new_data = array(
-            'field_key' => $field->field_key . '_copy',
-            'field_type' => $field->field_type,
-            'label_en' => $field->label_en . ' (Copy)',
-            'label_el' => $field->label_el . ' (Αντίγραφο)',
-            'placeholder_en' => $field->placeholder_en,
-            'placeholder_el' => $field->placeholder_el,
-            'is_required' => $field->is_required,
-            'is_visible' => $field->is_visible,
-            'sort_order' => $field->sort_order + 1,
-            'validation_rules' => $field->validation_rules,
-            'field_options' => $field->field_options
-        );
-        
-        return self::save_field($new_data);
-    }
+    // Duplicate field method removed
     
     /**
      * Get field statistics
@@ -360,58 +336,9 @@ class CB_Form_Fields {
         return $stats;
     }
     
-    /**
-     * Export fields to JSON
-     */
-    public static function export_fields() {
-        $fields = self::get_all_fields(false);
-        
-        $export_data = array();
-        foreach ($fields as $field) {
-            $export_data[] = array(
-                'field_key' => $field->field_key,
-                'field_type' => $field->field_type,
-                'label_en' => $field->label_en,
-                'label_el' => $field->label_el,
-                'placeholder_en' => $field->placeholder_en,
-                'placeholder_el' => $field->placeholder_el,
-                'is_required' => (bool) $field->is_required,
-                'is_visible' => (bool) $field->is_visible,
-                'sort_order' => $field->sort_order,
-                'validation_rules' => $field->validation_rules ? json_decode($field->validation_rules, true) ?: array() : array(),
-                'field_options' => $field->field_options ? json_decode($field->field_options, true) ?: array() : array()
-            );
-        }
-        
-        return json_encode($export_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-    }
+    // Export fields method removed
     
-    /**
-     * Import fields from JSON
-     */
-    public static function import_fields($json_data) {
-        if (!$json_data) {
-            return false;
-        }
-        
-        $fields_data = json_decode($json_data, true);
-        if (!$fields_data) {
-            return false;
-        }
-        
-        $imported = 0;
-        foreach ($fields_data as $field_data) {
-            // Validate field data
-            $errors = self::validate_field_data($field_data);
-            if (empty($errors)) {
-                if (self::save_field($field_data)) {
-                    $imported++;
-                }
-            }
-        }
-        
-        return $imported;
-    }
+    // Import fields method removed
     
     /**
      * Clear field cache for specific key
@@ -445,22 +372,5 @@ class CB_Form_Fields {
         }
     }
     
-    /**
-     * Reset fields to default
-     */
-    public static function reset_to_default() {
-        global $wpdb;
-        $table = $wpdb->prefix . 'cb_form_fields';
-        
-        // Delete all existing fields
-        $wpdb->query("DELETE FROM $table");
-        
-        // Clear cache
-        self::clear_all_field_cache();
-        
-        // Re-insert default fields
-        CB_Database::insert_default_form_fields();
-        
-        return true;
-    }
+    // Reset to default method removed
 }

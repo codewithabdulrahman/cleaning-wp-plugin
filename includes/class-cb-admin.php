@@ -31,7 +31,6 @@ class CB_Admin {
         add_action('wp_ajax_cb_save_form_field', array($this, 'ajax_save_form_field'));
         add_action('wp_ajax_cb_delete_form_field', array($this, 'ajax_delete_form_field'));
         add_action('wp_ajax_cb_update_field_order', array($this, 'ajax_update_field_order'));
-        add_action('wp_ajax_cb_duplicate_form_field', array($this, 'ajax_duplicate_form_field'));
         
         // Translations AJAX handlers
         add_action('wp_ajax_cb_save_translation', array($this, 'ajax_save_translation'));
@@ -838,22 +837,7 @@ class CB_Admin {
         }
     }
     
-    public function ajax_duplicate_form_field() {
-        check_ajax_referer('cb_admin_nonce', 'nonce');
-        
-        if (!current_user_can('manage_options')) {
-            wp_die(__('You do not have sufficient permissions to access this page.'));
-        }
-        
-        $field_id = intval($_POST['field_id']);
-        $result = CB_Form_Fields::duplicate_field($field_id);
-        
-        if ($result) {
-            wp_send_json_success(array('message' => __('Field duplicated successfully!', 'cleaning-booking')));
-        } else {
-            wp_send_json_error(array('message' => __('Error duplicating field.', 'cleaning-booking')));
-        }
-    }
+    // Duplicate field method removed
     
     // Translations Page Methods
     public function translations_page() {
