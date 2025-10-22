@@ -41,10 +41,6 @@ if (!defined('ABSPATH')) {
                         <span class="cb-step-number">4</span>
                         <span class="cb-step-label"><?php _e('Date & Time', 'cleaning-booking'); ?></span>
                     </div>
-                    <div class="cb-step" data-step="5">
-                        <span class="cb-step-number">5</span>
-                        <span class="cb-step-label"><?php _e('Checkout', 'cleaning-booking'); ?></span>
-                    </div>
                 </div>
             <?php endif; ?>
         </div>
@@ -132,13 +128,16 @@ if (!defined('ABSPATH')) {
                                 <div class="cb-price-item">
                                     <span><?php _e('Service Price:', 'cleaning-booking'); ?></span>
                                     <span id="cb-step3-service-price">€0.00</span>
+                                    <span id="cb-step3-service-price">€0.00</span>
                                 </div>
                                 <div class="cb-price-item">
                                     <span><?php _e('Extras:', 'cleaning-booking'); ?></span>
                                     <span id="cb-step3-extras-price">€0.00</span>
+                                    <span id="cb-step3-extras-price">€0.00</span>
                                 </div>
                                 <div class="cb-price-item cb-price-total">
                                     <span><?php _e('Total:', 'cleaning-booking'); ?></span>
+                                    <span id="cb-step3-total-price">€0.00</span>
                                     <span id="cb-step3-total-price">€0.00</span>
                                 </div>
                             </div>
@@ -193,6 +192,9 @@ if (!defined('ABSPATH')) {
                             <button type="button" class="cb-btn cb-btn-secondary cb-prev-step" data-prev="3">
                                 <?php _e('Back', 'cleaning-booking'); ?>
                             </button>
+                            <!-- <button type="button" class="cb-btn cb-btn-primary" id="cb-proceed-checkout" disabled>
+                                <?php _e('Proceed to Checkout', 'cleaning-booking'); ?>
+                            </button> -->
                         </div>
                     </div>
                 </form>
@@ -228,6 +230,7 @@ if (!defined('ABSPATH')) {
                     </div>
                     
                     <button type="button" class="cb-btn cb-btn-checkout" disabled id="cb-sidebar-checkout">
+                        <span id="cb-checkout-price">€0.00</span> - <?php _e('Proceed to Checkout', 'cleaning-booking'); ?>
                         <span id="cb-checkout-price">€0.00</span> - <?php _e('Proceed to Checkout', 'cleaning-booking'); ?>
                     </button>
                 </div>

@@ -187,20 +187,44 @@ class CB_Translations {
     /**
      * Bulk update translations
      */
-    public static function bulk_update_translations($updates) {
-        global $wpdb;
-        $table = $wpdb->prefix . 'cb_translations';
+  /**
+ * Bulk update translations
+ */
+public static function bulk_update_translations($updates) {
+    global $wpdb;
+    $table = $wpdb->prefix . 'cb_translations';
+    
+    $updated = 0;
+    foreach ($updates as $update) {
+        // Only update if we have valid data
+        if (empty($update['id']) || (!isset($update['text_en']) && !isset($update['text_el']))) {
+            continue;
+        }
         
-        $updated = 0;
-        foreach ($updates as $update) {
+        // Build update data dynamically
+        $update_data = array();
+        $format = array();
+        
+        if (isset($update['text_en'])) {
+            $update_data['text_en'] = !empty($update['text_en']) ? sanitize_textarea_field($update['text_en']) : '';
+            $format[] = '%s';
+        }
+        
+        if (isset($update['text_el'])) {
+            $update_data['text_el'] = !empty($update['text_el']) ? sanitize_textarea_field($update['text_el']) : '';
+            $format[] = '%s';
+        }
+        
+        // Only proceed if we have data to update
+        if (!empty($update_data)) {
+            $update_data['updated_at'] = current_time('mysql');
+            $format[] = '%s';
+            
             $result = $wpdb->update(
                 $table,
-                array(
-                    'text_en' => sanitize_textarea_field($update['text_en']),
-                    'text_el' => sanitize_textarea_field($update['text_el'])
-                ),
+                $update_data,
                 array('id' => intval($update['id'])),
-                array('%s', '%s'),
+                $format,
                 array('%d')
             );
             
@@ -208,13 +232,13 @@ class CB_Translations {
                 $updated++;
             }
         }
-        
-        // Clear all translation caches
-        self::clear_all_translation_cache();
-        
-        return $updated;
     }
     
+    // Clear all translation caches
+    self::clear_all_translation_cache();
+    
+    return $updated;
+}
     /**
      * Clear translation cache for specific key and category
      */
@@ -256,29 +280,63 @@ class CB_Translations {
     /**
      * Get translation statistics
      */
-    public static function get_translation_stats() {
-        global $wpdb;
-        $table = $wpdb->prefix . 'cb_translations';
-        
-        $stats = array();
-        
-        // Total translations
-        $stats['total'] = $wpdb->get_var("SELECT COUNT(*) FROM $table WHERE is_active = 1");
-        
-        // By category
-        $category_stats = $wpdb->get_results(
-            "SELECT category, COUNT(*) as count FROM $table WHERE is_active = 1 GROUP BY category ORDER BY category"
-        );
-        
-        $stats['by_category'] = array();
-        foreach ($category_stats as $stat) {
-            $stats['by_category'][$stat->category] = $stat->count;
-        }
-        
-        // Missing translations
-        $stats['missing_en'] = $wpdb->get_var("SELECT COUNT(*) FROM $table WHERE is_active = 1 AND (text_en = '' OR text_en = text_el)");
-        $stats['missing_el'] = $wpdb->get_var("SELECT COUNT(*) FROM $table WHERE is_active = 1 AND (text_el = '' OR text_el = text_en)");
-        
-        return $stats;
+   /**
+ * Get translation statistics
+ */
+public static function get_translation_stats() {
+    global $wpdb;
+    $table = $wpdb->prefix . 'cb_translations';
+    
+    $stats = array();
+    
+    // Total translations
+    $stats['total'] = $wpdb->get_var("SELECT COUNT(*) FROM $table WHERE is_active = 1");
+    
+    // By category
+    $category_stats = $wpdb->get_results(
+        "SELECT category, COUNT(*) as count FROM $table WHERE is_active = 1 GROUP BY category ORDER BY category"
+    );
+    
+    $stats['by_category'] = array();
+    foreach ($category_stats as $stat) {
+        $stats['by_category'][$stat->category] = $stat->count;
     }
+    
+    // Missing translations - where text is empty OR same as the other language
+    $stats['missing_en'] = $wpdb->get_var("
+        SELECT COUNT(*) FROM $table 
+        WHERE is_active = 1 
+        AND (text_en = '' OR text_en IS NULL OR text_en = text_el)
+    ");
+    
+    $stats['missing_el'] = $wpdb->get_var("
+        SELECT COUNT(*) FROM $table 
+        WHERE is_active = 1 
+        AND (text_el = '' OR text_el IS NULL OR text_el = text_en)
+    ");
+    
+    // Also count truly empty fields (not just same as other language)
+    $stats['empty_en'] = $wpdb->get_var("
+        SELECT COUNT(*) FROM $table 
+        WHERE is_active = 1 
+        AND (text_en = '' OR text_en IS NULL)
+    ");
+    
+    $stats['empty_el'] = $wpdb->get_var("
+        SELECT COUNT(*) FROM $table 
+        WHERE is_active = 1 
+        AND (text_el = '' OR text_el IS NULL)
+    ");
+    
+    // Count where both languages are the same (potential duplicates)
+    $stats['duplicate_content'] = $wpdb->get_var("
+        SELECT COUNT(*) FROM $table 
+        WHERE is_active = 1 
+        AND text_en = text_el 
+        AND text_en != '' 
+        AND text_en IS NOT NULL
+    ");
+    
+    return $stats;
+}
 }
