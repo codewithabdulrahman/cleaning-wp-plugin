@@ -366,12 +366,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (proceedCheckoutBtn) {
             proceedCheckoutBtn.addEventListener('click', proceedToCheckout);
         }
-
-        // Checkout button
-        const proceedCheckoutBtn = document.getElementById('cb-proceed-checkout');
-        if (proceedCheckoutBtn) {
-            proceedCheckoutBtn.addEventListener('click', proceedToCheckout);
-        }
         
         // Step navigation
         const nextStepButtons = document.querySelectorAll('.cb-next-step');
@@ -409,10 +403,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const promocodeInput = document.getElementById('cb-promocode');
         if (promocodeInput) {
             promocodeInput.addEventListener('keypress', function(e) {
-            if (e.which === 13) {
-                handlePromocodeApply();
-            }
-        });
+                if (e.which === 13) {
+                    handlePromocodeApply();
+                }
+            });
         }
         
         // Sidebar checkout button
@@ -669,15 +663,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (proceedCheckoutBtn) {
             proceedCheckoutBtn.disabled = false;
-        // Enable both checkout buttons when time slot is selected
-        const proceedCheckoutBtn = document.getElementById('cb-proceed-checkout');
-        const sidebarCheckout = document.getElementById('cb-sidebar-checkout');
-        
-        if (proceedCheckoutBtn) {
-            proceedCheckoutBtn.disabled = false;
-        }
-        if (sidebarCheckout) {
-            sidebarCheckout.disabled = false;
         }
         if (sidebarCheckout) {
             sidebarCheckout.disabled = false;
@@ -723,71 +708,70 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(response => {
+            if (response.success) {
+                // Update translations
+                cb_frontend.translations = response.data.translations;
                 
-                if (response.success) {
-                    // Update translations
-                    cb_frontend.translations = response.data.translations;
+                // Update services with translated data
+                if (response.data.services) {
+                    services = response.data.services;
+                    displayServices(); // Re-render service cards with translations
                     
-                    // Update services with translated data
-                    if (response.data.services) {
-                        services = response.data.services;
-                        displayServices(); // Re-render service cards with translations
-                        
-                        // Update sidebar service title if a service is selected
-                        updateServiceTitle();
-                    }
-                    
-                    // Update extras with translated data
-                    if (response.data.extras) {
-                        // Update extras for currently selected service
-                        const selectedService = getSelectedService();
-                        if (selectedService) {
-                            const serviceExtras = response.data.extras.filter(extra => extra.service_id === selectedService.id);
-                            displayExtras(serviceExtras);
-                        }
-                    }
-                    
-                    // Update form fields with translated data
-                    if (response.data.form_fields) {
-                        cb_frontend.form_fields = response.data.form_fields;
-                        // Re-render form fields if we're on a form step
-                        if (currentStep >= 2) {
-                            updateFormFields();
-                        }
-                    }
-                    
-                    // Update available slots with translated data
-                    if (response.data.available_slots) {
-                        // Re-render time slots if we're on the time selection step
-                        if (currentStep >= 3) {
-                            displayTimeSlots(response.data.available_slots);
-                        }
-                    }
-                    
-                    // Update UI text
-                    updateUITranslations();
-                    
-                    // Update current language
-                    cb_frontend.current_language = targetLanguage;
-                    
-                    // Update language selector value
-                    if (languageSelector) {
-                        languageSelector.value = targetLanguage;
-                    }
-                    
-                    // Save language preference
-                    localStorage.setItem('cb_language', targetLanguage);
-                    
-                    console.log('Language switched to:', targetLanguage);
-                    console.log('Current language is now:', cb_frontend.current_language);
-                    
-                    // Show success message
-                    const message = response.data.translations['Language switched successfully'] || response.data.message || 'Language switched successfully';
-                    showNotification(message, 'success');
-                } else {
-                    console.error('Language switch failed:', response);
-                    showNotification('Failed to switch language', 'error');
+                    // Update sidebar service title if a service is selected
+                    updateServiceTitle();
                 }
+                
+                // Update extras with translated data
+                if (response.data.extras) {
+                    // Update extras for currently selected service
+                    const selectedService = getSelectedService();
+                    if (selectedService) {
+                        const serviceExtras = response.data.extras.filter(extra => extra.service_id === selectedService.id);
+                        displayExtras(serviceExtras);
+                    }
+                }
+                
+                // Update form fields with translated data
+                if (response.data.form_fields) {
+                    cb_frontend.form_fields = response.data.form_fields;
+                    // Re-render form fields if we're on a form step
+                    if (currentStep >= 2) {
+                        updateFormFields();
+                    }
+                }
+                
+                // Update available slots with translated data
+                if (response.data.available_slots) {
+                    // Re-render time slots if we're on the time selection step
+                    if (currentStep >= 3) {
+                        displayTimeSlots(response.data.available_slots);
+                    }
+                }
+                
+                // Update UI text
+                updateUITranslations();
+                
+                // Update current language
+                cb_frontend.current_language = targetLanguage;
+                
+                // Update language selector value
+                if (languageSelector) {
+                    languageSelector.value = targetLanguage;
+                }
+                
+                // Save language preference
+                localStorage.setItem('cb_language', targetLanguage);
+                
+                console.log('Language switched to:', targetLanguage);
+                console.log('Current language is now:', cb_frontend.current_language);
+                
+                // Show success message
+                const message = response.data.translations['Language switched successfully'] || response.data.message || 'Language switched successfully';
+                showNotification(message, 'success');
+            } else {
+                console.error('Language switch failed:', response);
+                showNotification('Failed to switch language', 'error');
+            }
         })
         .catch(error => {
             console.error('Language switch fetch error:', error);
@@ -876,9 +860,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (zipLabel) zipLabel.textContent = translations['ZIP Code'];
         }
         if (translations['Space (m²)']) {
-        if (translations['Space (m²)']) {
             const spaceLabel = document.querySelector('label[for="cb-square-meters"]');
-            if (spaceLabel) spaceLabel.textContent = translations['Space (m²)'];
             if (spaceLabel) spaceLabel.textContent = translations['Space (m²)'];
         }
         if (translations['Additional Services']) {
@@ -1071,27 +1053,27 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .catch(error => {
-        console.error('Fetch error:', error);
+            console.error('Fetch error:', error);
     
-        // Check if it's a JSON parse error (HTML response)
-        if (error instanceof SyntaxError && error.message.includes('JSON')) {
-            showNotification(cb_frontend.strings.server_error || 'Σφάλμα διακομιστή. Παρακαλούμε προσπαθήστε ξανά ή επικοινωνήστε με την υποστήριξη.', 'error');
-            console.error('Server returned HTML instead of JSON - likely a PHP error');
+            // Check if it's a JSON parse error (HTML response)
+            if (error instanceof SyntaxError && error.message.includes('JSON')) {
+                showNotification(cb_frontend.strings.server_error || 'Σφάλμα διακομιστή. Παρακαλούμε προσπαθήστε ξανά ή επικοινωνήστε με την υποστήριξη.', 'error');
+                console.error('Server returned HTML instead of JSON - likely a PHP error');
     
-            // Try to get the response text to see the actual error
-            fetch(cb_frontend.ajax_url, {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.text())
-            .then(html => {
-                console.error('Server returned HTML:', html.substring(0, 500)); // Log first 500 chars
-            });
-        } else {
-            showNotification(cb_frontend.translations['Network error. Please check your connection and try again.'] || 'Σφάλμα δικτύου. Παρακαλούμε ελέγξτε τη σύνδεσή σας και προσπαθήστε ξανά.', 'error');
-        }
-        restoreButtonState();
-    });
+                // Try to get the response text to see the actual error
+                fetch(cb_frontend.ajax_url, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.text())
+                .then(html => {
+                    console.error('Server returned HTML:', html.substring(0, 500)); // Log first 500 chars
+                });
+            } else {
+                showNotification(cb_frontend.translations['Network error. Please check your connection and try again.'] || 'Σφάλμα δικτύου. Παρακαλούμε ελέγξτε τη σύνδεσή σας και προσπαθήστε ξανά.', 'error');
+            }
+            restoreButtonState();
+        });
     
         function restoreButtonState() {
             if (proceedCheckoutBtn) {
@@ -1104,7 +1086,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     }
-}
+    
     function validateBookingData() {
         // Validate only the essential booking data
         if (!bookingData.zip_code) {
@@ -1191,22 +1173,22 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(response => response.json())
             .then(response => {
-                    if (response.success && response.data.available) {
-                        hideError('cb-zip-error');
-                        bookingData.zip_code = zipCode; // Save valid ZIP code
-                        showNotification(cb_frontend.translations['Great! We provide services in your area.'] || 'Τέλεια! Παρέχουμε υπηρεσίες στην περιοχή σας.', 'success');
-                        resolve(true);
-                    } else {
-                        showError('cb-zip-error', response.data.message || cb_frontend.strings.zip_unavailable);
-                        showNotification(response.data.message || cb_frontend.strings.zip_unavailable, 'error');
-                        resolve(false);
-                    }
+                if (response.success && response.data.available) {
+                    hideError('cb-zip-error');
+                    bookingData.zip_code = zipCode; // Save valid ZIP code
+                    showNotification(cb_frontend.translations['Great! We provide services in your area.'] || 'Τέλεια! Παρέχουμε υπηρεσίες στην περιοχή σας.', 'success');
+                    resolve(true);
+                } else {
+                    showError('cb-zip-error', response.data.message || cb_frontend.strings.zip_unavailable);
+                    showNotification(response.data.message || cb_frontend.strings.zip_unavailable, 'error');
+                    resolve(false);
+                }
             })
             .catch(error => {
                 console.error('ZIP code validation error:', error);
-                    showError('cb-zip-error', cb_frontend.strings.server_error);
-                    showNotification(cb_frontend.strings.server_error, 'error');
-                    reject(new Error('ZIP code validation failed'));
+                showError('cb-zip-error', cb_frontend.strings.server_error);
+                showNotification(cb_frontend.strings.server_error, 'error');
+                reject(new Error('ZIP code validation failed'));
             });
         });
     }
@@ -1290,10 +1272,10 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(response => {
-                if (response.success && response.data.slots) {
-                    availableSlots = response.data.slots;
-                    displayTimeSlots();
-                } else {
+            if (response.success && response.data.slots) {
+                availableSlots = response.data.slots;
+                displayTimeSlots();
+            } else {
                 if (timeSlotsContainer) {
                     timeSlotsContainer.innerHTML = '<div class="cb-loading">' + (response.data.message || cb_frontend.strings.no_slots_available) + '</div>';
                 }
@@ -1425,7 +1407,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     loadExtras();
                 } else {
                     console.log('Step 3 - calling displayExtras');
-                    console.log('Step 3 - calling displayExtras');
                     displayExtras();
                     
                     setTimeout(() => {
@@ -1525,8 +1506,8 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(response => {
-                // Now try to get services
-                loadServicesReal();
+            // Now try to get services
+            loadServicesReal();
         })
         .catch(error => {
             console.error('Debug error:', error);
@@ -1549,10 +1530,10 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(response => {
             console.log('Services fetch response:', response);
-                if (response.success && response.data.services) {
-                    services = response.data.services;
-                    displayServices();
-                } else {
+            if (response.success && response.data.services) {
+                services = response.data.services;
+                displayServices();
+            } else {
                 if (servicesContainer) {
                     servicesContainer.innerHTML = '<div class="cb-loading">' + cb_frontend.strings.no_services_available + '</div>';
                 }
@@ -1560,19 +1541,19 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(error => {
             console.error('Services fetch error:', error);
-                console.log('Trying REST API fallback...');
-                
-                // Fallback to REST API
+            console.log('Trying REST API fallback...');
+            
+            // Fallback to REST API
             fetch(cb_frontend.rest_url + 'services', {
                 method: 'GET'
             })
             .then(response => response.json())
             .then(response => {
-                        console.log('Services REST response:', response);
-                        if (response.success && response.services) {
-                            services = response.services;
-                            displayServices();
-                        } else {
+                console.log('Services REST response:', response);
+                if (response.success && response.services) {
+                    services = response.services;
+                    displayServices();
+                } else {
                     if (servicesContainer) {
                         servicesContainer.innerHTML = '<div class="cb-loading">' + cb_frontend.strings.no_services_available + '</div>';
                     }
@@ -1602,25 +1583,24 @@ document.addEventListener('DOMContentLoaded', function() {
             cardElement.dataset.serviceId = service.id;
             
             cardElement.innerHTML = `
-                    <div class="cb-service-icon">🧹</div>
-                    <h4>${service.name}</h4>
-                    <p>${service.description}</p>
-                    <div class="cb-service-details">
-                        <div class="cb-service-price">
-                            <span class="cb-price-current">€${parseFloat(service.base_price).toFixed(2)}</span>
-                            <span class="cb-price-current">€${parseFloat(service.base_price).toFixed(2)}</span>
-                        </div>
-                        <div class="cb-service-duration">
-                            <span class="cb-duration-label">${cb_frontend.translations['Duration:'] || 'Διάρκεια:'}</span>
-                            <span class="cb-duration-value">${service.base_duration} ${cb_frontend.translations['minutes'] || 'λεπτά'}</span>
-                        </div>
-                        ${service.default_area > 0 ? `
-                        <div class="cb-service-area">
-                            <span class="cb-area-label">${cb_frontend.translations['Includes:'] || 'Περιλαμβάνει:'}</span>
-                            <span class="cb-area-value">${service.default_area} m²</span>
-                        </div>
-                        ` : ''}
+                <div class="cb-service-icon">🧹</div>
+                <h4>${service.name}</h4>
+                <p>${service.description}</p>
+                <div class="cb-service-details">
+                    <div class="cb-service-price">
+                        <span class="cb-price-current">€${parseFloat(service.base_price).toFixed(2)}</span>
                     </div>
+                    <div class="cb-service-duration">
+                        <span class="cb-duration-label">${cb_frontend.translations['Duration:'] || 'Διάρκεια:'}</span>
+                        <span class="cb-duration-value">${service.base_duration} ${cb_frontend.translations['minutes'] || 'λεπτά'}</span>
+                    </div>
+                    ${service.default_area > 0 ? `
+                    <div class="cb-service-area">
+                        <span class="cb-area-label">${cb_frontend.translations['Includes:'] || 'Περιλαμβάνει:'}</span>
+                        <span class="cb-area-value">${service.default_area} m²</span>
+                    </div>
+                    ` : ''}
+                </div>
             `;
             
             servicesContainer.appendChild(cardElement);
@@ -1691,7 +1671,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function loadExtras() {
-        
         if (!bookingData.service_id || extras.length > 0) {
             displayExtras();
             return;
@@ -1715,12 +1694,12 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(response => {
             console.log('Extras fetch response:', response);
-                if (response.success && response.data.extras) {
-                    extras = response.data.extras;
-                    console.log('Loaded extras:', extras);
-                    displayExtras();
-                } else {
-                    console.log('No extras available or error:', response.data.message);
+            if (response.success && response.data.extras) {
+                extras = response.data.extras;
+                console.log('Loaded extras:', extras);
+                displayExtras();
+            } else {
+                console.log('No extras available or error:', response.data.message);
                 if (extrasContainer) {
                     extrasContainer.innerHTML = '<div class="cb-loading">' + (response.data.message || cb_frontend.strings.no_extras_available) + '</div>';
                 }
@@ -1767,13 +1746,12 @@ document.addEventListener('DOMContentLoaded', function() {
             itemElement.style.cursor = 'pointer';
             
             itemElement.innerHTML = `
-                    <div class="cb-extra-checkbox"></div>
-                    <div class="cb-extra-info">
-                        <div class="cb-extra-name">${extra.name}</div>
-                        <div class="cb-extra-description">${extra.description}</div>
-                        <div class="cb-extra-price">€${parseFloat(extra.price).toFixed(2)}</div>
-                        <div class="cb-extra-price">€${parseFloat(extra.price).toFixed(2)}</div>
-                    </div>
+                <div class="cb-extra-checkbox"></div>
+                <div class="cb-extra-info">
+                    <div class="cb-extra-name">${extra.name}</div>
+                    <div class="cb-extra-description">${extra.description}</div>
+                    <div class="cb-extra-price">€${parseFloat(extra.price).toFixed(2)}</div>
+                </div>
             `;
             
             // Click handler is already attached via document delegation
@@ -1796,7 +1774,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function forceUpdateExtrasVisualState() {
-        
         // Update all extra items to reflect current state
         const extraItems = document.querySelectorAll('.cb-extra-item');
         extraItems.forEach(function(item) {
@@ -1851,13 +1828,13 @@ document.addEventListener('DOMContentLoaded', function() {
         formData.append('zip_code', bookingData.zip_code);
         
         console.log('Sending smart price calculation request:', {
-                action: 'cb_calculate_price',
-                nonce: cb_frontend.nonce,
-                service_id: bookingData.service_id,
-                square_meters: additionalArea,
-                use_smart_area: '1',
-                extras: bookingData.extras,
-                zip_code: bookingData.zip_code
+            action: 'cb_calculate_price',
+            nonce: cb_frontend.nonce,
+            service_id: bookingData.service_id,
+            square_meters: additionalArea,
+            use_smart_area: '1',
+            extras: bookingData.extras,
+            zip_code: bookingData.zip_code
         });
         
         fetch(cb_frontend.ajax_url, {
@@ -1879,29 +1856,29 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         })
         .then(response => {
-                console.log('Price calculation response:', response);
-                if (response.success) {
-                    bookingData.pricing = response.data.pricing;
-                    console.log('Price calculated:', bookingData.pricing);
-                    updatePricingDisplay();
-                    updateSidebarDisplay();
-                } else {
-                    console.error('Price calculation failed:', response.data.message);
-                }
+            console.log('Price calculation response:', response);
+            if (response.success) {
+                bookingData.pricing = response.data.pricing;
+                console.log('Price calculated:', bookingData.pricing);
+                updatePricingDisplay();
+                updateSidebarDisplay();
+            } else {
+                console.error('Price calculation failed:', response.data.message);
+            }
         })
         .catch(error => {
             console.error('Price calculation error:', error);
             
             // Show user-friendly error message
             showNotification(cb_frontend.translations['Unable to calculate price. Please try again.'] || 'Δεν είναι δυνατός ο υπολογισμός της τιμής. Παρακαλούμε προσπαθήστε ξανά.', 'error');
-                
-                // Try to extract JSON from mixed response
-                try {
+            
+            // Try to extract JSON from mixed response
+            try {
                 if (error.message && error.message.includes('Invalid JSON')) {
                     console.error('Server returned HTML instead of JSON - likely a PHP error');
                     showNotification(cb_frontend.strings.server_error || 'Σφάλμα διακομιστή. Παρακαλούμε ελέγξτε τη διαμόρφωσή σας.', 'error');
-                    }
-                } catch (e) {
+                }
+            } catch (e) {
                 console.error('Could not extract error details:', e);
             }
         });
@@ -1959,7 +1936,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 step3ExtrasPrice.textContent = formatPrice(pricing.extras_price);
             } else {
                 step3ExtrasPrice.textContent = '€0.00';
-                step3ExtrasPrice.textContent = '€0.00';
             }
         }
         if (step3TotalPrice) step3TotalPrice.textContent = formatPrice(pricing.total_price);
@@ -1994,7 +1970,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function formatPrice(price) {
-        return '€' + parseFloat(price).toFixed(2);
         return '€' + parseFloat(price).toFixed(2);
     }
     
@@ -2097,12 +2072,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 5000);
     }
     
-    function showSuccessMessage(message) {
-        showNotification(message, 'success');
-    }
-    
     function isValidEmail(email) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+€/;
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return emailRegex.test(email);
     }
     
@@ -2122,19 +2093,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const ampm = hour >= 12 ? 'PM' : 'AM';
         const displayHour = hour % 12 || 12;
         return `${displayHour}:${minutes} ${ampm}`;
-    }
-    
-    function formatDuration(minutes) {
-        const hours = Math.floor(minutes / 60);
-        const mins = minutes % 60;
-        
-        if (hours > 0 && mins > 0) {
-            return `${hours}h ${mins}m`;
-        } else if (hours > 0) {
-            return `${hours}h`;
-        } else {
-            return `${mins}m`;
-        }
     }
     
     // Initialize default payment method selection when step 5 is displayed

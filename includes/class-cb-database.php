@@ -1472,25 +1472,69 @@ class CB_Database {
         return $string_key; // Fallback to key if translation not found
     }
     
-    public static function save_translation($data) {
-        global $wpdb;
-        $table = $wpdb->prefix . 'cb_translations';
-        
-        $translation_data = array(
-            'string_key' => sanitize_text_field($data['string_key']),
-            'category' => sanitize_text_field($data['category']),
-            'text_en' => sanitize_textarea_field($data['text_en']),
-            'text_el' => sanitize_textarea_field($data['text_el']),
-            'context' => sanitize_text_field($data['context']),
-            'is_active' => isset($data['is_active']) ? intval($data['is_active']) : 1
-        );
-        
-        if (isset($data['id']) && !empty($data['id'])) {
-            return $wpdb->update($table, $translation_data, array('id' => intval($data['id'])));
-        } else {
-            return $wpdb->insert($table, $translation_data);
-        }
+   public static function save_translation($data) {
+    global $wpdb;
+    $table = $wpdb->prefix . 'cb_translations';
+    
+    error_log('Database save_translation called with: ' . print_r($data, true));
+    
+    // Basic validation
+    if (empty($data['string_key']) || empty($data['text_en']) || empty($data['text_el'])) {
+        error_log('Translation save failed: Missing required fields');
+        return false;
     }
+    
+    $translation_data = array(
+        'string_key' => sanitize_text_field($data['string_key']),
+        'category' => 'general',
+        'text_en' => sanitize_textarea_field($data['text_en']),
+        'text_el' => sanitize_textarea_field($data['text_el']),
+        'context' => isset($data['context']) ? sanitize_text_field($data['context']) : '',
+        'is_active' => 1,
+        'updated_at' => current_time('mysql')
+    );
+    
+    error_log('Prepared database data: ' . print_r($translation_data, true));
+    
+    // Check if a translation with this string_key and category already exists
+    $existing = $wpdb->get_var($wpdb->prepare(
+        "SELECT id FROM $table WHERE string_key = %s AND category = %s",
+        $translation_data['string_key'],
+        $translation_data['category']
+    ));
+    
+    if (!empty($data['id']) && $data['id'] > 0) {
+        // Update existing translation by ID
+        error_log('Updating translation ID: ' . $data['id']);
+        $result = $wpdb->update($table, $translation_data, array('id' => intval($data['id'])));
+        error_log('Update result: ' . var_export($result, true));
+        error_log('Last error: ' . $wpdb->last_error);
+        return $result !== false ? $data['id'] : false;
+    } else if ($existing) {
+        // Update existing translation by string_key + category (if no ID provided but record exists)
+        error_log('Updating existing translation by string_key: ' . $translation_data['string_key']);
+        $result = $wpdb->update(
+            $table, 
+            $translation_data, 
+            array(
+                'string_key' => $translation_data['string_key'],
+                'category' => $translation_data['category']
+            )
+        );
+        error_log('Update by string_key result: ' . var_export($result, true));
+        error_log('Last error: ' . $wpdb->last_error);
+        return $result !== false ? $existing : false;
+    } else {
+        // Insert new translation
+        error_log('Inserting new translation');
+        $translation_data['created_at'] = current_time('mysql');
+        $result = $wpdb->insert($table, $translation_data);
+        error_log('Insert result: ' . var_export($result, true));
+        error_log('Insert ID: ' . $wpdb->insert_id);
+        error_log('Last error: ' . $wpdb->last_error);
+        return $result ? $wpdb->insert_id : false;
+    }
+}
     
     public static function delete_translation($translation_id) {
         global $wpdb;
