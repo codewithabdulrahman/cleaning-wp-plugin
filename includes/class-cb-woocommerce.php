@@ -34,6 +34,9 @@ class CB_WooCommerce {
         add_action('woocommerce_admin_order_data_after_billing_address', array($this, 'display_booking_details'));
         add_action('woocommerce_order_details_after_order_table', array($this, 'display_booking_details_frontend'));
         
+        // Display booking details on checkout page
+        add_action('woocommerce_checkout_before_customer_details', array($this, 'display_booking_details_on_checkout'));
+        
         // Handle booking checkout redirect
         add_action('template_redirect', array($this, 'handle_booking_checkout_redirect'));
         
@@ -95,7 +98,7 @@ class CB_WooCommerce {
      * Pre-fill WooCommerce checkout fields with customer details from booking
      */
     private function prefill_checkout_fields($booking) {
-        if (!WC()->session) {
+        if (!function_exists('WC') || !WC() || !WC()->session) {
             return;
         }
         
@@ -305,16 +308,32 @@ class CB_WooCommerce {
                 // Function to force set field values
                 function forceSetField(selector, value) {
                     if (value && value.trim() !== '') {
-                        $(selector).val(value).trigger('change').trigger('input');
-                        // Also try to trigger WooCommerce specific events
-                        $(selector).trigger('woocommerce_update_checkout');
-                        $(selector).trigger('update_checkout');
+                        const element = document.querySelector(selector);
+                        if (element) {
+                            element.value = value;
+                            // Trigger change and input events
+                            element.dispatchEvent(new Event('change', { bubbles: true }));
+                            element.dispatchEvent(new Event('input', { bubbles: true }));
+                            // Also try to trigger WooCommerce specific events
+                            element.dispatchEvent(new CustomEvent('woocommerce_update_checkout', { bubbles: true }));
+                            element.dispatchEvent(new CustomEvent('update_checkout', { bubbles: true }));
+                        }
                     }
                 }
                 
                 // Clear existing values first
-                $('#billing_first_name, #billing_last_name, #billing_email, #billing_phone, #billing_address_1, #billing_city, #billing_state, #billing_postcode').val('');
-                $('#shipping_first_name, #shipping_last_name, #shipping_address_1, #shipping_city, #shipping_state, #shipping_postcode').val('');
+                const billingFields = ['#billing_first_name', '#billing_last_name', '#billing_email', '#billing_phone', '#billing_address_1', '#billing_city', '#billing_state', '#billing_postcode'];
+                const shippingFields = ['#shipping_first_name', '#shipping_last_name', '#shipping_address_1', '#shipping_city', '#shipping_state', '#shipping_postcode'];
+                
+                billingFields.forEach(selector => {
+                    const element = document.querySelector(selector);
+                    if (element) element.value = '';
+                });
+                
+                shippingFields.forEach(selector => {
+                    const element = document.querySelector(selector);
+                    if (element) element.value = '';
+                });
                 
                 // Wait a moment for fields to be cleared
                 setTimeout(function() {
@@ -373,12 +392,17 @@ class CB_WooCommerce {
                     
                     // Pre-select payment method
                     <?php if ($payment_method): ?>
-                    $('input[name="payment_method"][value="<?php echo esc_js($payment_method); ?>"]').prop('checked', true).trigger('change');
+                    const paymentMethodInput = document.querySelector('input[name="payment_method"][value="<?php echo esc_js($payment_method); ?>"]');
+                    if (paymentMethodInput) {
+                        paymentMethodInput.checked = true;
+                        paymentMethodInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
                     <?php endif; ?>
                     
                     // Force update checkout
-                    $('body').trigger('update_checkout');
-                    $('body').trigger('woocommerce_update_checkout');
+                    const body = document.body;
+                    body.dispatchEvent(new CustomEvent('update_checkout', { bubbles: true }));
+                    body.dispatchEvent(new CustomEvent('woocommerce_update_checkout', { bubbles: true }));
                     
                     console.log('CB Debug - Checkout fields pre-filled with booking data');
                 }, 500);
@@ -406,25 +430,39 @@ class CB_WooCommerce {
             return $existing_product[0]->ID;
         }
         
-        // Create new product
-        $product_data = array(
-            'post_title' => sprintf('Cleaning Service - %s', $booking->booking_reference),
-            'post_content' => $this->get_booking_description($booking),
-            'post_status' => 'publish',
-            'post_type' => 'product',
-            'meta_input' => array(
-                '_cb_booking_id' => $booking->id,
-                '_cb_booking_reference' => $booking->booking_reference,
-                '_price' => $booking->total_price,
-                '_regular_price' => $booking->total_price,
-                '_sale_price' => '',
-                '_manage_stock' => 'no',
-                '_stock_status' => 'instock',
-                '_virtual' => 'yes',
-                '_downloadable' => 'no',
-                '_sold_individually' => 'yes'
-            )
-        );
+         // Create new product with proper service name
+         global $wpdb;
+         
+         // Try to get service name from session first (for session-based bookings)
+         $service_name = WC()->session ? WC()->session->get('cb_service_name') : null;
+         
+         // If not in session, get from database
+         if (!$service_name) {
+             $service = $wpdb->get_row($wpdb->prepare(
+                 "SELECT name FROM {$wpdb->prefix}cb_services WHERE id = %d",
+                 $booking->service_id
+             ));
+             $service_name = $service ? $service->name : 'Cleaning Service';
+         }
+         
+         $product_data = array(
+             'post_title' => sprintf('%s - %s', $service_name, $booking->booking_reference),
+             'post_content' => $this->get_booking_description($booking),
+             'post_status' => 'publish',
+             'post_type' => 'product',
+             'meta_input' => array(
+                 '_cb_booking_id' => $booking->id,
+                 '_cb_booking_reference' => $booking->booking_reference,
+                 '_price' => $booking->total_price,
+                 '_regular_price' => $booking->total_price,
+                 '_sale_price' => '',
+                 '_manage_stock' => 'no',
+                 '_stock_status' => 'instock',
+                 '_virtual' => 'yes',
+                 '_downloadable' => 'no',
+                 '_sold_individually' => 'yes'
+             )
+         );
         
         $product_id = wp_insert_post($product_data);
         
@@ -443,10 +481,65 @@ class CB_WooCommerce {
             ));
         }
         
-        return $product_id;
-    }
-    
-    private function get_booking_description($booking) {
+         return $product_id;
+     }
+     
+     private function update_product_title_with_booking_reference($order_id, $booking_id) {
+         global $wpdb;
+         
+         // Get the booking details
+         $booking = CB_Database::get_booking($booking_id);
+         if (!$booking) {
+             error_log("CB Debug - No booking found with ID $booking_id");
+             return false;
+         }
+         
+         // Get the order
+         $order = wc_get_order($order_id);
+         if (!$order) {
+             error_log("CB Debug - No order found with ID $order_id");
+             return false;
+         }
+         
+         // Get the service name
+         $service = $wpdb->get_row($wpdb->prepare(
+             "SELECT name FROM {$wpdb->prefix}cb_services WHERE id = %d",
+             $booking->service_id
+         ));
+         $service_name = $service ? $service->name : 'Cleaning Service';
+         
+         // Get all products in the order
+         $items = $order->get_items();
+         foreach ($items as $item) {
+             $product_id = $item->get_product_id();
+             
+             // Check if this is a booking product
+             $is_booking_product = get_post_meta($product_id, '_cb_booking_id', true);
+             if ($is_booking_product !== false) {
+                 // Update the product title with correct booking reference
+                 $new_title = sprintf('%s - %s', $service_name, $booking->booking_reference);
+                 
+                 $result = wp_update_post(array(
+                     'ID' => $product_id,
+                     'post_title' => $new_title
+                 ));
+                 
+                 if ($result) {
+                     // Update the booking reference meta
+                     update_post_meta($product_id, '_cb_booking_reference', $booking->booking_reference);
+                     update_post_meta($product_id, '_cb_booking_id', $booking_id);
+                     
+                     error_log("CB Debug - Updated product $product_id title to: $new_title");
+                 } else {
+                     error_log("CB Debug - Failed to update product $product_id title");
+                 }
+             }
+         }
+         
+         return true;
+     }
+     
+     private function get_booking_description($booking) {
         global $wpdb;
         
         $service = $wpdb->get_row($wpdb->prepare(
@@ -586,43 +679,48 @@ class CB_WooCommerce {
             return;
         }
     }
-
-  public function link_booking_to_order($order_id) {
-    error_log("CB Debug - link_booking_to_order called for order $order_id");
     
-    // Check if this is a session-based booking
-    $booking_data = WC()->session->get('cb_booking_data');
+    public function link_booking_to_order($order_id) {
+        error_log("CB Debug - link_booking_to_order called for order $order_id");
     
-    if ($booking_data) {
-        error_log("CB Debug - Creating booking from session data for order $order_id");
-        
-        // Get customer details from order
-        $order = wc_get_order($order_id);
-        $payment_method = $order ? $order->get_payment_method() : null;
-        
-        // Create the actual booking from session data
-        $booking_id = $this->create_booking_from_session($booking_data, $order_id, $order);
-        
-        if ($booking_id) {
-            error_log("CB Debug - Successfully created booking $booking_id from session for order $order_id");
-            
-            // Update booking status based on payment method
-            $status = $payment_method === 'cod' ? 'confirmed' : 'pending';
-            CB_Database::update_booking_status($booking_id, $status, $order_id, $payment_method);
-            
-            // Release slot hold for the new booking
-            $this->release_slot_hold($booking_id);
+        // Check if this is a session-based booking
+        $booking_data = WC()->session->get('cb_booking_data');
+    
+        if ($booking_data) {
+            error_log("CB Debug - Creating booking from session data for order $order_id");
+    
+            // Get customer details from order
+            $order = wc_get_order($order_id);
+            $payment_method = $order ? $order->get_payment_method() : null;
+    
+            // Create the actual booking from session data
+            $booking_id = $this->create_booking_from_session($booking_data, $order_id, $order);
+    
+             if ($booking_id) {
+                 error_log("CB Debug - Successfully created booking $booking_id from session for order $order_id");
+     
+                 // Update booking status based on payment method
+                 $status = $payment_method === 'cod' ? 'confirmed' : 'pending';
+                 CB_Database::update_booking_status($booking_id, $status, $order_id, $payment_method);
+     
+                 // Update product title with correct booking reference
+                 $this->update_product_title_with_booking_reference($order_id, $booking_id);
+     
+                 // Release slot hold for the new booking
+                 $this->release_slot_hold($booking_id);
+             } else {
+                 error_log("CB Debug - Failed to create booking from session for order $order_id");
+             }
+    
+            // Clear session data
+            WC()->session->set('cb_booking_data', null);
+            WC()->session->set('cb_booking_timestamp', null);
+            WC()->session->set('cb_generated_booking_reference', null);
+            WC()->session->set('cb_service_name', null);
         } else {
-            error_log("CB Debug - Failed to create booking from session for order $order_id");
+            error_log("CB Debug - No booking session data found for order $order_id");
         }
-        
-        // Clear session data
-        WC()->session->set('cb_booking_data', null);
-        WC()->session->set('cb_booking_timestamp', null);
-    } else {
-        error_log("CB Debug - No booking session data found for order $order_id");
     }
-}
     
     /**
      * Handle linking booking to order from thankyou page
@@ -783,13 +881,64 @@ class CB_WooCommerce {
         
         $slot_holds_table = $wpdb->prefix . 'cb_slot_holds';
         $bookings_table = $wpdb->prefix . 'cb_bookings';
-        
-        // Check for existing bookings (include buffer time in conflict detection)
+        $trucks_table = $wpdb->prefix . 'cb_trucks';
         $buffer_time = get_option('cb_buffer_time', 15);
-        $existing_booking = $wpdb->get_var($wpdb->prepare(
+        
+        // Count total active trucks (one truck = one slot)
+        $total_trucks = $wpdb->get_var(
+            "SELECT COUNT(*) FROM $trucks_table WHERE is_active = 1"
+        );
+        
+        // If trucks table doesn't exist or no trucks, fall back to old logic
+        if ($total_trucks === null || $total_trucks <= 0) {
+            // Fallback: check for any existing bookings (old behavior)
+            $existing_booking = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM $bookings_table 
+                 WHERE booking_date = %s 
+                 AND status IN ('confirmed', 'paid') 
+                 AND id != %d
+                 AND (
+                     (booking_time <= %s AND ADDTIME(booking_time, SEC_TO_TIME((total_duration + %d) * 60)) > %s) OR
+                     (booking_time < ADDTIME(%s, SEC_TO_TIME(%d * 60)) AND ADDTIME(booking_time, SEC_TO_TIME((total_duration + %d) * 60)) >= ADDTIME(%s, SEC_TO_TIME(%d * 60)))
+                 )",
+                $booking->booking_date,
+                $booking->id,
+                $booking->booking_time,
+                $buffer_time,
+                $booking->booking_time,
+                $booking->booking_time,
+                $booking->total_duration,
+                $buffer_time,
+                $booking->booking_time,
+                $booking->total_duration
+            ));
+            
+            if ($existing_booking > 0) {
+                return false;
+            }
+            
+            // Check for active holds (excluding current session)
+            $current_session_id = WC()->session->get('cb_slot_session_id');
+            $active_hold = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM $slot_holds_table 
+                 WHERE booking_date = %s 
+                 AND booking_time = %s 
+                 AND expires_at > NOW() 
+                 AND session_id != %s",
+                $booking->booking_date,
+                $booking->booking_time,
+                $current_session_id ?: ''
+            ));
+            
+            return $active_hold == 0;
+        }
+        
+        // Count existing bookings for this time slot (pending, confirmed, paid, on-hold)
+        // Include buffer time in the conflict detection
+        $existing_bookings_count = $wpdb->get_var($wpdb->prepare(
             "SELECT COUNT(*) FROM $bookings_table 
              WHERE booking_date = %s 
-             AND status IN ('confirmed', 'paid') 
+             AND status IN ('pending', 'confirmed', 'paid', 'on-hold')
              AND id != %d
              AND (
                  (booking_time <= %s AND ADDTIME(booking_time, SEC_TO_TIME((total_duration + %d) * 60)) > %s) OR
@@ -807,25 +956,31 @@ class CB_WooCommerce {
             $booking->total_duration
         ));
         
-        if ($existing_booking > 0) {
-            return false;
-        }
-        
-        // Check for active holds (excluding current session)
-        $current_session_id = WC()->session->get('cb_slot_session_id');
-        $buffer_time = get_option('cb_buffer_time', 15);
-        $active_hold = $wpdb->get_var($wpdb->prepare(
+        // Count active slot holds for this time slot
+        $active_holds_count = $wpdb->get_var($wpdb->prepare(
             "SELECT COUNT(*) FROM $slot_holds_table 
              WHERE booking_date = %s 
-             AND booking_time = %s 
-             AND expires_at > NOW() 
-             AND session_id != %s",
+             AND expires_at > NOW()
+             AND (
+                 (booking_time <= %s AND ADDTIME(booking_time, SEC_TO_TIME((duration + %d) * 60)) > %s) OR
+                 (booking_time < ADDTIME(%s, SEC_TO_TIME(%d * 60)) AND ADDTIME(booking_time, SEC_TO_TIME((duration + %d) * 60)) >= ADDTIME(%s, SEC_TO_TIME(%d * 60)))
+             )",
             $booking->booking_date,
             $booking->booking_time,
-            $current_session_id ?: ''
+            $buffer_time,
+            $booking->booking_time,
+            $booking->booking_time,
+            $booking->total_duration,
+            $buffer_time,
+            $booking->booking_time,
+            $booking->total_duration
         ));
         
-        return $active_hold == 0;
+        // Total occupied slots = bookings + holds
+        $total_occupied = $existing_bookings_count + $active_holds_count;
+        
+        // Slot available if occupied slots < total trucks
+        return $total_occupied < $total_trucks;
     }
     
     private function release_slot_hold($booking_id) {
@@ -860,7 +1015,33 @@ class CB_WooCommerce {
     }
     
     public function display_booking_details_frontend($order) {
-        $this->display_booking_details($order);
+$this->display_booking_details($order);
+    }
+    
+    public function display_booking_details_on_checkout() {
+        if (!WC()->session) {
+            return;
+        }
+        
+        $booking_data = WC()->session->get('cb_booking_data');
+        if (!$booking_data) {
+            return;
+        }
+        
+        // Create a temporary booking object for display
+        $booking = new stdClass();
+        $booking->booking_reference = WC()->session->get('cb_generated_booking_reference') ?: 'CB' . date('Ymd') . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+        $booking->service_id = $booking_data['service_id'];
+        $booking->square_meters = $booking_data['square_meters'];
+        $booking->booking_date = $booking_data['booking_date'];
+        $booking->booking_time = $booking_data['booking_time'];
+        $booking->total_duration = $booking_data['pricing']['total_duration'] ?? 120;
+        $booking->extras_data = json_encode($booking_data['extras']);
+        
+        echo '<div class="cb-checkout-booking-summary" style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px; margin-bottom: 20px;">';
+        echo '<h3 style="margin-top: 0; color: #495057;">' . __('Your Booking Summary', 'cleaning-booking') . '</h3>';
+        $this->render_booking_details($booking);
+        echo '</div>';
     }
     
     private function render_booking_details($booking) {
@@ -1002,109 +1183,133 @@ class CB_WooCommerce {
             echo '</div>';
         }
     }
-    /**
- * Generate checkout URL from session data
- */
-/**
- * Generate checkout URL from session data
- */
-public function generate_checkout_url_from_session() {  // Changed from private to public
-    if (!WC()->session) {
-        error_log('CB Debug - No WooCommerce session available');
-        return false;
-    }
-    
-    $booking_data = WC()->session->get('cb_booking_data');
-    
-    if (!$booking_data) {
-        error_log('CB Debug - No booking data in session');
-        return false;
-    }
-    
-    error_log('CB Debug - Generating checkout from session data: ' . print_r($booking_data, true));
-    
-    // Create a temporary booking object from session data
-    $booking = new stdClass();
-    $booking->id = 0; // Temporary ID, will be created after checkout
-    $booking->booking_reference = 'TEMP_' . wp_generate_uuid4();
-    $booking->service_id = $booking_data['service_id'];
-    $booking->square_meters = $booking_data['square_meters'];
-    $booking->booking_date = $booking_data['booking_date'];
-    $booking->booking_time = $booking_data['booking_time'];
-    $booking->total_price = $booking_data['pricing']['total_price'] ?? 0;
-    $booking->total_duration = $booking_data['pricing']['total_duration'] ?? 120;
-    $booking->extras_data = json_encode($booking_data['extras']);
-    
-    // Create product and get checkout URL
-    $product_id = $this->create_booking_product($booking);
-    
-    if (!$product_id) {
-        error_log('CB Debug - Failed to create booking product from session');
-        return false;
-    }
-    
-    $checkout_url = add_query_arg(array(
-        'booking_session' => '1',
-        'add-to-cart' => $product_id,
-        'quantity' => 1
-    ), wc_get_checkout_url());
-    
-    error_log('CB Debug - Generated checkout URL from session: ' . $checkout_url);
-    
-    return $checkout_url;
-}
+        /**
+         * Generate checkout URL from session data
+         */
+        /**
+         * Generate checkout URL from session data
+         */
+        public function generate_checkout_url_from_session() {  // Changed from private to public
+            if (!WC()->session) {
+                error_log('CB Debug - No WooCommerce session available');
+                return false;
+            }
 
-/**
- * Create booking from session data after order is created
- */
-/**
- * Create booking from session data after order is created
- */
-public function create_booking_from_session($booking_data, $order_id, $order) {  // Changed from private to public
-    global $wpdb;
-    
-    // Get customer details from order
-    $customer_name = $order->get_billing_first_name() . ' ' . $order->get_billing_last_name();
-    $customer_email = $order->get_billing_email();
-    $customer_phone = $order->get_billing_phone();
-    $address = $order->get_billing_address_1();
-    $zip_code = $order->get_billing_postcode();
-    
-    // Generate booking reference
-    $booking_reference = 'CB' . date('Ymd') . strtoupper(wp_generate_password(6, false));
-    
-    // Prepare booking data for database
-    $booking_db_data = array(
-        'booking_reference' => $booking_reference,
-        'service_id' => $booking_data['service_id'],
-        'square_meters' => $booking_data['square_meters'],
-        'booking_date' => $booking_data['booking_date'],
-        'booking_time' => $booking_data['booking_time'],
-        'total_duration' => $booking_data['pricing']['total_duration'] ?? 120,
-        'total_price' => $booking_data['pricing']['total_price'] ?? 0,
-        'customer_name' => $customer_name,
-        'customer_email' => $customer_email,
-        'customer_phone' => $customer_phone,
-        'address' => $address,
-        'zip_code' => $zip_code,
-        'extras_data' => json_encode($booking_data['extras']),
-        'status' => 'pending',
-        'woocommerce_order_id' => $order_id,
-        'created_at' => current_time('mysql'),
-        'updated_at' => current_time('mysql')
-    );
-    
-    error_log('CB Debug - Creating booking from session: ' . print_r($booking_db_data, true));
-    
-    $result = $wpdb->insert("{$wpdb->prefix}cb_bookings", $booking_db_data);
-    
-    if ($result) {
-        $booking_id = $wpdb->insert_id;
-        error_log("CB Debug - Booking created successfully with ID: $booking_id");
-        return $booking_id;
-    } else {
-        error_log("CB Debug - Failed to create booking: " . $wpdb->last_error);
-        return false;
-    }
-}
+            $booking_data = WC()->session->get('cb_booking_data');
+
+            if (!$booking_data) {
+                error_log('CB Debug - No booking data in session');
+                return false;
+            }
+
+            error_log('CB Debug - Generating checkout from session data: ' . print_r($booking_data, true));
+
+             // Create a booking object from session data with proper reference
+             $booking = new stdClass();
+             $booking->id = 0; // Temporary ID, will be created after checkout
+             $booking->booking_reference = 'CB' . date('Ymd') . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+             $booking->service_id = $booking_data['service_id'];
+             $booking->square_meters = $booking_data['square_meters'];
+             $booking->booking_date = $booking_data['booking_date'];
+             $booking->booking_time = $booking_data['booking_time'];
+             $booking->total_price = $booking_data['pricing']['total_price'] ?? 0;
+             $booking->total_duration = $booking_data['pricing']['total_duration'] ?? 120;
+             $booking->extras_data = json_encode($booking_data['extras']);
+             
+             // Store the generated reference in session for later use
+             WC()->session->set('cb_generated_booking_reference', $booking->booking_reference);
+             
+             // Also store the service name for product creation
+             global $wpdb;
+             $service = $wpdb->get_row($wpdb->prepare(
+                 "SELECT name FROM {$wpdb->prefix}cb_services WHERE id = %d",
+                 $booking->service_id
+             ));
+             $service_name = $service ? $service->name : 'Cleaning Service';
+             WC()->session->set('cb_service_name', $service_name);
+
+            // Create product and get checkout URL
+            $product_id = $this->create_booking_product($booking);
+
+            if (!$product_id) {
+                error_log('CB Debug - Failed to create booking product from session');
+                return false;
+            }
+
+            $checkout_url = add_query_arg(array(
+                'booking_session' => '1',
+                'add-to-cart' => $product_id,
+                'quantity' => 1
+            ), wc_get_checkout_url());
+
+            error_log('CB Debug - Generated checkout URL from session: ' . $checkout_url);
+
+            return $checkout_url;
+        }
+
+        /**
+         * Create booking from session data after order is created
+         */
+        /**
+         * Create booking from session data after order is created
+         */
+        public function create_booking_from_session($booking_data, $order_id, $order) {  // Changed from private to public
+            global $wpdb;
+
+            // Get customer details from order
+            $customer_name = $order->get_billing_first_name() . ' ' . $order->get_billing_last_name();
+            $customer_email = $order->get_billing_email();
+            $customer_phone = $order->get_billing_phone();
+            $address = $order->get_billing_address_1();
+            $zip_code = $order->get_billing_postcode();
+
+            // Use the generated booking reference from session or create new one
+            $booking_reference = WC()->session->get('cb_generated_booking_reference');
+            if (!$booking_reference) {
+                $booking_reference = 'CB' . date('Ymd') . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+            }
+
+            // Assign available truck automatically
+            $total_duration = $booking_data['pricing']['total_duration'] ?? 120;
+            $available_truck = CB_Database::get_available_truck($booking_data['booking_date'], $booking_data['booking_time'], $total_duration);
+            if (!$available_truck) {
+                error_log("CB Debug - No available truck found for WooCommerce booking on {$booking_data['booking_date']} at {$booking_data['booking_time']}");
+                return false;
+            }
+
+            // Prepare booking data for database
+            $booking_db_data = array(
+                'booking_reference' => $booking_reference,
+                'service_id' => $booking_data['service_id'],
+                'square_meters' => $booking_data['square_meters'],
+                'booking_date' => $booking_data['booking_date'],
+                'booking_time' => $booking_data['booking_time'],
+                'total_duration' => $total_duration,
+                'total_price' => $booking_data['pricing']['total_price'] ?? 0,
+                'customer_name' => $customer_name,
+                'customer_email' => $customer_email,
+                'customer_phone' => $customer_phone,
+                'address' => $address,
+                'zip_code' => $zip_code,
+                'extras_data' => json_encode($booking_data['extras']),
+                'status' => 'pending',
+                'truck_id' => $available_truck->id,
+                'woocommerce_order_id' => $order_id,
+                'created_at' => current_time('mysql'),
+                'updated_at' => current_time('mysql')
+            );
+
+            error_log('CB Debug - Creating booking from session: ' . print_r($booking_db_data, true));
+
+            $result = $wpdb->insert("{$wpdb->prefix}cb_bookings", $booking_db_data);
+
+            if ($result) {
+                $booking_id = $wpdb->insert_id;
+                error_log("CB Debug - Booking created successfully with ID: $booking_id");
+                return $booking_id;
+            } else {
+                error_log("CB Debug - Failed to create booking: " . $wpdb->last_error);
+                return false;
+            }
+        }
 }

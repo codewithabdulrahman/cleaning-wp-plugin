@@ -33,6 +33,34 @@
     --cb-info: #17a2b8;
 }
 
+.elementor-kit-88 .cb-widget .cb-btn,
+.elementor-kit-88 .cb-widget-container .cb-btn,
+.cb-widget .cb-btn {
+    background-color: var(--cb-primary-color) !important;
+    border-color: var(--cb-primary-color) !important;
+}
+
+.elementor-kit-88 .cb-widget .cb-btn:hover,
+.elementor-kit-88 .cb-widget-container .cb-btn:hover,
+.cb-widget .cb-btn:hover {
+    background-color: var(--cb-secondary-color) !important;
+    border-color: var(--cb-secondary-color) !important;
+}
+
+.elementor-kit-88 .cb-widget .cb-btn-secondary,
+.elementor-kit-88 .cb-widget-container .cb-btn-secondary,
+.cb-widget .cb-btn-secondary {
+    background-color: transparent !important;
+    border-color: var(--cb-primary-color) !important;
+}
+
+.elementor-kit-88 .cb-widget .cb-btn-secondary:hover,
+.elementor-kit-88 .cb-widget-container .cb-btn-secondary:hover,
+.cb-widget .cb-btn-secondary:hover {
+    background-color: var(--cb-primary-color) !important;
+    border-color: var(--cb-primary-color) !important;
+}
+
 .cb-container {
     width: 100%;
     max-width: 100%;
@@ -45,6 +73,7 @@
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    border-radius: 10px;
 }
 
 .cb-header {
@@ -52,7 +81,7 @@
     color: white;
     padding: 24px;
     text-align: left;
-    border-radius: 20px;
+    border-radius: 10px;
 }
 
 .cb-header-top {
@@ -226,7 +255,7 @@
 }
 
 .cb-main-content {
-    padding: 16px;
+    padding: 10px;
     border-right: 1px solid var(--cb-border-color);
     background: var(--cb-background-color);
     color: var(--cb-text-color);
@@ -236,7 +265,7 @@
 }
 
 .cb-checkout-sidebar {
-    padding: 24px 15px;
+    padding: 16px 8px;
     background: var(--cb-background-color);
     display: flex;
     flex-direction: column;
@@ -474,7 +503,7 @@
 }
 
 .cb-btn-checkout {
-    background: var(--cb-primary-color) ;
+    background: var(--cb-primary-color);
     color: white;
     font-size: 10px;
     padding: 14px 19px;
@@ -569,7 +598,7 @@
 
 .cb-service-card h4 {
     margin: 0 0 4px 0;
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 600;
     color: var(--cb-text-color);
 }
@@ -589,7 +618,7 @@
 }
 
 .cb-price-current {
-    font-size: 18px;
+    font-size: 15px;
     font-weight: 700;
     color: #2962ff;
 }
@@ -812,7 +841,7 @@
 }
 
 .cb-duration-value {
-    font-size: 18px;
+    font-size: 12px;
     font-weight: 700;
     color: #1a1a1a;
     display: block;
@@ -904,7 +933,7 @@
 }
 
 .cb-price-current {
-    font-size: 28px;
+    font-size: 15px;
     font-weight: 700;
     color: #1a1a1a;
 }
@@ -958,7 +987,7 @@
 }
 
 .cb-time-slot.unavailable::after {
-    content: "Booked";
+    content: "Κρατημένο";
     position: absolute;
     top: 50%;
     left: 50%;
@@ -1073,7 +1102,7 @@ body {
     }
     
     .cb-checkout-sidebar {
-        padding: 24px 15px;
+        padding: 16px 8px;
         grid-area: sidebar;
         min-height: auto;
     }
@@ -1108,7 +1137,7 @@ body {
     }
     
     .cb-checkout-sidebar {
-        padding: 24px 15px;
+        padding: 16px 8px;
         grid-area: sidebar;
         min-height: auto;
     }
@@ -1206,7 +1235,7 @@ body {
     }
     
     .cb-service-card {
-        padding: 12px;
+        padding: 15px;
     }
     
     .cb-service-icon {
@@ -1217,7 +1246,7 @@ body {
     }
     
     .cb-service-card h4 {
-        font-size: 14px;
+        font-size: 15px;
         margin-bottom: 4px;
     }
     
@@ -1227,7 +1256,7 @@ body {
     }
     
     .cb-price-current {
-        font-size: 18px;
+        font-size: 15px;
     }
     
     .cb-service-duration,

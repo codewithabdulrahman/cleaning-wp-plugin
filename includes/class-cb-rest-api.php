@@ -435,6 +435,14 @@ class CB_REST_API {
         $data['total_price'] = $pricing_data['pricing']['total_price'];
         $data['total_duration'] = $pricing_data['duration']['total_duration'];
         
+        // Assign available truck automatically
+        $available_truck = CB_Database::get_available_truck($data['booking_date'], $data['booking_time'], $data['total_duration']);
+        if ($available_truck) {
+            $data['truck_id'] = $available_truck->id;
+        } else {
+            return new WP_Error('no_truck_available', __('No trucks available for the selected time slot. Please choose another time.', 'cleaning-booking'), array('status' => 400));
+        }
+        
         // Create booking
         $booking_id = CB_Database::create_booking($data);
         

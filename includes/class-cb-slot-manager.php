@@ -117,8 +117,32 @@ class CB_Slot_Manager {
             $duration
         ));
         
-        // One truck = one slot, so slot available if bookings < total trucks
-        return $existing_bookings_count < $total_trucks;
+        // Count active slot holds for this time slot
+        $slot_holds_table = $wpdb->prefix . 'cb_slot_holds';
+        $active_holds_count = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM $slot_holds_table 
+             WHERE booking_date = %s 
+             AND expires_at > NOW()
+             AND (
+                 (booking_time <= %s AND ADDTIME(booking_time, SEC_TO_TIME((duration + %d) * 60)) > %s) OR
+                 (booking_time < ADDTIME(%s, SEC_TO_TIME(%d * 60)) AND ADDTIME(booking_time, SEC_TO_TIME((duration + %d) * 60)) >= ADDTIME(%s, SEC_TO_TIME(%d * 60)))
+             )",
+            $date,
+            $time,
+            $buffer_time,
+            $time,
+            $time,
+            $duration,
+            $buffer_time,
+            $time,
+            $duration
+        ));
+        
+        // Total occupied slots = bookings + holds
+        $total_occupied = $existing_bookings_count + $active_holds_count;
+        
+        // Slot available if occupied slots < total trucks
+        return $total_occupied < $total_trucks;
     }
     
     private function slots_overlap($time1, $duration1, $time2, $duration2) {
@@ -135,8 +159,14 @@ class CB_Slot_Manager {
     public function hold_slot($date, $time, $duration) {
         global $wpdb;
         
-        // Check if slot is still available
+        // Check if slot is still available (considering truck availability)
         if (!$this->is_slot_available($date, $time, $duration)) {
+            return false;
+        }
+        
+        // Get an available truck for this slot
+        $available_truck = CB_Database::get_available_truck($date, $time, $duration);
+        if (!$available_truck) {
             return false;
         }
         
@@ -151,7 +181,8 @@ class CB_Slot_Manager {
             'booking_time' => $time,
             'duration' => $duration,
             'session_id' => $session_id,
-            'expires_at' => $expires_at
+            'expires_at' => $expires_at,
+            'truck_id' => $available_truck->id
         ));
         
         if ($result) {
@@ -318,6 +349,82 @@ class CB_Slot_Manager {
         }
         
         return $calendar;
+    }
+    
+    /**
+     * Test method to verify truck-based slot availability
+     * This can be called to test the system logic
+     */
+    public function test_truck_slot_availability($date, $time, $duration) {
+        global $wpdb;
+        
+        $trucks_table = $wpdb->prefix . 'cb_trucks';
+        $bookings_table = $wpdb->prefix . 'cb_bookings';
+        $slot_holds_table = $wpdb->prefix . 'cb_slot_holds';
+        
+        // Get total active trucks
+        $total_trucks = $wpdb->get_var(
+            "SELECT COUNT(*) FROM $trucks_table WHERE is_active = 1"
+        );
+        
+        // Get existing bookings for this time slot
+        $existing_bookings = $wpdb->get_results($wpdb->prepare(
+            "SELECT id, booking_reference, truck_id, booking_time, total_duration 
+             FROM $bookings_table 
+             WHERE booking_date = %s 
+             AND status IN ('pending', 'confirmed', 'paid', 'on-hold')
+             AND (
+                 (booking_time <= %s AND ADDTIME(booking_time, SEC_TO_TIME((total_duration + 15) * 60)) > %s) OR
+                 (booking_time < ADDTIME(%s, SEC_TO_TIME(%d * 60)) AND ADDTIME(booking_time, SEC_TO_TIME((total_duration + 15) * 60)) >= ADDTIME(%s, SEC_TO_TIME(%d * 60)))
+             )",
+            $date,
+            $time,
+            $time,
+            $time,
+            $duration,
+            $time,
+            $duration
+        ));
+        
+        // Get active slot holds for this time slot
+        $active_holds = $wpdb->get_results($wpdb->prepare(
+            "SELECT id, session_id, truck_id, booking_time, duration 
+             FROM $slot_holds_table 
+             WHERE booking_date = %s 
+             AND expires_at > NOW()
+             AND (
+                 (booking_time <= %s AND ADDTIME(booking_time, SEC_TO_TIME((duration + 15) * 60)) > %s) OR
+                 (booking_time < ADDTIME(%s, SEC_TO_TIME(%d * 60)) AND ADDTIME(booking_time, SEC_TO_TIME((duration + 15) * 60)) >= ADDTIME(%s, SEC_TO_TIME(%d * 60)))
+             )",
+            $date,
+            $time,
+            $time,
+            $time,
+            $duration,
+            $time,
+            $duration
+        ));
+        
+        // Get available trucks
+        $available_truck = CB_Database::get_available_truck($date, $time, $duration);
+        
+        $result = array(
+            'date' => $date,
+            'time' => $time,
+            'duration' => $duration,
+            'total_trucks' => $total_trucks,
+            'existing_bookings_count' => count($existing_bookings),
+            'active_holds_count' => count($active_holds),
+            'total_occupied' => count($existing_bookings) + count($active_holds),
+            'is_slot_available' => $this->is_slot_available($date, $time, $duration),
+            'available_truck' => $available_truck ? $available_truck->truck_name : null,
+            'existing_bookings' => $existing_bookings,
+            'active_holds' => $active_holds
+        );
+        
+        error_log("CB Debug - Truck slot availability test: " . json_encode($result));
+        
+        return $result;
     }
     
 }

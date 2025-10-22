@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
             <div class="cb-language-widget">
                 <select class="cb-language-selector">
                     <option value="en">English</option>
-                    <option value="el">Ελληνικά</option>
+                    <option value="el" selected>Ελληνικά</option>
                 </select>
             </div>
         </div>
@@ -45,8 +45,8 @@ if (!defined('ABSPATH')) {
             <?php endif; ?>
         </div>
         
-        <div class="cb-content">
-            <div class="cb-main-content">
+        <div class="cb-content cb-sidebar-<?php echo esc_attr(CB_Style_Manager::get_setting('sidebar_position', 'right')); ?>">
+            <div class="cb-main-content cb-sidebar-<?php echo esc_attr(CB_Style_Manager::get_setting('sidebar_position', 'right')); ?>">
                 <form id="cb-booking-form" class="cb-form">
                     <!-- Step 1: ZIP Code Check -->
                     <div class="cb-step-content cb-step-1 cb-step-active">
@@ -128,13 +128,16 @@ if (!defined('ABSPATH')) {
                                 <div class="cb-price-item">
                                     <span><?php _e('Service Price:', 'cleaning-booking'); ?></span>
                                     <span id="cb-step3-service-price">€0.00</span>
+                                    <span id="cb-step3-service-price">€0.00</span>
                                 </div>
                                 <div class="cb-price-item">
                                     <span><?php _e('Extras:', 'cleaning-booking'); ?></span>
                                     <span id="cb-step3-extras-price">€0.00</span>
+                                    <span id="cb-step3-extras-price">€0.00</span>
                                 </div>
                                 <div class="cb-price-item cb-price-total">
                                     <span><?php _e('Total:', 'cleaning-booking'); ?></span>
+                                    <span id="cb-step3-total-price">€0.00</span>
                                     <span id="cb-step3-total-price">€0.00</span>
                                 </div>
                             </div>
@@ -211,7 +214,7 @@ if (!defined('ABSPATH')) {
                     
                     <div class="cb-duration-section">
                         <span class="cb-duration-label"><?php _e('Approximate working time', 'cleaning-booking'); ?></span>
-                        <span class="cb-duration-value" id="cb-sidebar-duration">-<?php _e('hours', 'cleaning-booking'); ?></span>
+                        <span class="cb-duration-value" id="cb-sidebar-duration">-<?php _e('λεπτά', 'cleaning-booking'); ?></span>
                     </div>
                     
                     <div class="cb-selected-extras-section" id="cb-selected-extras" style="display: none;">
@@ -222,11 +225,12 @@ if (!defined('ABSPATH')) {
                     <div class="cb-price-section">
                         <div class="cb-price-label"><?php _e('Pricing:', 'cleaning-booking'); ?></div>
                         <div class="cb-price-display">
-                            <span class="cb-price-current" id="cb-sidebar-total">Price will be calculated</span>
+                            <span class="cb-price-current" id="cb-sidebar-total"><?php _e('Price will be calculated', 'cleaning-booking'); ?></span>
                         </div>
                     </div>
                     
                     <button type="button" class="cb-btn cb-btn-checkout" disabled id="cb-sidebar-checkout">
+                        <span id="cb-checkout-price">€0.00</span> - <?php _e('Proceed to Checkout', 'cleaning-booking'); ?>
                         <span id="cb-checkout-price">€0.00</span> - <?php _e('Proceed to Checkout', 'cleaning-booking'); ?>
                     </button>
                 </div>

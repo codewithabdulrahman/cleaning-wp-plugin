@@ -26,6 +26,21 @@ class CB_Admin {
         add_action('wp_ajax_cb_update_booking', array($this, 'ajax_update_booking'));
         add_action('wp_ajax_cb_delete_booking', array($this, 'ajax_delete_booking'));
         add_action('wp_ajax_cb_save_booking', array($this, 'ajax_save_booking'));
+        
+        // Form Fields AJAX handlers
+        add_action('wp_ajax_cb_save_form_field', array($this, 'ajax_save_form_field'));
+        add_action('wp_ajax_cb_delete_form_field', array($this, 'ajax_delete_form_field'));
+        add_action('wp_ajax_cb_update_field_order', array($this, 'ajax_update_field_order'));
+        
+        // Translations AJAX handlers
+        add_action('wp_ajax_cb_save_translation', array($this, 'ajax_save_translation'));
+        add_action('wp_ajax_cb_delete_translation', array($this, 'ajax_delete_translation'));
+        add_action('wp_ajax_cb_bulk_update_translations', array($this, 'ajax_bulk_update_translations'));
+        // Import/Export removed per product decision
+        
+        // Style Settings AJAX handlers
+        add_action('wp_ajax_cb_save_style_setting', array($this, 'ajax_save_style_setting'));
+        add_action('wp_ajax_cb_reset_style_settings', array($this, 'ajax_reset_style_settings'));
     }
     
     public function add_admin_menu() {
@@ -67,6 +82,23 @@ class CB_Admin {
             array($this, 'services_page')
         );
         
+        add_submenu_page(
+            'cleaning-booking',
+            __('Form Fields', 'cleaning-booking'),
+            __('Form Fields', 'cleaning-booking'),
+            'manage_options',
+            'cb-form-fields',
+            array($this, 'form_fields_page')
+        );
+        
+        add_submenu_page(
+            'cleaning-booking',
+            __('Translations', 'cleaning-booking'),
+            __('Translations', 'cleaning-booking'),
+            'manage_options',
+            'cb-translations',
+            array($this, 'translations_page')
+        );
         
         add_submenu_page(
             'cleaning-booking',
@@ -204,6 +236,39 @@ class CB_Admin {
                 update_option($key, $value);
             }
             
+            // Handle style settings
+            $style_settings = array(
+                // Typography settings
+                'heading_font_family' => sanitize_text_field($_POST['heading_font_family']),
+                'body_font_family' => sanitize_text_field($_POST['body_font_family']),
+                'heading_font_size' => sanitize_text_field($_POST['heading_font_size']),
+                'body_font_size' => sanitize_text_field($_POST['body_font_size']),
+                'label_font_size' => sanitize_text_field($_POST['label_font_size']),
+                'button_font_size' => sanitize_text_field($_POST['button_font_size']),
+                'font_weight_heading' => sanitize_text_field($_POST['font_weight_heading']),
+                'font_weight_body' => sanitize_text_field($_POST['font_weight_body']),
+                
+                // Spacing settings
+                'form_padding' => sanitize_text_field($_POST['form_padding']),
+                'field_spacing' => sanitize_text_field($_POST['field_spacing']),
+                'button_padding' => sanitize_text_field($_POST['button_padding']),
+                'container_max_width' => sanitize_text_field($_POST['container_max_width']),
+                
+                // Layout settings
+                'sidebar_position' => sanitize_text_field($_POST['sidebar_position']),
+                'step_indicator_style' => sanitize_text_field($_POST['step_indicator_style']),
+                'mobile_breakpoint' => sanitize_text_field($_POST['mobile_breakpoint']),
+                
+                // Language settings
+                'default_language' => sanitize_text_field($_POST['default_language']),
+                'auto_detect_language' => isset($_POST['auto_detect_language']) ? '1' : '0',
+                'geolocation_detection' => isset($_POST['geolocation_detection']) ? '1' : '0'
+            );
+            
+            foreach ($style_settings as $key => $value) {
+                CB_Style_Manager::save_setting($key, $value, 'text', 'general', '');
+            }
+            
             echo '<div class="notice notice-success"><p>' . __('Settings saved!', 'cleaning-booking') . '</p></div>';
         }
         
@@ -241,10 +306,46 @@ class CB_Admin {
             // Update existing
             $result = $wpdb->update($table, $data, array('id' => intval($_POST['id'])));
             $message = $result ? __('Service updated successfully!', 'cleaning-booking') : __('Error updating service', 'cleaning-booking');
+            // Persist translations for service name/description (default both languages to provided values)
+            $service_id = intval($_POST['id']);
+            if ($service_id) {
+                CB_Translations::save_translation(array(
+                    'string_key' => 'service_name_' . $service_id,
+                    'category' => 'services',
+                    'text_en' => $data['name'],
+                    'text_el' => $data['name'],
+                    'context' => 'Service name'
+                ));
+                CB_Translations::save_translation(array(
+                    'string_key' => 'service_desc_' . $service_id,
+                    'category' => 'services',
+                    'text_en' => $data['description'],
+                    'text_el' => $data['description'],
+                    'context' => 'Service description'
+                ));
+            }
         } else {
             // Insert new
             $result = $wpdb->insert($table, $data);
             $message = $result ? __('Service created successfully!', 'cleaning-booking') : __('Error creating service', 'cleaning-booking');
+            if ($result) {
+                $service_id = intval($wpdb->insert_id);
+                // Initialize translations so admin can edit them later
+                CB_Translations::save_translation(array(
+                    'string_key' => 'service_name_' . $service_id,
+                    'category' => 'services',
+                    'text_en' => $data['name'],
+                    'text_el' => $data['name'],
+                    'context' => 'Service name'
+                ));
+                CB_Translations::save_translation(array(
+                    'string_key' => 'service_desc_' . $service_id,
+                    'category' => 'services',
+                    'text_en' => $data['description'],
+                    'text_el' => $data['description'],
+                    'context' => 'Service description'
+                ));
+            }
         }
         
         wp_send_json_success(array('message' => $message));
@@ -289,9 +390,44 @@ class CB_Admin {
         if (isset($_POST['id']) && !empty($_POST['id'])) {
             $result = CB_Database::update_service_extra($service_id, intval($_POST['id']), $extra_data);
             $message = $result ? __('Extra updated successfully!', 'cleaning-booking') : __('Error updating extra', 'cleaning-booking');
+            $extra_id = intval($_POST['id']);
+            if ($extra_id) {
+                // Persist translations for extra name/description (defaults to provided value in both langs)
+                CB_Translations::save_translation(array(
+                    'string_key' => 'extra_name_' . $extra_id,
+                    'category' => 'extras',
+                    'text_en' => $extra_data['name'],
+                    'text_el' => $extra_data['name'],
+                    'context' => 'Extra name (service ' . $service_id . ')'
+                ));
+                CB_Translations::save_translation(array(
+                    'string_key' => 'extra_desc_' . $extra_id,
+                    'category' => 'extras',
+                    'text_en' => $extra_data['description'],
+                    'text_el' => $extra_data['description'],
+                    'context' => 'Extra description (service ' . $service_id . ')'
+                ));
+            }
         } else {
             $result = CB_Database::add_service_extra($service_id, $extra_data);
             $message = $result ? __('Extra created successfully!', 'cleaning-booking') : __('Error creating extra', 'cleaning-booking');
+            if ($result) {
+                $extra_id = intval($wpdb->insert_id);
+                CB_Translations::save_translation(array(
+                    'string_key' => 'extra_name_' . $extra_id,
+                    'category' => 'extras',
+                    'text_en' => $extra_data['name'],
+                    'text_el' => $extra_data['name'],
+                    'context' => 'Extra name (service ' . $service_id . ')'
+                ));
+                CB_Translations::save_translation(array(
+                    'string_key' => 'extra_desc_' . $extra_id,
+                    'category' => 'extras',
+                    'text_en' => $extra_data['description'],
+                    'text_el' => $extra_data['description'],
+                    'context' => 'Extra description (service ' . $service_id . ')'
+                ));
+            }
         }
         
         wp_send_json_success(array('message' => $message));
@@ -623,6 +759,188 @@ class CB_Admin {
             } else {
                 wp_send_json_error(array('message' => __('Error creating booking', 'cleaning-booking')));
             }
+        }
+    }
+    
+    // Form Fields Page Methods
+    public function form_fields_page() {
+        include CB_PLUGIN_DIR . 'templates/admin/form-fields.php';
+    }
+    
+    public function ajax_save_form_field() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.'));
+        }
+        
+        $data = array(
+            'id' => isset($_POST['field_id']) ? intval($_POST['field_id']) : '',
+            'field_key' => sanitize_text_field($_POST['field_key']),
+            'field_type' => sanitize_text_field($_POST['field_type']),
+            'label_en' => sanitize_text_field($_POST['label_en']),
+            'label_el' => sanitize_text_field($_POST['label_el']),
+            'placeholder_en' => sanitize_text_field($_POST['placeholder_en']),
+            'placeholder_el' => sanitize_text_field($_POST['placeholder_el']),
+            'is_required' => isset($_POST['is_required']) ? 1 : 0,
+            'is_visible' => isset($_POST['is_visible']) ? 1 : 0,
+            'sort_order' => intval($_POST['sort_order']),
+            'validation_rules' => isset($_POST['validation_rules']) ? $_POST['validation_rules'] : array(),
+            'field_options' => isset($_POST['field_options']) ? $_POST['field_options'] : array()
+        );
+        
+        $errors = CB_Form_Fields::validate_field_data($data);
+        if (!empty($errors)) {
+            wp_send_json_error(array('message' => implode(', ', $errors)));
+        }
+        
+        $result = CB_Form_Fields::save_field($data);
+        
+        if ($result !== false) {
+            wp_send_json_success(array('message' => __('Field saved successfully!', 'cleaning-booking')));
+        } else {
+            wp_send_json_error(array('message' => __('Error saving field.', 'cleaning-booking')));
+        }
+    }
+    
+    public function ajax_delete_form_field() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.'));
+        }
+        
+        $field_id = intval($_POST['field_id']);
+        $result = CB_Form_Fields::delete_field($field_id);
+        
+        if ($result) {
+            wp_send_json_success(array('message' => __('Field deleted successfully!', 'cleaning-booking')));
+        } else {
+            wp_send_json_error(array('message' => __('Error deleting field.', 'cleaning-booking')));
+        }
+    }
+    
+    public function ajax_update_field_order() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.'));
+        }
+        
+        $field_orders = $_POST['field_orders'];
+        $result = CB_Form_Fields::update_field_order($field_orders);
+        
+        if ($result) {
+            wp_send_json_success(array('message' => __('Field order updated successfully!', 'cleaning-booking')));
+        } else {
+            wp_send_json_error(array('message' => __('Error updating field order.', 'cleaning-booking')));
+        }
+    }
+    
+    // Duplicate field method removed
+    
+    // Translations Page Methods
+    public function translations_page() {
+        include CB_PLUGIN_DIR . 'templates/admin/translations.php';
+    }
+    
+    public function ajax_save_translation() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.'));
+        }
+        
+        $data = array(
+            'id' => isset($_POST['translation_id']) ? intval($_POST['translation_id']) : '',
+            'string_key' => sanitize_text_field($_POST['string_key']),
+            'category' => sanitize_text_field($_POST['category']),
+            'text_en' => sanitize_textarea_field($_POST['text_en']),
+            'text_el' => sanitize_textarea_field($_POST['text_el']),
+            'context' => sanitize_text_field($_POST['context']),
+            'is_active' => isset($_POST['is_active']) ? 1 : 0
+        );
+        
+        $result = CB_Translations::save_translation($data);
+        
+        if ($result !== false) {
+            wp_send_json_success(array('message' => __('Translation saved successfully!', 'cleaning-booking')));
+        } else {
+            wp_send_json_error(array('message' => __('Error saving translation.', 'cleaning-booking')));
+        }
+    }
+    
+    public function ajax_delete_translation() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.'));
+        }
+        
+        $translation_id = intval($_POST['translation_id']);
+        $result = CB_Translations::delete_translation($translation_id);
+        
+        if ($result) {
+            wp_send_json_success(array('message' => __('Translation deleted successfully!', 'cleaning-booking')));
+        } else {
+            wp_send_json_error(array('message' => __('Error deleting translation.', 'cleaning-booking')));
+        }
+    }
+    
+    public function ajax_bulk_update_translations() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.'));
+        }
+        
+        $updates = $_POST['updates'];
+        $updated = CB_Translations::bulk_update_translations($updates);
+        
+        wp_send_json_success(array(
+            'message' => sprintf(__('%d translations updated successfully!', 'cleaning-booking'), $updated),
+            'updated' => $updated
+        ));
+    }
+    
+    // Import/Export translations removed
+    
+    // Style Settings AJAX Methods
+    public function ajax_save_style_setting() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.'));
+        }
+        
+        $setting_key = sanitize_text_field($_POST['setting_key']);
+        $setting_value = sanitize_text_field($_POST['setting_value']);
+        $setting_type = sanitize_text_field($_POST['setting_type']);
+        $category = sanitize_text_field($_POST['category']);
+        $description = sanitize_text_field($_POST['description']);
+        
+        $result = CB_Style_Manager::save_setting($setting_key, $setting_value, $setting_type, $category, $description);
+        
+        if ($result !== false) {
+            wp_send_json_success(array('message' => __('Setting saved successfully!', 'cleaning-booking')));
+        } else {
+            wp_send_json_error(array('message' => __('Error saving setting.', 'cleaning-booking')));
+        }
+    }
+    
+    public function ajax_reset_style_settings() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.'));
+        }
+        
+        $result = CB_Style_Manager::reset_to_default();
+        
+        if ($result) {
+            wp_send_json_success(array('message' => __('Style settings reset to default successfully!', 'cleaning-booking')));
+        } else {
+            wp_send_json_error(array('message' => __('Error resetting style settings.', 'cleaning-booking')));
         }
     }
     

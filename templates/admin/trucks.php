@@ -169,37 +169,51 @@ if (!defined('ABSPATH')) {
 </div>
 
 <script>
-jQuery(document).ready(function($) {
+document.addEventListener('DOMContentLoaded', function() {
     // Edit truck functionality
-    $('.cb-edit-truck').on('click', function() {
-        var truckId = $(this).data('truck-id');
-        
-        // Get truck data (you might want to fetch this via AJAX)
-        // For now, we'll populate from the table row
-        var row = $(this).closest('tr');
-        var truckName = row.find('td:nth-child(2)').text();
-        var truckNumber = row.find('td:nth-child(3)').text();
-        var isActive = row.find('.cb-status').hasClass('cb-status-active');
-        
-        // Populate form
-        $('#edit_truck_id').val(truckId);
-        $('#edit_truck_name').val(truckName);
-        $('#edit_truck_number').val(truckNumber === '-' ? '' : truckNumber);
-        $('#edit_is_active').prop('checked', isActive);
-        
-        // Show modal
-        $('#cb-edit-truck-modal').show();
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.cb-edit-truck')) {
+            const editBtn = e.target.closest('.cb-edit-truck');
+            const truckId = editBtn.dataset.truckId;
+            
+            // Get truck data (you might want to fetch this via AJAX)
+            // For now, we'll populate from the table row
+            const row = editBtn.closest('tr');
+            const truckName = row.querySelector('td:nth-child(2)').textContent;
+            const truckNumber = row.querySelector('td:nth-child(3)').textContent;
+            const statusElement = row.querySelector('.cb-status');
+            const isActive = statusElement && statusElement.classList.contains('cb-status-active');
+            
+            // Populate form
+            const editTruckId = document.getElementById('edit_truck_id');
+            const editTruckName = document.getElementById('edit_truck_name');
+            const editTruckNumber = document.getElementById('edit_truck_number');
+            const editIsActive = document.getElementById('edit_is_active');
+            
+            if (editTruckId) editTruckId.value = truckId;
+            if (editTruckName) editTruckName.value = truckName;
+            if (editTruckNumber) editTruckNumber.value = truckNumber === '-' ? '' : truckNumber;
+            if (editIsActive) editIsActive.checked = isActive;
+            
+            // Show modal
+            const modal = document.getElementById('cb-edit-truck-modal');
+            if (modal) modal.style.display = 'block';
+        }
     });
     
     // Close modal
-    $('.cb-modal-close, .cb-modal-cancel').on('click', function() {
-        $('#cb-edit-truck-modal').hide();
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.cb-modal-close') || e.target.closest('.cb-modal-cancel')) {
+            const modal = document.getElementById('cb-edit-truck-modal');
+            if (modal) modal.style.display = 'none';
+        }
     });
     
     // Close modal when clicking outside
-    $(window).on('click', function(e) {
+    window.addEventListener('click', function(e) {
         if (e.target.id === 'cb-edit-truck-modal') {
-            $('#cb-edit-truck-modal').hide();
+            const modal = document.getElementById('cb-edit-truck-modal');
+            if (modal) modal.style.display = 'none';
         }
     });
 });

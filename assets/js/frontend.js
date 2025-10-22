@@ -12,7 +12,7 @@
             tools: {},
             ajax_url: '',
             nonce: '',
-            current_language: 'en',
+            current_language: 'el',
             translations: {},
             strings: {},
             // Add all possible properties that other scripts might expect
@@ -34,7 +34,7 @@
                     tools: {},
                     ajax_url: '',
                     nonce: '',
-                    current_language: 'en',
+                    current_language: 'el',
                     translations: {},
                     strings: {},
                     init: function() {},
@@ -69,7 +69,7 @@ document.addEventListener('DOMContentLoaded', function() {
         cb_frontend.nonce = '';
     }
     if (!cb_frontend.current_language) {
-        cb_frontend.current_language = 'en';
+        cb_frontend.current_language = 'el';
     }
     if (!cb_frontend.translations) {
         cb_frontend.translations = {};
@@ -125,6 +125,11 @@ document.addEventListener('DOMContentLoaded', function() {
         initializeDatePicker();
         updateSidebarDisplay();
         initializeLanguage();
+        
+        // Update UI translations on initialization
+        setTimeout(() => {
+            updateUITranslations();
+        }, 100);
         
         // Debug: Check if custom colors are loaded
         if (cb_frontend.colors) {
@@ -215,8 +220,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function initializeLanguage() {
-        // Check for saved language preference
-        const savedLanguage = localStorage.getItem('cb_language') || cb_frontend.current_language;
+        // Check for saved language preference, default to Greek
+        const savedLanguage = localStorage.getItem('cb_language') || 'el';
         
         // Set active language in selector
         const languageSelector = document.querySelector('.cb-language-selector');
@@ -313,7 +318,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Use default duration since pricing is disabled
         const sidebarDuration = document.getElementById('cb-sidebar-duration');
         if (sidebarDuration) {
-            sidebarDuration.textContent = '2 hours';
+            const hoursText = cb_frontend.strings.hours || 'ώρες';
+            sidebarDuration.textContent = `2 ${hoursText}`;
         }
     }
     
@@ -353,6 +359,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const languageSelector = document.querySelector('.cb-language-selector');
         if (languageSelector) {
             languageSelector.addEventListener('change', handleLanguageSwitch);
+        }
+
+        // Checkout button
+        const proceedCheckoutBtn = document.getElementById('cb-proceed-checkout');
+        if (proceedCheckoutBtn) {
+            proceedCheckoutBtn.addEventListener('click', proceedToCheckout);
         }
 
         // Checkout button
@@ -463,7 +475,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }).catch(function(error) {
             console.error('Validation error:', error);
             clearTimeout(timeoutId); // Clear timeout since validation failed
-            showNotification('Validation failed. Please try again.', 'error');
+            showNotification(cb_frontend.translations['Validation failed. Please try again.'] || 'Η επικύρωση απέτυχε. Παρακαλούμε προσπαθήστε ξανά.', 'error');
         }).finally(function() {
             // Restore button state
             button.disabled = false;
@@ -480,6 +492,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         currentStep--;
         updateStepDisplay();
+        
+        // Scroll to header when going back to previous step (with small delay for smooth transition)
+        setTimeout(() => {
+            scrollToHeader();
+        }, 100);
     }
     
     function checkAndCalculatePrice() {
@@ -501,7 +518,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Update button states
         updateButtonStates();
-    } 
+    }
     
     function handleDateChange(e) {
         bookingData.booking_date = e.target.value;
@@ -626,7 +643,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const clickedSlot = e.target.closest('.cb-time-slot');
         
         if (clickedSlot.classList.contains('unavailable')) {
-            showNotification('This time slot is already booked. Please select another time.', 'warning');
+            // Show a tooltip or message that this slot is booked
+            showNotification(cb_frontend.translations['This time slot is already booked. Please select another time.'] || 'Αυτή η χρονική περίοδος είναι ήδη κρατημένη. Παρακαλούμε επιλέξτε άλλη ώρα.', 'warning');
             return;
         }
         
@@ -651,6 +669,15 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (proceedCheckoutBtn) {
             proceedCheckoutBtn.disabled = false;
+        // Enable both checkout buttons when time slot is selected
+        const proceedCheckoutBtn = document.getElementById('cb-proceed-checkout');
+        const sidebarCheckout = document.getElementById('cb-sidebar-checkout');
+        
+        if (proceedCheckoutBtn) {
+            proceedCheckoutBtn.disabled = false;
+        }
+        if (sidebarCheckout) {
+            sidebarCheckout.disabled = false;
         }
         if (sidebarCheckout) {
             sidebarCheckout.disabled = false;
@@ -710,6 +737,33 @@ document.addEventListener('DOMContentLoaded', function() {
                         updateServiceTitle();
                     }
                     
+                    // Update extras with translated data
+                    if (response.data.extras) {
+                        // Update extras for currently selected service
+                        const selectedService = getSelectedService();
+                        if (selectedService) {
+                            const serviceExtras = response.data.extras.filter(extra => extra.service_id === selectedService.id);
+                            displayExtras(serviceExtras);
+                        }
+                    }
+                    
+                    // Update form fields with translated data
+                    if (response.data.form_fields) {
+                        cb_frontend.form_fields = response.data.form_fields;
+                        // Re-render form fields if we're on a form step
+                        if (currentStep >= 2) {
+                            updateFormFields();
+                        }
+                    }
+                    
+                    // Update available slots with translated data
+                    if (response.data.available_slots) {
+                        // Re-render time slots if we're on the time selection step
+                        if (currentStep >= 3) {
+                            displayTimeSlots(response.data.available_slots);
+                        }
+                    }
+                    
                     // Update UI text
                     updateUITranslations();
                     
@@ -752,6 +806,12 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (!translations || Object.keys(translations).length === 0) {
             return; // No translations available
+        }
+        
+        // Update main title
+        if (translations['Book Your Cleaning Service']) {
+            const mainTitle = document.querySelector('.cb-title');
+            if (mainTitle) mainTitle.textContent = translations['Book Your Cleaning Service'];
         }
         
         // Update step labels
@@ -816,7 +876,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (zipLabel) zipLabel.textContent = translations['ZIP Code'];
         }
         if (translations['Space (m²)']) {
+        if (translations['Space (m²)']) {
             const spaceLabel = document.querySelector('label[for="cb-square-meters"]');
+            if (spaceLabel) spaceLabel.textContent = translations['Space (m²)'];
             if (spaceLabel) spaceLabel.textContent = translations['Space (m²)'];
         }
         if (translations['Additional Services']) {
@@ -830,13 +892,19 @@ document.addEventListener('DOMContentLoaded', function() {
             if (dateLabel) dateLabel.textContent = translations['Date'];
         }
         if (translations['Available Time Slots']) {
-            const timeLabel = document.querySelector('.cb-step-4 label');
+            const timeLabel = document.querySelector('.cb-step-4 .cb-form-group:last-child label');
             if (timeLabel) timeLabel.textContent = translations['Available Time Slots'];
+        }
+        
+        // Update info banner
+        if (translations['Our contractors have all the necessary cleaning products and equipment']) {
+            const infoBanner = document.querySelector('.cb-info-text');
+            if (infoBanner) infoBanner.textContent = translations['Our contractors have all the necessary cleaning products and equipment'];
         }
         
         // Update buttons
         if (translations['Check Availability']) {
-            const checkBtn = document.querySelector('.cb-check-availability');
+            const checkBtn = document.querySelector('.cb-next-step[data-next="2"]');
             if (checkBtn) checkBtn.textContent = translations['Check Availability'];
         }
         if (translations['Back']) {
@@ -846,6 +914,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     btn.textContent = translations['Back'];
                 }
             });
+        }
+        if (translations['Proceed to Checkout']) {
+            const checkoutBtn = document.querySelector('#cb-sidebar-checkout');
+            if (checkoutBtn) {
+                const priceSpan = checkoutBtn.querySelector('#cb-checkout-price');
+                const price = priceSpan ? priceSpan.textContent : '€0.00';
+                checkoutBtn.innerHTML = `<span id="cb-checkout-price">${price}</span> - ${translations['Proceed to Checkout']}`;
+            }
         }
         if (translations['Continue']) {
             const continueBtns = document.querySelectorAll('.cb-next-step');
@@ -861,9 +937,17 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Update sidebar content
-        if (translations['Please select a service to see pricing']) {
+        if (translations['Select a service to see pricing']) {
             const sidebarTitle = document.querySelector('#cb-sidebar-service-title');
-            if (sidebarTitle) sidebarTitle.textContent = translations['Please select a service to see pricing'];
+            if (sidebarTitle) sidebarTitle.textContent = translations['Select a service to see pricing'];
+        }
+        if (translations['Base Service Included']) {
+            const baseServiceLabel = document.querySelector('.cb-sidebar-base-service .cb-sidebar-label');
+            if (baseServiceLabel) baseServiceLabel.textContent = translations['Base Service Included'];
+        }
+        if (translations['Additional Services']) {
+            const additionalServicesLabel = document.querySelector('.cb-sidebar-extras .cb-sidebar-label');
+            if (additionalServicesLabel) additionalServicesLabel.textContent = translations['Additional Services'];
         }
         if (translations['Our contractors have all the necessary cleaning products and equipment']) {
             const infoText = document.querySelector('.cb-info-box p');
@@ -887,132 +971,159 @@ document.addEventListener('DOMContentLoaded', function() {
             const spacePlaceholder = document.querySelector('#cb-square-meters + small');
             if (spacePlaceholder) spacePlaceholder.textContent = translations['Enter additional space beyond the default area, or leave as 0 to skip'];
         }
-    }
-    
-  function proceedToCheckout() {
-    if (!validateBookingData()) {
-        return;
-    }
-
-    // Show loading state
-    const proceedCheckoutBtn = document.getElementById('cb-proceed-checkout');
-    const sidebarCheckout = document.getElementById('cb-sidebar-checkout');
-    
-    if (proceedCheckoutBtn) {
-        proceedCheckoutBtn.disabled = true;
-        proceedCheckoutBtn.textContent = cb_frontend.strings.processing;
-    }
-    if (sidebarCheckout) {
-        sidebarCheckout.disabled = true;
-        sidebarCheckout.textContent = cb_frontend.strings.processing;
-    }
-
-    // Store booking data in session instead of creating booking immediately
-    const formData = new FormData();
-    formData.append('action', 'cb_store_booking_session');
-    formData.append('nonce', cb_frontend.nonce);
-    
-    // Add booking data to store in session
-    const sessionData = {
-        zip_code: bookingData.zip_code,
-        service_id: bookingData.service_id,
-        square_meters: bookingData.square_meters,
-        extras: bookingData.extras || [],
-        booking_date: bookingData.booking_date,
-        booking_time: bookingData.booking_time,
-        pricing: bookingData.pricing || {}
-    };
-    
-    formData.append('booking_data', JSON.stringify(sessionData));
-
-    console.log('Storing booking data in session:', sessionData);
-
-    // Store booking data in session
-    fetch(cb_frontend.ajax_url, {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(response => {
-        console.log('Session storage response:', response);
         
-        if (response.success) {
-            // Release the held slot since we're moving to checkout
-            if (currentSlotSessionId) {
-                releaseSlot();
-            }
-            
-            // Show success message
-            showSuccessMessage('Redirecting to checkout...');
-            
-            // Redirect to WooCommerce checkout with session reference
-            if (response.data.checkout_url) {
-                console.log('Redirecting to checkout URL:', response.data.checkout_url);
-                window.location.replace(response.data.checkout_url);
-            } else {
-                console.error('No checkout URL provided');
-                showNotification('Checkout URL not available. Please try again.', 'error');
-                restoreButtonState();
-            }
-        } else {
-            console.error('Session storage failed:', response);
-            showNotification(response.data.message || 'Failed to proceed to checkout. Please try again.', 'error');
-            restoreButtonState();
+        // Update Step 3 pricing labels
+        if (translations['Service Price:']) {
+            const servicePriceLabel = document.querySelector('.cb-step-3 .cb-price-item:first-child span:first-child');
+            if (servicePriceLabel) servicePriceLabel.textContent = translations['Service Price:'];
         }
-    })
-    .catch(error => {
-    console.error('Fetch error:', error);
+        if (translations['Extras:']) {
+            const extrasLabel = document.querySelector('.cb-step-3 .cb-price-item:nth-child(2) span:first-child');
+            if (extrasLabel) extrasLabel.textContent = translations['Extras:'];
+        }
+        if (translations['Total:']) {
+            const totalLabel = document.querySelector('.cb-step-3 .cb-price-total span:first-child');
+            if (totalLabel) totalLabel.textContent = translations['Total:'];
+        }
+        if (translations['Service Duration:']) {
+            const serviceDurationLabel = document.querySelector('.cb-step-3 .cb-duration-item:first-child span:first-child');
+            if (serviceDurationLabel) serviceDurationLabel.textContent = translations['Service Duration:'];
+        }
+        if (translations['Extras Duration:']) {
+            const extrasDurationLabel = document.querySelector('.cb-step-3 .cb-duration-item:nth-child(2) span:first-child');
+            if (extrasDurationLabel) extrasDurationLabel.textContent = translations['Extras Duration:'];
+        }
+        if (translations['Total Duration:']) {
+            const totalDurationLabel = document.querySelector('.cb-step-3 .cb-duration-total span:first-child');
+            if (totalDurationLabel) totalDurationLabel.textContent = translations['Total Duration:'];
+        }
+    }
     
-    // Check if it's a JSON parse error (HTML response)
-    if (error instanceof SyntaxError && error.message.includes('JSON')) {
-        showNotification('Server error occurred. Please try again or contact support.', 'error');
-        console.error('Server returned HTML instead of JSON - likely a PHP error');
-        
-        // Try to get the response text to see the actual error
+    function proceedToCheckout() {
+        if (!validateBookingData()) {
+            return;
+        }
+    
+        // Show loading state
+        const proceedCheckoutBtn = document.getElementById('cb-proceed-checkout');
+        const sidebarCheckout = document.getElementById('cb-sidebar-checkout');
+    
+        if (proceedCheckoutBtn) {
+            proceedCheckoutBtn.disabled = true;
+            proceedCheckoutBtn.textContent = cb_frontend.strings.processing;
+        }
+        if (sidebarCheckout) {
+            sidebarCheckout.disabled = true;
+            sidebarCheckout.textContent = cb_frontend.strings.processing;
+        }
+    
+        // Store booking data in session instead of creating booking immediately
+        const formData = new FormData();
+        formData.append('action', 'cb_store_booking_session');
+        formData.append('nonce', cb_frontend.nonce);
+    
+        // Add booking data to store in session
+        const sessionData = {
+            zip_code: bookingData.zip_code,
+            service_id: bookingData.service_id,
+            square_meters: bookingData.square_meters,
+            extras: bookingData.extras || [],
+            booking_date: bookingData.booking_date,
+            booking_time: bookingData.booking_time,
+            pricing: bookingData.pricing || {}
+        };
+    
+        formData.append('booking_data', JSON.stringify(sessionData));
+    
+        console.log('Storing booking data in session:', sessionData);
+    
+        // Store booking data in session
         fetch(cb_frontend.ajax_url, {
             method: 'POST',
             body: formData
         })
-        .then(response => response.text())
-        .then(html => {
-            console.error('Server returned HTML:', html.substring(0, 500)); // Log first 500 chars
-        });
-    } else {
-        showNotification('Network error. Please check your connection and try again.', 'error');
-    }
-    restoreButtonState();
-});
-
-    function restoreButtonState() {
-        if (proceedCheckoutBtn) {
-            proceedCheckoutBtn.disabled = false;
-            proceedCheckoutBtn.textContent = 'Proceed to Checkout';
+        .then(response => response.json())
+        .then(response => {
+            console.log('Session storage response:', response);
+    
+            if (response.success) {
+                // Release the held slot since we're moving to checkout
+                if (currentSlotSessionId) {
+                    releaseSlot();
+                }
+    
+                // Show success message
+                showSuccessMessage('Redirecting to checkout...');
+    
+                // Redirect to WooCommerce checkout with session reference
+                if (response.data.checkout_url) {
+                    console.log('Redirecting to checkout URL:', response.data.checkout_url);
+                    window.location.replace(response.data.checkout_url);
+                } else {
+                    console.error('No checkout URL provided');
+                    showNotification('Checkout URL not available. Please try again.', 'error');
+                    restoreButtonState();
+                }
+            } else {
+                console.error('Session storage failed:', response);
+                showNotification(response.data.message || 'Failed to proceed to checkout. Please try again.', 'error');
+                restoreButtonState();
+            }
+        })
+        .catch(error => {
+        console.error('Fetch error:', error);
+    
+        // Check if it's a JSON parse error (HTML response)
+        if (error instanceof SyntaxError && error.message.includes('JSON')) {
+            showNotification(cb_frontend.strings.server_error || 'Σφάλμα διακομιστή. Παρακαλούμε προσπαθήστε ξανά ή επικοινωνήστε με την υποστήριξη.', 'error');
+            console.error('Server returned HTML instead of JSON - likely a PHP error');
+    
+            // Try to get the response text to see the actual error
+            fetch(cb_frontend.ajax_url, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.text())
+            .then(html => {
+                console.error('Server returned HTML:', html.substring(0, 500)); // Log first 500 chars
+            });
+        } else {
+            showNotification(cb_frontend.translations['Network error. Please check your connection and try again.'] || 'Σφάλμα δικτύου. Παρακαλούμε ελέγξτε τη σύνδεσή σας και προσπαθήστε ξανά.', 'error');
         }
-        if (sidebarCheckout) {
-            sidebarCheckout.disabled = false;
-            sidebarCheckout.textContent = 'Proceed to Checkout';
+        restoreButtonState();
+    });
+    
+        function restoreButtonState() {
+            if (proceedCheckoutBtn) {
+                proceedCheckoutBtn.disabled = false;
+                proceedCheckoutBtn.textContent = cb_frontend.translations['Proceed to Checkout'] || 'Προχωρήστε στην Αγορά';
+            }
+            if (sidebarCheckout) {
+                sidebarCheckout.disabled = false;
+                sidebarCheckout.textContent = cb_frontend.translations['Proceed to Checkout'] || 'Προχωρήστε στην Αγορά';
+            }
         }
     }
 }
     function validateBookingData() {
         // Validate only the essential booking data
         if (!bookingData.zip_code) {
-            showNotification('ZIP code is required', 'error');
+            showNotification(cb_frontend.translations['ZIP code is required'] || 'Απαιτείται ταχυδρομικός κώδικας', 'error');
             return false;
         }
         
         if (!bookingData.service_id) {
-            showNotification('Please select a service', 'error');
+            showNotification(cb_frontend.translations['Please select a service'] || 'Παρακαλούμε επιλέξτε υπηρεσία', 'error');
             return false;
         }
         
         if (!bookingData.booking_date) {
-            showNotification('Please select a date', 'error');
+            showNotification(cb_frontend.translations['Please select a date'] || 'Παρακαλούμε επιλέξτε ημερομηνία', 'error');
             return false;
         }
         
         if (!bookingData.booking_time) {
-            showNotification('Please select a time slot', 'error');
+            showNotification(cb_frontend.translations['Please select a time slot'] || 'Παρακαλούμε επιλέξτε χρονική περίοδο', 'error');
             return false;
         }
         
@@ -1083,7 +1194,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (response.success && response.data.available) {
                         hideError('cb-zip-error');
                         bookingData.zip_code = zipCode; // Save valid ZIP code
-                        showNotification('Great! We provide services in your area.', 'success');
+                        showNotification(cb_frontend.translations['Great! We provide services in your area.'] || 'Τέλεια! Παρέχουμε υπηρεσίες στην περιοχή σας.', 'success');
                         resolve(true);
                     } else {
                         showError('cb-zip-error', response.data.message || cb_frontend.strings.zip_unavailable);
@@ -1118,13 +1229,13 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Allow 0 for skipping, only validate if user enters a positive number
             if (squareMeters < 0) {
-                showError('cb-sqm-error', 'Square meters cannot be negative');
+                showError('cb-sqm-error', cb_frontend.translations['Square meters cannot be negative'] || 'Τα τετραγωνικά μέτρα δεν μπορούν να είναι αρνητικά');
                 resolve(false);
                 return;
             }
             
             if (squareMeters > 1000) {
-                showError('cb-sqm-error', 'Maximum 1000 square meters allowed');
+                showError('cb-sqm-error', cb_frontend.translations['Maximum 1000 square meters allowed'] || 'Επιτρέπονται μέχρι 1000 τετραγωνικά μέτρα');
                 resolve(false);
                 return;
             }
@@ -1152,6 +1263,8 @@ document.addEventListener('DOMContentLoaded', function() {
         hideError('cb-time-error');
         return true;
     }
+    
+    // Price calculation function removed - pricing disabled for now
     
     function loadAvailableSlots() {
         if (!bookingData.booking_date) {
@@ -1293,6 +1406,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 break;
             case 3:
+                // Service details step
                 console.log('Step 3 - service_id:', bookingData.service_id);
                 
                 if (bookingData.service_id) {
@@ -1310,6 +1424,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.log('Step 3 - calling loadExtras');
                     loadExtras();
                 } else {
+                    console.log('Step 3 - calling displayExtras');
                     console.log('Step 3 - calling displayExtras');
                     displayExtras();
                     
@@ -1332,6 +1447,34 @@ document.addEventListener('DOMContentLoaded', function() {
         
         updateSidebarDisplay();
         updateButtonStates();
+        
+        // Scroll to header when moving to next step (with small delay for smooth transition)
+        setTimeout(() => {
+            scrollToHeader();
+        }, 100);
+    }
+    
+    function scrollToHeader() {
+        // Find the booking widget header
+        const bookingHeader = document.querySelector('.cb-header');
+        if (bookingHeader) {
+            // Scroll to the header of the booking widget, not the very top of the page
+            bookingHeader.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'start',
+                inline: 'nearest'
+            });
+        } else {
+            // Fallback to the entire widget if header not found
+            const bookingWidget = document.querySelector('.cb-widget');
+            if (bookingWidget) {
+                bookingWidget.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'start',
+                    inline: 'nearest'
+                });
+            }
+        }
     }
     
     function updateButtonStates() {
@@ -1357,8 +1500,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 break;
             case 4:
-                // For Step 4, the "Continue" button is replaced with "Proceed to Checkout"
-                // which is enabled when time slot is selected (handled in handleTimeSlotSelect)
                 break;
         }
     }
@@ -1467,14 +1608,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="cb-service-details">
                         <div class="cb-service-price">
                             <span class="cb-price-current">€${parseFloat(service.base_price).toFixed(2)}</span>
+                            <span class="cb-price-current">€${parseFloat(service.base_price).toFixed(2)}</span>
                         </div>
                         <div class="cb-service-duration">
-                            <span class="cb-duration-label">Duration:</span>
-                            <span class="cb-duration-value">${service.base_duration} min</span>
+                            <span class="cb-duration-label">${cb_frontend.translations['Duration:'] || 'Διάρκεια:'}</span>
+                            <span class="cb-duration-value">${service.base_duration} ${cb_frontend.translations['minutes'] || 'λεπτά'}</span>
                         </div>
                         ${service.default_area > 0 ? `
                         <div class="cb-service-area">
-                            <span class="cb-area-label">Includes:</span>
+                            <span class="cb-area-label">${cb_frontend.translations['Includes:'] || 'Περιλαμβάνει:'}</span>
                             <span class="cb-area-value">${service.default_area} m²</span>
                         </div>
                         ` : ''}
@@ -1514,7 +1656,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Show hint about additional area
         if (hintElement) {
             hintElement.style.display = 'block';
-            hintElement.innerHTML = `<small>Enter additional space beyond the default ${service.default_area} m², or leave as 0 to skip</small>`;
+            const hintText = cb_frontend.translations['Enter additional space beyond the default area, or leave as 0 to skip'] || 'Εισάγετε επιπλέον χώρο πέρα από την προεπιλεγμένη περιοχή, ή αφήστε 0 για παράλειψη';
+            hintElement.innerHTML = `<small>${hintText.replace('default area', `default ${service.default_area} m²`)}</small>`;
         }
         
         // Show base area info card
@@ -1522,14 +1665,18 @@ document.addEventListener('DOMContentLoaded', function() {
             baseAreaInfo.style.display = 'block';
             
             // Set base area message with skip option
-            baseAreaMessage.textContent = `This service includes ${service.default_area} m² at base price. Enter additional space above if needed, or skip to proceed with base service.`;
+            const baseMessage = cb_frontend.translations['This service includes 50 m² at base price. Enter additional space above if needed, or skip to proceed with base service.'] || 'Αυτή η υπηρεσία περιλαμβάνει 50 m² σε βασική τιμή. Εισάγετε επιπλέον χώρο παραπάνω αν χρειάζεται, ή παραλείψτε για να προχωρήσετε με τη βασική υπηρεσία.';
+            baseAreaMessage.textContent = baseMessage.replace('50 m²', `${service.default_area} m²`);
             
             // Calculate and display base pricing
             const basePrice = parseFloat(service.base_price) || 0;
             const baseDuration = parseInt(service.base_duration, 10) || 0;
             
-            basePriceDisplay.textContent = `Base Price: $${basePrice.toFixed(2)}`;
-            baseDurationDisplay.textContent = `Base Duration: ${baseDuration} min`;
+            const basePriceText = cb_frontend.translations['Base Price: $80.00'] || 'Βασική Τιμή: €80.00';
+            const baseDurationText = cb_frontend.translations['Base Duration: 20 min'] || 'Βασική Διάρκεια: 20 λεπτά';
+            
+            basePriceDisplay.textContent = basePriceText.replace('€80.00', `€${basePrice.toFixed(2)}`);
+            baseDurationDisplay.textContent = baseDurationText.replace('20 λεπτά', `${baseDuration} λεπτά`);
         }
         
         // Clear the input field and set to 0 (no additional area)
@@ -1597,9 +1744,10 @@ document.addEventListener('DOMContentLoaded', function() {
         extrasContainer.innerHTML = '';
         
         if (extras.length === 0) {
+            const noExtrasText = cb_frontend.translations['No additional services available for this service. You can proceed to the next step.'] || 'Δεν υπάρχουν διαθέσιμες επιπλέον υπηρεσίες για αυτή την υπηρεσία. Μπορείτε να προχωρήσετε στο επόμενο βήμα.';
             extrasContainer.innerHTML = '<div class="cb-extras-optional">' + 
                 '<p style="color: ' + (cb_frontend.colors?.text || '#666') + '; font-style: italic; text-align: center; padding: 20px;">' +
-                'No additional services available for this service. You can proceed to the next step.' +
+                noExtrasText +
                 '</p></div>';
             return;
         }
@@ -1623,6 +1771,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="cb-extra-info">
                         <div class="cb-extra-name">${extra.name}</div>
                         <div class="cb-extra-description">${extra.description}</div>
+                        <div class="cb-extra-price">€${parseFloat(extra.price).toFixed(2)}</div>
                         <div class="cb-extra-price">€${parseFloat(extra.price).toFixed(2)}</div>
                     </div>
             `;
@@ -1744,13 +1893,13 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Price calculation error:', error);
             
             // Show user-friendly error message
-            showNotification('Unable to calculate price. Please try again.', 'error');
+            showNotification(cb_frontend.translations['Unable to calculate price. Please try again.'] || 'Δεν είναι δυνατός ο υπολογισμός της τιμής. Παρακαλούμε προσπαθήστε ξανά.', 'error');
                 
                 // Try to extract JSON from mixed response
                 try {
                 if (error.message && error.message.includes('Invalid JSON')) {
                     console.error('Server returned HTML instead of JSON - likely a PHP error');
-                    showNotification('Server error occurred. Please check your configuration.', 'error');
+                    showNotification(cb_frontend.strings.server_error || 'Σφάλμα διακομιστή. Παρακαλούμε ελέγξτε τη διαμόρφωσή σας.', 'error');
                     }
                 } catch (e) {
                 console.error('Could not extract error details:', e);
@@ -1810,6 +1959,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 step3ExtrasPrice.textContent = formatPrice(pricing.extras_price);
             } else {
                 step3ExtrasPrice.textContent = '€0.00';
+                step3ExtrasPrice.textContent = '€0.00';
             }
         }
         if (step3TotalPrice) step3TotalPrice.textContent = formatPrice(pricing.total_price);
@@ -1844,6 +1994,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function formatPrice(price) {
+        return '€' + parseFloat(price).toFixed(2);
         return '€' + parseFloat(price).toFixed(2);
     }
     
@@ -1986,6 +2137,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    // Initialize default payment method selection when step 5 is displayed
+    function initializePaymentMethod() {
+        if (currentStep === 5) {
+            // Set default selection to cash
+            const cashOption = document.querySelector('.cb-payment-option[data-payment="cash"]');
+            if (cashOption) {
+                cashOption.classList.add('selected');
+            }
+            bookingData.payment_method = 'cash';
+            
+            // Update button states
+            updateButtonStates();
+        }
+    }
+    
     // Add database check function for debugging
     window.checkDatabaseStatus = function() {
         const formData = new FormData();
@@ -2046,6 +2212,73 @@ document.addEventListener('DOMContentLoaded', function() {
         
         keysToRemove.forEach(key => {
             localStorage.removeItem(key);
+        });
+    }
+    
+    // Helper function to get currently selected service
+    function getSelectedService() {
+        const selectedServiceCard = document.querySelector('.cb-service-card.selected');
+        if (selectedServiceCard) {
+            const serviceId = parseInt(selectedServiceCard.dataset.serviceId);
+            return services.find(service => service.id === serviceId);
+        }
+        return null;
+    }
+    
+    // Helper function to update form fields with new translations
+    function updateFormFields() {
+        // Update field labels
+        const fieldLabels = document.querySelectorAll('.cb-form-group label');
+        fieldLabels.forEach(label => {
+            const fieldKey = label.dataset.fieldKey;
+            if (fieldKey && cb_frontend.form_fields && cb_frontend.form_fields[fieldKey]) {
+                label.textContent = cb_frontend.form_fields[fieldKey].label;
+            }
+        });
+        
+        // Update field placeholders
+        const fieldInputs = document.querySelectorAll('.cb-form-group input, .cb-form-group textarea, .cb-form-group select');
+        fieldInputs.forEach(input => {
+            const fieldKey = input.dataset.fieldKey;
+            if (fieldKey && cb_frontend.form_fields && cb_frontend.form_fields[fieldKey]) {
+                input.placeholder = cb_frontend.form_fields[fieldKey].placeholder;
+            }
+        });
+    }
+    
+    // Helper function to display time slots with new data
+    function displayTimeSlots(slotsData) {
+        if (!slotsData) {
+            return;
+        }
+        
+        const timeSlotsContainer = document.querySelector('.cb-time-slots');
+        if (!timeSlotsContainer) {
+            return;
+        }
+        
+        // Clear existing slots
+        timeSlotsContainer.innerHTML = '';
+        
+        // Display slots for each date
+        Object.keys(slotsData).forEach(dateKey => {
+            const dateData = slotsData[dateKey];
+            const dateElement = document.createElement('div');
+            dateElement.className = 'cb-date-group';
+            dateElement.innerHTML = `
+                <h4>${dateData.date}</h4>
+                <div class="cb-time-grid">
+                    ${dateData.slots.map(slot => `
+                        <button class="cb-time-slot ${slot.available ? 'available' : 'unavailable'}" 
+                                data-time="${slot.time}" 
+                                data-date="${dateData.date}"
+                                ${!slot.available ? 'disabled' : ''}>
+                            ${slot.time}
+                        </button>
+                    `).join('')}
+                </div>
+            `;
+            timeSlotsContainer.appendChild(dateElement);
         });
     }
 });
