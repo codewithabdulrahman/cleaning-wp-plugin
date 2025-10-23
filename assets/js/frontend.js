@@ -299,6 +299,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function updateServiceTitle() {
         let title = cb_frontend.strings.select_service;
+        let iconHtml = '';
+        
         if (bookingData.service_id) {
             const service = services.find(s => s.id == bookingData.service_id);
             if (service) {
@@ -306,11 +308,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (bookingData.square_meters) {
                     title += ' (' + bookingData.square_meters + ' m²)';
                 }
+                
+                // Add service icon if available
+                if (service.icon_url) {
+                    iconHtml = `<img src="${service.icon_url}" alt="${service.name}" class="cb-sidebar-service-icon" style="width: 20px; height: 20px; margin-right: 8px; vertical-align: middle; object-fit: contain;">`;
+                } else {
+                    iconHtml = `<span class="cb-sidebar-service-icon" style="margin-right: 8px;">🧹</span>`;
+                }
             }
         }
+        
         const sidebarServiceTitle = document.getElementById('cb-sidebar-service-title');
         if (sidebarServiceTitle) {
-            sidebarServiceTitle.textContent = title;
+            sidebarServiceTitle.innerHTML = iconHtml + title;
         }
     }
     
@@ -1344,7 +1354,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (service) {
             const summaryService = document.getElementById('cb-summary-service');
             if (summaryService) {
-                summaryService.textContent = service.name;
+                let iconHtml = '';
+                if (service.icon_url) {
+                    iconHtml = `<img src="${service.icon_url}" alt="${service.name}" class="cb-summary-service-icon" style="width: 16px; height: 16px; margin-right: 6px; vertical-align: middle; object-fit: contain;">`;
+                } else {
+                    iconHtml = `<span class="cb-summary-service-icon" style="margin-right: 6px; font-size: 14px;">🧹</span>`;
+                }
+                summaryService.innerHTML = iconHtml + service.name;
             }
         }
         
@@ -1551,6 +1567,13 @@ document.addEventListener('DOMContentLoaded', function() {
             
                 if (response.success && response.data.services) {
                     services = response.data.services;
+                    // Debug: Check if icon_url is present
+                    console.log('Services loaded:', services);
+                    if (services.length > 0) {
+                        console.log('First service:', services[0]);
+                        console.log('Has icon_url:', 'icon_url' in services[0]);
+                        console.log('icon_url value:', services[0].icon_url);
+                    }
                     displayServices();
                 } else {
                 if (servicesContainer) {
@@ -1587,51 +1610,60 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    function displayServices() {
-        const servicesContainer = document.getElementById('cb-services-container');
-        if (!servicesContainer) return;
-        
-        servicesContainer.innerHTML = '';
-        
-        services.forEach(function(service) {
-            const isSelected = bookingData.service_id == service.id;
-            const selectedClass = isSelected ? ' selected' : '';
-            
-            const cardElement = document.createElement('div');
-            cardElement.className = `cb-service-card${selectedClass}`;
-            cardElement.dataset.serviceId = service.id;
-            
-            cardElement.innerHTML = `
-                    <div class="cb-service-icon">🧹</div>
-                    <h4>${service.name}</h4>
-                    <p>${service.description}</p>
-                    <div class="cb-service-details">
-                        <div class="cb-service-price">
-                            <span class="cb-price-current">€${parseFloat(service.base_price).toFixed(2)}</span>
-                        </div>
-                        <div class="cb-service-duration">
-                            <span class="cb-duration-label">${cb_frontend.translations['Duration:'] || 'Διάρκεια:'}</span>
-                            <span class="cb-duration-value">${service.base_duration} ${cb_frontend.translations['minutes'] || 'λεπτά'}</span>
-                        </div>
-                        ${service.default_area > 0 ? `
-                        <div class="cb-service-area">
-                            <span class="cb-area-label">${cb_frontend.translations['Includes:'] || 'Περιλαμβάνει:'}</span>
-                            <span class="cb-area-value">${service.default_area} m²</span>
-                        </div>
-                        ` : ''}
-                    </div>
-            `;
-            
-            servicesContainer.appendChild(cardElement);
-        });
-        
-        // Apply custom border colors to newly created service cards
-        if (cb_frontend.colors) {
-            applyCustomBorderColors();
-        }
-    }
+ function displayServices() {
+    const servicesContainer = document.getElementById('cb-services-container');
+    if (!servicesContainer) return;
     
-    /**
+    servicesContainer.innerHTML = '';
+    
+    services.forEach(function(service) {
+        const isSelected = bookingData.service_id == service.id;
+        const selectedClass = isSelected ? ' selected' : '';
+        
+        const cardElement = document.createElement('div');
+        cardElement.className = `cb-service-card${selectedClass}`;
+        cardElement.dataset.serviceId = service.id;
+        
+        // Use icon_url if available, otherwise fallback to emoji
+        let iconHtml = '';
+        if (service.icon_url && service.icon_url.trim() !== '') {
+            iconHtml = `<img src="${service.icon_url}" alt="${service.name}" class="cb-service-icon-img" style="max-width: 50px; max-height: 50px; object-fit: contain;">`;
+        } else {
+            // Fallback to emoji icon
+            iconHtml = `<div class="cb-service-icon">🧹</div>`;
+        }
+        
+        cardElement.innerHTML = `
+            <div class="cb-service-icon-container">
+                ${iconHtml}
+            </div>
+            <h4>${service.name}</h4>
+            <p>${service.description}</p>
+            <div class="cb-service-details">
+                <div class="cb-service-price">
+                    <span class="cb-price-current">€${parseFloat(service.base_price).toFixed(2)}</span>
+                </div>
+                <div class="cb-service-duration">
+                    <span class="cb-duration-label">${cb_frontend.translations['Duration:'] || 'Διάρκεια:'}</span>
+                    <span class="cb-duration-value">${service.base_duration} ${cb_frontend.translations['minutes'] || 'λεπτά'}</span>
+                </div>
+                ${service.default_area > 0 ? `
+                <div class="cb-service-area">
+                    <span class="cb-area-label">${cb_frontend.translations['Includes:'] || 'Περιλαμβάνει:'}</span>
+                    <span class="cb-area-value">${service.default_area} m²</span>
+                </div>
+                ` : ''}
+            </div>
+        `;
+        
+        servicesContainer.appendChild(cardElement);
+    });
+    
+    // Apply custom border colors to newly created service cards
+    if (cb_frontend.colors) {
+        applyCustomBorderColors();
+    }
+}   /**
      * Set default area for the selected service
      */
     function setDefaultArea(serviceId) {

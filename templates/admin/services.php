@@ -82,6 +82,22 @@ if (!defined('ABSPATH')) {
                 </tr>
                 <tr>
                     <th scope="row">
+                        <label for="service-icon"><?php _e('Service Icon', 'cleaning-booking'); ?></label>
+                    </th>
+                    <td>
+                        <div class="cb-icon-upload-container">
+                            <input type="hidden" id="service-icon-url" name="icon_url" value="">
+                            <div id="service-icon-preview" class="cb-icon-preview" style="display: none;">
+                                <img id="service-icon-img" src="" alt="Service Icon" style="max-width: 50px; max-height: 50px;">
+                                <button type="button" id="service-icon-remove" class="button button-small"><?php _e('Remove', 'cleaning-booking'); ?></button>
+                            </div>
+                            <button type="button" id="service-icon-upload" class="button"><?php _e('Upload Icon', 'cleaning-booking'); ?></button>
+                            <span class="description"><?php _e('Upload an icon for this service (recommended: 50x50px)', 'cleaning-booking'); ?></span>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">
                         <label for="service-sort-order"><?php _e('Sort Order', 'cleaning-booking'); ?></label>
                     </th>
                     <td>
@@ -121,6 +137,7 @@ if (!defined('ABSPATH')) {
             <table class="wp-list-table widefat fixed striped">
                 <thead>
                     <tr>
+                        <th><?php _e('Icon', 'cleaning-booking'); ?></th>
                         <th><?php _e('Name', 'cleaning-booking'); ?></th>
                         <th><?php _e('Base Price', 'cleaning-booking'); ?></th>
                         <th><?php _e('Base Duration', 'cleaning-booking'); ?></th>
@@ -134,11 +151,18 @@ if (!defined('ABSPATH')) {
                 <tbody>
                     <?php if (empty($services)): ?>
                         <tr>
-                            <td colspan="8" class="text-center"><?php _e('No services found', 'cleaning-booking'); ?></td>
+                            <td colspan="9" class="text-center"><?php _e('No services found', 'cleaning-booking'); ?></td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($services as $service): ?>
                             <tr data-service-id="<?php echo esc_attr($service->id); ?>">
+                                <td>
+                                    <?php if (!empty($service->icon_url)): ?>
+                                        <img src="<?php echo esc_url($service->icon_url); ?>" alt="<?php echo esc_attr($service->name); ?>" style="width: 30px; height: 30px; object-fit: contain;">
+                                    <?php else: ?>
+                                        <span class="dashicons dashicons-admin-tools" style="font-size: 20px; color: #999;"></span>
+                                    <?php endif; ?>
+                                </td>
                                 <td>
                                     <strong><?php echo esc_html($service->name); ?></strong>
                                     <?php if ($service->description): ?>

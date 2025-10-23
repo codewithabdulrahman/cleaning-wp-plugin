@@ -224,69 +224,73 @@ class CB_REST_API {
         ), 200);
     }
     
-    public function get_services($request) {
-        $services = CB_Database::get_services();
-        
-        $formatted_services = array();
-        foreach ($services as $service) {
-            $formatted_services[] = array(
-                'id' => $service->id,
-                'name' => $service->name,
-                'description' => $service->description,
-                'base_price' => floatval($service->base_price),
-                'base_duration' => intval($service->base_duration),
-                'sqm_multiplier' => floatval($service->sqm_multiplier),
-                'sqm_duration_multiplier' => floatval($service->sqm_duration_multiplier)
-            );
-        }
-        
-        return new WP_REST_Response(array(
-            'success' => true,
-            'services' => $formatted_services
-        ), 200);
+   public function get_services($request) {
+    $services = CB_Database::get_services();
+    
+    $formatted_services = array();
+    foreach ($services as $service) {
+        $formatted_services[] = array(
+            'id' => $service->id,
+            'name' => $service->name,
+            'description' => $service->description,
+            'base_price' => floatval($service->base_price),
+            'base_duration' => intval($service->base_duration),
+            'sqm_multiplier' => floatval($service->sqm_multiplier),
+            'sqm_duration_multiplier' => floatval($service->sqm_duration_multiplier),
+            'default_area' => isset($service->default_area) ? intval($service->default_area) : 0,
+            'icon_url' => isset($service->icon_url) ? $service->icon_url : '', // Add this line
+            'is_active' => $service->is_active,
+            'sort_order' => $service->sort_order
+        );
     }
     
-    public function get_extras($request) {
-        $service_id_param = $request->get_param('service_id');
+    return new WP_REST_Response(array(
+        'success' => true,
+        'services' => $formatted_services
+    ), 200);
+}
+   public function get_extras($request) {
+    $service_id_param = $request->get_param('service_id');
+    
+    $formatted_extras = array();
+    
+    if (!empty($service_id_param)) {
+        // Handle single ID or comma-separated IDs
+        $service_ids = array_map('intval', explode(',', $service_id_param));
         
-        $formatted_extras = array();
-        
-        if (!empty($service_id_param)) {
-            // Handle single ID or comma-separated IDs
-            $service_ids = array_map('intval', explode(',', $service_id_param));
+        // Get extras for specific services
+        foreach ($service_ids as $service_id) {
+            // Get only ACTIVE extras for frontend use
+            $extras = CB_Database::get_service_extras($service_id, true);
             
-            // Get extras for specific services
-            foreach ($service_ids as $service_id) {
-                // Get only ACTIVE extras for frontend use
-                $extras = CB_Database::get_service_extras($service_id, true);
-                
-                foreach ($extras as $extra) {
-                    $formatted_extras[] = array(
-                        'id' => $extra->id,
-                        'service_id' => $extra->service_id,
-                        'name' => $extra->name,
-                        'description' => $extra->description,
-                        'price' => floatval($extra->price),
-                        'duration' => intval($extra->duration)
-                    );
-                }
+            foreach ($extras as $extra) {
+                $formatted_extras[] = array(
+                    'id' => $extra->id,
+                    'service_id' => $extra->service_id,
+                    'name' => $extra->name,
+                    'description' => $extra->description,
+                    'price' => floatval($extra->price),
+                    'duration' => intval($extra->duration),
+                    'is_active' => isset($extra->is_active) ? intval($extra->is_active) : 1,
+                    'sort_order' => isset($extra->sort_order) ? intval($extra->sort_order) : 0
+                );
             }
-        } else {
-            // Return empty array if no service_id provided
-            // Frontend should call this endpoint with service_id when service is selected
-            return new WP_REST_Response(array(
-                'success' => true,
-                'extras' => array(),
-                'message' => __('Please provide service_id parameter (e.g., ?service_id=1 or ?service_id=1,2,3)', 'cleaning-booking')
-            ), 200);
         }
-        
+    } else {
+        // Return empty array if no service_id provided
+        // Frontend should call this endpoint with service_id when service is selected
         return new WP_REST_Response(array(
             'success' => true,
-            'extras' => $formatted_extras
+            'extras' => array(),
+            'message' => __('Please provide service_id parameter (e.g., ?service_id=1 or ?service_id=1,2,3)', 'cleaning-booking')
         ), 200);
     }
     
+    return new WP_REST_Response(array(
+        'success' => true,
+        'extras' => $formatted_extras
+    ), 200);
+}
     public function calculate_price($request) {
         $service_id = $request->get_param('service_id');
         $square_meters = $request->get_param('square_meters');
