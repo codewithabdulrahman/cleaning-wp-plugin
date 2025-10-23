@@ -62,6 +62,11 @@ $missing_translations = CB_Translations::get_missing_translations('el');
             <?php _e('Cancel Changes', 'cleaning-booking'); ?>
         </button>
         
+        <button type="button" class="button button-secondary" id="cb-clear-cache">
+            <span class="dashicons dashicons-update" style="vertical-align: middle; margin-right: 5px;"></span>
+            <?php _e('Clear Cache', 'cleaning-booking'); ?>
+        </button>
+        
         <div style="margin-left: auto;">
             <span class="cb-changes-indicator" style="color: #d63638; font-weight: bold; display: none;">
                 <span class="dashicons dashicons-warning" style="vertical-align: middle; margin-right: 5px;"></span>
@@ -633,6 +638,37 @@ jQuery(document).ready(function($) {
     $('#cb-cancel-bulk').on('click', function() {
         if (confirm('<?php _e('Are you sure you want to cancel all unsaved changes?', 'cleaning-booking'); ?>')) {
             location.reload();
+        }
+    });
+    
+    // Clear cache
+    $('#cb-clear-cache').on('click', function() {
+        if (confirm('<?php _e('This will clear all translation caches. Continue?', 'cleaning-booking'); ?>')) {
+            var $button = $(this);
+            var originalText = $button.text();
+            $button.prop('disabled', true).html('<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite;"></span> <?php _e('Clearing...', 'cleaning-booking'); ?>');
+            
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'cb_clear_translation_cache',
+                    nonce: '<?php echo wp_create_nonce('cb_admin_nonce'); ?>'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        showNotification('<?php _e('Translation cache cleared successfully!', 'cleaning-booking'); ?>', 'success');
+                    } else {
+                        showNotification('<?php _e('Error clearing cache: ', 'cleaning-booking'); ?>' + response.data.message, 'error');
+                    }
+                },
+                error: function() {
+                    showNotification('<?php _e('Network error. Please try again.', 'cleaning-booking'); ?>', 'error');
+                },
+                complete: function() {
+                    $button.prop('disabled', false).text(originalText);
+                }
+            });
         }
     });
     

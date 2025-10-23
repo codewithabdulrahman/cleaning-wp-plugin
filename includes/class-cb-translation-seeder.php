@@ -406,7 +406,12 @@ class CB_Translation_Seeder {
             'Error deleting translation.',
             'Error occurred',
             'Insufficient permissions',
-            'Click to add translation'
+            'Click to add translation',
+            'Clear Cache',
+            'This will clear all translation caches. Continue?',
+            'Clearing...',
+            'Translation cache cleared successfully!',
+            'Error clearing cache: '
         ];
         
         return self::insert_strings($admin_strings, 'admin');

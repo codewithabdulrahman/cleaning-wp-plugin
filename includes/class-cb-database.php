@@ -1450,7 +1450,8 @@ class CB_Database {
         
         $translations = array();
         foreach ($results as $row) {
-            $translations[$row->string_key] = $language === 'el' ? $row->text_el : $row->text_en;
+            // Key translations by English text instead of string_key for frontend compatibility
+            $translations[$row->text_en] = $language === 'el' ? $row->text_el : $row->text_en;
         }
         
         return $translations;

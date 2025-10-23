@@ -38,6 +38,7 @@ class CB_Admin {
         add_action('wp_ajax_cb_bulk_update_translations', array($this, 'ajax_bulk_update_translations'));
         add_action('wp_ajax_cb_run_translation_seeder', array($this, 'ajax_run_translation_seeder'));
         add_action('wp_ajax_cb_get_seeder_stats', array($this, 'ajax_get_seeder_stats'));
+        add_action('wp_ajax_cb_clear_translation_cache', array($this, 'ajax_clear_translation_cache'));
         // Import/Export removed per product decision
         
         // Style Settings AJAX handlers
@@ -1120,6 +1121,27 @@ class CB_Admin {
             $stats = CB_Translation_Seeder::get_stats();
             
             wp_send_json_success(array('stats' => $stats));
+            
+        } catch (Exception $e) {
+            wp_send_json_error(array('message' => $e->getMessage()));
+        }
+    }
+    
+    /**
+     * AJAX handler for clearing translation cache
+     */
+    public function ajax_clear_translation_cache() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Insufficient permissions', 'cleaning-booking')));
+        }
+        
+        try {
+            // Clear all translation caches
+            CB_Translations::clear_all_translation_cache();
+            
+            wp_send_json_success(array('message' => __('Translation cache cleared successfully!', 'cleaning-booking')));
             
         } catch (Exception $e) {
             wp_send_json_error(array('message' => $e->getMessage()));
