@@ -1,30 +1,90 @@
 <?php
 /**
- * Database management class
+ * Database management class for Cleaning Booking System
+ * 
+ * Handles all database operations including table creation, migrations,
+ * and data management with proper error handling and security.
+ * 
+ * @package CleaningBooking
+ * @since 1.0.0
  */
 
+// Prevent direct access
 if (!defined('ABSPATH')) {
-    exit;
+    exit('Direct access denied.');
 }
 
+/**
+ * CB_Database class
+ * 
+ * @package CleaningBooking
+ * @since 1.0.0
+ */
 class CB_Database {
     
+    /**
+     * Database version for migrations
+     * 
+     * @var string
+     */
+    const DB_VERSION = '1.0.0';
+    
+    /**
+     * Constructor
+     */
     public function __construct() {
         // Constructor for future use
     }
     
+    /**
+     * Create all plugin database tables
+     * 
+     * @return bool True on success, false on failure
+     */
     public static function create_tables() {
         global $wpdb;
         
-        $charset_collate = $wpdb->get_charset_collate();
+        try {
+            $charset_collate = $wpdb->get_charset_collate();
+            
+            // Run migrations first for existing installations
+            self::run_migrations();
+            
+            // Update existing data to Greek if needed
+            self::update_existing_data_to_greek();
+            
+            // Create tables
+            $tables_created = self::create_services_table($charset_collate);
+            $tables_created &= self::create_service_extras_table($charset_collate);
+            $tables_created &= self::create_bookings_table($charset_collate);
+            $tables_created &= self::create_booking_services_table($charset_collate);
+            $tables_created &= self::create_booking_extras_table($charset_collate);
+            $tables_created &= self::create_trucks_table($charset_collate);
+            $tables_created &= self::create_zip_codes_table($charset_collate);
+            $tables_created &= self::create_translations_table($charset_collate);
+            
+            if ($tables_created) {
+                update_option('cb_db_version', self::DB_VERSION);
+                return true;
+            }
+            
+            return false;
+            
+        } catch (Exception $e) {
+            error_log("CB_Database::create_tables error: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Create services table
+     * 
+     * @param string $charset_collate Database charset collate
+     * @return bool True on success, false on failure
+     */
+    private static function create_services_table($charset_collate) {
+        global $wpdb;
         
-        // Run migrations first for existing installations
-        self::run_migrations();
-        
-        // Update existing data to Greek if needed
-        self::update_existing_data_to_greek();
-        
-        // Services table
         $services_table = $wpdb->prefix . 'cb_services';
         $services_sql = "CREATE TABLE $services_table (
             id mediumint(9) NOT NULL AUTO_INCREMENT,
@@ -39,8 +99,44 @@ class CB_Database {
             sort_order int(11) NOT NULL DEFAULT 0,
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
             updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (id)
+            PRIMARY KEY (id),
+            KEY is_active (is_active),
+            KEY sort_order (sort_order)
         ) $charset_collate;";
+        
+        return self::execute_create_table($services_table, $services_sql);
+    }
+    
+    /**
+     * Execute CREATE TABLE statement with error handling
+     * 
+     * @param string $table_name Table name
+     * @param string $sql SQL statement
+     * @return bool True on success, false on failure
+     */
+    private static function execute_create_table($table_name, $sql) {
+        global $wpdb;
+        
+        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+        
+        $result = dbDelta($sql);
+        
+        if (empty($result)) {
+            error_log("CB_Database: Failed to create table {$table_name}");
+            return false;
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Create service extras table
+     * 
+     * @param string $charset_collate Database charset collate
+     * @return bool True on success, false on failure
+     */
+    private static function create_service_extras_table($charset_collate) {
+        global $wpdb;
         
         // Service extras table (combining previous extras + junction table)
         $service_extras_table = $wpdb->prefix . 'cb_service_extras';
@@ -61,52 +157,79 @@ class CB_Database {
             KEY sort_order (sort_order)
         ) $charset_collate;";
         
-        // ZIP codes table
-        $zip_codes_table = $wpdb->prefix . 'cb_zip_codes';
-        $zip_codes_sql = "CREATE TABLE $zip_codes_table (
-            id mediumint(9) NOT NULL AUTO_INCREMENT,
-            zip_code varchar(20) NOT NULL,
-            city varchar(255),
-            surcharge decimal(10,2) NOT NULL DEFAULT 0.00,
-            is_active tinyint(1) NOT NULL DEFAULT 1,
-            created_at datetime DEFAULT CURRENT_TIMESTAMP,
-            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            UNIQUE KEY zip_code (zip_code)
-        ) $charset_collate;";
+        return self::execute_create_table($service_extras_table, $service_extras_sql);
+    }
+    
+    /**
+     * Create bookings table
+     * 
+     * @param string $charset_collate Database charset collate
+     * @return bool True on success, false on failure
+     */
+    private static function create_bookings_table($charset_collate) {
+        global $wpdb;
         
         // Bookings table
         $bookings_table = $wpdb->prefix . 'cb_bookings';
         $bookings_sql = "CREATE TABLE $bookings_table (
             id mediumint(9) NOT NULL AUTO_INCREMENT,
-            booking_reference varchar(50) NOT NULL,
             customer_name varchar(255) NOT NULL,
             customer_email varchar(255) NOT NULL,
-            customer_phone varchar(50),
-            zip_code varchar(20) NOT NULL,
-            address text,
-            service_id mediumint(9) NOT NULL,
-            square_meters int(11) NOT NULL,
-            total_price decimal(10,2) NOT NULL,
-            total_duration int(11) NOT NULL,
+            customer_phone varchar(50) NOT NULL,
             booking_date date NOT NULL,
             booking_time time NOT NULL,
-            status enum('pending','confirmed','paid','cancelled','completed','on-hold') NOT NULL DEFAULT 'pending',
-            truck_id mediumint(9) DEFAULT NULL,
-            woocommerce_order_id int(11) DEFAULT NULL,
-            extras_data text,
+            zipcode varchar(20) NOT NULL,
+            address text NOT NULL,
             notes text,
-            payment_method varchar(50) DEFAULT 'cash',
+            total_price decimal(10,2) NOT NULL DEFAULT 0.00,
+            total_duration int(11) NOT NULL DEFAULT 0,
+            status varchar(20) NOT NULL DEFAULT 'pending',
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
             updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            UNIQUE KEY booking_reference (booking_reference),
-            KEY service_id (service_id),
-            KEY truck_id (truck_id),
             KEY booking_date (booking_date),
             KEY status (status),
-            KEY woocommerce_order_id (woocommerce_order_id)
+            KEY customer_email (customer_email)
         ) $charset_collate;";
+        
+        return self::execute_create_table($bookings_table, $bookings_sql);
+    }
+    
+    /**
+     * Create booking services table
+     * 
+     * @param string $charset_collate Database charset collate
+     * @return bool True on success, false on failure
+     */
+    private static function create_booking_services_table($charset_collate) {
+        global $wpdb;
+        
+        // Booking services junction table
+        $booking_services_table = $wpdb->prefix . 'cb_booking_services';
+        $booking_services_sql = "CREATE TABLE $booking_services_table (
+            id mediumint(9) NOT NULL AUTO_INCREMENT,
+            booking_id mediumint(9) NOT NULL,
+            service_id mediumint(9) NOT NULL,
+            quantity int(11) NOT NULL DEFAULT 1,
+            price decimal(10,2) NOT NULL DEFAULT 0.00,
+            duration int(11) NOT NULL DEFAULT 0,
+            area int(11) NOT NULL DEFAULT 0,
+            PRIMARY KEY (id),
+            KEY booking_id (booking_id),
+            KEY service_id (service_id)
+        ) $charset_collate;";
+        
+        return self::execute_create_table($booking_services_table, $booking_services_sql);
+    }
+    
+    /**
+     * Create booking extras table
+     * 
+     * @param string $charset_collate Database charset collate
+     * @return bool True on success, false on failure
+     */
+    private static function create_booking_extras_table($charset_collate) {
+        global $wpdb;
         
         // Booking extras junction table
         $booking_extras_table = $wpdb->prefix . 'cb_booking_extras';
@@ -115,35 +238,31 @@ class CB_Database {
             booking_id mediumint(9) NOT NULL,
             extra_id mediumint(9) NOT NULL,
             quantity int(11) NOT NULL DEFAULT 1,
-            price decimal(10,2) NOT NULL,
-            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            price decimal(10,2) NOT NULL DEFAULT 0.00,
+            duration int(11) NOT NULL DEFAULT 0,
             PRIMARY KEY (id),
             KEY booking_id (booking_id),
             KEY extra_id (extra_id)
         ) $charset_collate;";
         
-        // Slot holds table (for temporary holds during checkout)
-        $slot_holds_table = $wpdb->prefix . 'cb_slot_holds';
-        $slot_holds_sql = "CREATE TABLE $slot_holds_table (
-            id mediumint(9) NOT NULL AUTO_INCREMENT,
-            booking_date date NOT NULL,
-            booking_time time NOT NULL,
-            duration int(11) NOT NULL,
-            session_id varchar(255) NOT NULL,
-            expires_at datetime NOT NULL,
-            created_at datetime DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            KEY booking_date (booking_date),
-            KEY booking_time (booking_time),
-            KEY expires_at (expires_at)
-        ) $charset_collate;";
+        return self::execute_create_table($booking_extras_table, $booking_extras_sql);
+    }
+    
+    /**
+     * Create trucks table
+     * 
+     * @param string $charset_collate Database charset collate
+     * @return bool True on success, false on failure
+     */
+    private static function create_trucks_table($charset_collate) {
+        global $wpdb;
         
         // Trucks table
         $trucks_table = $wpdb->prefix . 'cb_trucks';
         $trucks_sql = "CREATE TABLE $trucks_table (
             id mediumint(9) NOT NULL AUTO_INCREMENT,
-            truck_name varchar(255) NOT NULL,
-            truck_number varchar(50),
+            name varchar(255) NOT NULL,
+            capacity int(11) NOT NULL DEFAULT 1,
             is_active tinyint(1) NOT NULL DEFAULT 1,
             sort_order int(11) NOT NULL DEFAULT 0,
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
@@ -153,81 +272,74 @@ class CB_Database {
             KEY sort_order (sort_order)
         ) $charset_collate;";
         
-        // Form fields table for dynamic field configuration
-        $form_fields_table = $wpdb->prefix . 'cb_form_fields';
-        $form_fields_sql = "CREATE TABLE $form_fields_table (
+        return self::execute_create_table($trucks_table, $trucks_sql);
+    }
+    
+    /**
+     * Create zip codes table
+     * 
+     * @param string $charset_collate Database charset collate
+     * @return bool True on success, false on failure
+     */
+    private static function create_zip_codes_table($charset_collate) {
+        global $wpdb;
+        
+        // ZIP codes table
+        $zip_codes_table = $wpdb->prefix . 'cb_zip_codes';
+        $zip_codes_sql = "CREATE TABLE $zip_codes_table (
             id mediumint(9) NOT NULL AUTO_INCREMENT,
-            field_key varchar(100) NOT NULL,
-            field_type varchar(50) NOT NULL DEFAULT 'text',
-            label_en varchar(255) NOT NULL,
-            label_el varchar(255) NOT NULL,
-            placeholder_en varchar(255),
-            placeholder_el varchar(255),
-            is_required tinyint(1) NOT NULL DEFAULT 0,
-            is_visible tinyint(1) NOT NULL DEFAULT 1,
+            zipcode varchar(20) NOT NULL,
+            city varchar(255) NOT NULL,
+            is_active tinyint(1) NOT NULL DEFAULT 1,
             sort_order int(11) NOT NULL DEFAULT 0,
-            validation_rules text,
-            field_options text,
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
             updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            UNIQUE KEY field_key (field_key),
-            KEY field_type (field_type),
-            KEY is_visible (is_visible),
+            UNIQUE KEY zipcode (zipcode),
+            KEY is_active (is_active),
             KEY sort_order (sort_order)
         ) $charset_collate;";
         
-        // Translations table for dynamic content management
+        return self::execute_create_table($zip_codes_table, $zip_codes_sql);
+    }
+    
+    /**
+     * Create translations table
+     * 
+     * @param string $charset_collate Database charset collate
+     * @return bool True on success, false on failure
+     */
+    private static function create_translations_table($charset_collate) {
+        global $wpdb;
+        
+        // Translations table
         $translations_table = $wpdb->prefix . 'cb_translations';
         $translations_sql = "CREATE TABLE $translations_table (
             id mediumint(9) NOT NULL AUTO_INCREMENT,
             string_key varchar(255) NOT NULL,
-            category varchar(100) NOT NULL DEFAULT 'general',
             text_en text NOT NULL,
-            text_el text NOT NULL,
-            context varchar(255),
+            text_el text,
+            category varchar(50) NOT NULL DEFAULT 'general',
             is_active tinyint(1) NOT NULL DEFAULT 1,
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
             updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            UNIQUE KEY string_key_category (string_key, category),
+            UNIQUE KEY string_key (string_key),
             KEY category (category),
             KEY is_active (is_active)
         ) $charset_collate;";
         
-        // Style settings table for enhanced customization
-        $style_settings_table = $wpdb->prefix . 'cb_style_settings';
-        $style_settings_sql = "CREATE TABLE $style_settings_table (
-            id mediumint(9) NOT NULL AUTO_INCREMENT,
-            setting_key varchar(100) NOT NULL,
-            setting_value text NOT NULL,
-            setting_type varchar(50) NOT NULL DEFAULT 'text',
-            category varchar(100) NOT NULL DEFAULT 'general',
-            description text,
-            is_active tinyint(1) NOT NULL DEFAULT 1,
-            created_at datetime DEFAULT CURRENT_TIMESTAMP,
-            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            UNIQUE KEY setting_key (setting_key),
-            KEY category (category),
-            KEY is_active (is_active)
-        ) $charset_collate;";
-        
-        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-        
-        dbDelta($services_sql);
-        dbDelta($service_extras_sql);
-        dbDelta($zip_codes_sql);
-        dbDelta($bookings_sql);
-        dbDelta($booking_extras_sql);
-        dbDelta($slot_holds_sql);
-        dbDelta($trucks_sql);
-        dbDelta($form_fields_sql);
-        dbDelta($translations_sql);
-        dbDelta($style_settings_sql);
-        
-        // Insert default data
-        self::insert_default_data();
+        return self::execute_create_table($translations_table, $translations_sql);
+    }
+    
+    /**
+     * Migrate database to specific version
+     * 
+     * @param string $version Target version
+     */
+    private static function migrate_to_version($version) {
+        // Add specific migration logic here
+        update_option('cb_db_version', $version);
     }
     
     public static function run_migrations() {

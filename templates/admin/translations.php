@@ -67,40 +67,18 @@ $missing_translations = CB_Translations::get_missing_translations('el');
             <?php _e('Clear Cache', 'cleaning-booking'); ?>
         </button>
         
+        <button type="button" class="button button-secondary" id="cb-remove-duplicates">
+            <span class="dashicons dashicons-trash" style="vertical-align: middle; margin-right: 5px;"></span>
+            <?php _e('Remove Duplicates', 'cleaning-booking'); ?>
+        </button>
+        
+        <div id="cb-duplicate-status" style="margin-left: 15px; font-weight: bold; display: none;"></div>
+        
         <div style="margin-left: auto;">
             <span class="cb-changes-indicator" style="color: #d63638; font-weight: bold; display: none;">
                 <span class="dashicons dashicons-warning" style="vertical-align: middle; margin-right: 5px;"></span>
                 <span class="cb-changes-count">0</span> <?php _e('unsaved changes', 'cleaning-booking'); ?>
             </span>
-        </div>
-    </div>
-    
-    <!-- Translation Seeder Management -->
-    <div class="cb-seeder-section" style="background: #fff; padding: 20px; border: 1px solid #ddd; margin: 20px 0; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-        <h3 style="margin: 0 0 15px 0; color: #333;"><?php _e('Translation Seeder', 'cleaning-booking'); ?></h3>
-        <p style="margin: 0 0 15px 0; color: #666;">
-            <?php _e('The seeder automatically populates the translation database with all plugin strings. Use this to add any missing translations or update existing ones.', 'cleaning-booking'); ?>
-        </p>
-        
-        <div style="display: flex; gap: 10px; align-items: center;">
-            <button type="button" class="button button-secondary" id="cb-run-seeder">
-                <span class="dashicons dashicons-update" style="vertical-align: middle; margin-right: 5px;"></span>
-                <?php _e('Run Translation Seeder', 'cleaning-booking'); ?>
-            </button>
-            
-            <button type="button" class="button button-secondary" id="cb-seeder-stats">
-                <span class="dashicons dashicons-chart-bar" style="vertical-align: middle; margin-right: 5px;"></span>
-                <?php _e('Show Seeder Statistics', 'cleaning-booking'); ?>
-            </button>
-            
-            <div id="cb-seeder-status" style="margin-left: 15px; font-weight: bold; display: none;"></div>
-        </div>
-        
-        <div id="cb-seeder-stats-display" style="margin-top: 15px; display: none;">
-            <div style="background: #f8f9fa; padding: 15px; border-radius: 4px; border: 1px solid #e1e1e1;">
-                <h4 style="margin: 0 0 10px 0;"><?php _e('Current Translation Statistics', 'cleaning-booking'); ?></h4>
-                <div id="cb-seeder-stats-content"></div>
-            </div>
         </div>
     </div>
     
@@ -170,6 +148,7 @@ $missing_translations = CB_Translations::get_missing_translations('el');
                             </div>
                         </th>
                         <th style="width: 80px; padding: 12px 8px;"><?php _e('Status', 'cleaning-booking'); ?></th>
+                        <th style="width: 80px; padding: 12px 8px;"><?php _e('Actions', 'cleaning-booking'); ?></th>
                 </tr>
             </thead>
             <tbody>
@@ -216,6 +195,15 @@ $missing_translations = CB_Translations::get_missing_translations('el');
                                       style="padding: 4px 8px; border-radius: 3px; font-size: 11px; font-weight: 500; text-transform: uppercase;">
                                     <?php echo $status_text; ?>
                                 </span>
+                        </td>
+                        <td style="padding: 12px 8px; vertical-align: top; text-align: center;">
+                            <button type="button" class="button button-small cb-delete-translation" 
+                                    data-translation-id="<?php echo $translation->id; ?>"
+                                    data-translation-text="<?php echo esc_attr($translation->text_en); ?>"
+                                    style="color: #d63638; border-color: #d63638; background: transparent; padding: 4px 8px; font-size: 11px;">
+                                <span class="dashicons dashicons-trash" style="font-size: 12px; vertical-align: middle;"></span>
+                                <?php _e('Delete', 'cleaning-booking'); ?>
+                            </button>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -672,6 +660,44 @@ jQuery(document).ready(function($) {
         }
     });
     
+    // Delete translation
+    $(document).on('click', '.cb-delete-translation', function() {
+        var $button = $(this);
+        var translationId = $button.data('translation-id');
+        var translationText = $button.data('translation-text');
+        
+        if (confirm('<?php _e('Are you sure you want to delete this translation?', 'cleaning-booking'); ?>\n\n"' + translationText + '"')) {
+            $button.prop('disabled', true).html('<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite;"></span> <?php _e('Deleting...', 'cleaning-booking'); ?>');
+            
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'cb_delete_translation',
+                    translation_id: translationId,
+                    nonce: '<?php echo wp_create_nonce('cb_admin_nonce'); ?>'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Remove the row from table
+                        $button.closest('tr').fadeOut(300, function() {
+                            $(this).remove();
+                            updateRowCount();
+                        });
+                        showSaveIndicator('<?php _e('Translation deleted successfully!', 'cleaning-booking'); ?>');
+                    } else {
+                        showErrorIndicator('<?php _e('Error deleting translation: ', 'cleaning-booking'); ?>' + response.data.message);
+                        $button.prop('disabled', false).html('<span class="dashicons dashicons-trash" style="font-size: 12px; vertical-align: middle;"></span> <?php _e('Delete', 'cleaning-booking'); ?>');
+                    }
+                },
+                error: function() {
+                    showErrorIndicator('<?php _e('Network error. Please try again.', 'cleaning-booking'); ?>');
+                    $button.prop('disabled', false).html('<span class="dashicons dashicons-trash" style="font-size: 12px; vertical-align: middle;"></span> <?php _e('Delete', 'cleaning-booking'); ?>');
+                }
+            });
+        }
+    });
+    
     // Show save indicator
     function showSaveIndicator(message) {
         $('#cb-save-message').text(message);
@@ -727,80 +753,35 @@ jQuery(document).ready(function($) {
         }
     });
     
-    // Seeder functionality
-    $('#cb-run-seeder').on('click', function() {
-        if (confirm('<?php _e('This will add any missing translation strings to the database. Existing translations will not be modified. Continue?', 'cleaning-booking'); ?>')) {
+    // Duplicate removal functionality
+    $('#cb-remove-duplicates').on('click', function() {
+        if (confirm('<?php _e('This will remove duplicate translations based on English text. This action cannot be undone. Continue?', 'cleaning-booking'); ?>')) {
             var $button = $(this);
             var originalText = $button.text();
-            $button.prop('disabled', true).html('<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite;"></span> <?php _e('Running Seeder...', 'cleaning-booking'); ?>');
+            $button.prop('disabled', true).html('<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite;"></span> <?php _e('Removing Duplicates...', 'cleaning-booking'); ?>');
             
             $.ajax({
                 url: ajaxurl,
                 type: 'POST',
                 data: {
-                    action: 'cb_run_translation_seeder',
+                    action: 'cb_remove_duplicate_translations',
                     nonce: '<?php echo wp_create_nonce('cb_admin_nonce'); ?>'
                 },
                 success: function(response) {
                     if (response.success) {
-                        $('#cb-seeder-status').text('<?php _e('Seeder completed successfully!', 'cleaning-booking'); ?>').css('color', '#00a32a').show();
+                        $('#cb-duplicate-status').text('<?php _e('Duplicates removed successfully! Removed ', 'cleaning-booking'); ?>' + response.data.removed_count + ' <?php _e('duplicate(s)', 'cleaning-booking'); ?>').css('color', '#00a32a').show();
                         setTimeout(function() {
                             location.reload();
                         }, 2000);
                     } else {
-                        $('#cb-seeder-status').text('<?php _e('Seeder failed: ', 'cleaning-booking'); ?>' + response.data.message).css('color', '#d63638').show();
+                        $('#cb-duplicate-status').text('<?php _e('Error removing duplicates: ', 'cleaning-booking'); ?>' + response.data.message).css('color', '#d63638').show();
                     }
                 },
                 error: function() {
-                    $('#cb-seeder-status').text('<?php _e('Network error. Please try again.', 'cleaning-booking'); ?>').css('color', '#d63638').show();
+                    $('#cb-duplicate-status').text('<?php _e('Network error. Please try again.', 'cleaning-booking'); ?>').css('color', '#d63638').show();
                 },
                 complete: function() {
                     $button.prop('disabled', false).text(originalText);
-                }
-            });
-        }
-    });
-    
-    $('#cb-seeder-stats').on('click', function() {
-        var $button = $(this);
-        var $display = $('#cb-seeder-stats-display');
-        var $content = $('#cb-seeder-stats-content');
-        
-        if ($display.is(':visible')) {
-            $display.hide();
-            $button.text('<?php _e('Show Seeder Statistics', 'cleaning-booking'); ?>');
-        } else {
-            $button.text('<?php _e('Hide Statistics', 'cleaning-booking'); ?>');
-            
-            $.ajax({
-                url: ajaxurl,
-                type: 'POST',
-                data: {
-                    action: 'cb_get_seeder_stats',
-                    nonce: '<?php echo wp_create_nonce('cb_admin_nonce'); ?>'
-                },
-                success: function(response) {
-                    if (response.success) {
-                        var stats = response.data.stats;
-                        var html = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">';
-                        html += '<div><strong><?php _e('Total:', 'cleaning-booking'); ?></strong> ' + stats.total + '</div>';
-                        html += '<div><strong><?php _e('Frontend:', 'cleaning-booking'); ?></strong> ' + stats.frontend + '</div>';
-                        html += '<div><strong><?php _e('Admin:', 'cleaning-booking'); ?></strong> ' + stats.admin + '</div>';
-                        html += '<div><strong><?php _e('General:', 'cleaning-booking'); ?></strong> ' + stats.general + '</div>';
-                        html += '<div><strong><?php _e('Messages:', 'cleaning-booking'); ?></strong> ' + stats.messages + '</div>';
-                        html += '<div><strong><?php _e('UI:', 'cleaning-booking'); ?></strong> ' + stats.ui + '</div>';
-                        html += '<div><strong><?php _e('Services:', 'cleaning-booking'); ?></strong> ' + stats.services + '</div>';
-                        html += '</div>';
-                        $content.html(html);
-                        $display.show();
-                    } else {
-                        $content.html('<p style="color: #d63638;"><?php _e('Error loading statistics.', 'cleaning-booking'); ?></p>');
-                        $display.show();
-                    }
-                },
-                error: function() {
-                    $content.html('<p style="color: #d63638;"><?php _e('Network error loading statistics.', 'cleaning-booking'); ?></p>');
-                    $display.show();
                 }
             });
         }

@@ -36,8 +36,7 @@ class CB_Admin {
         add_action('wp_ajax_cb_save_translation', array($this, 'ajax_save_translation'));
         add_action('wp_ajax_cb_delete_translation', array($this, 'ajax_delete_translation'));
         add_action('wp_ajax_cb_bulk_update_translations', array($this, 'ajax_bulk_update_translations'));
-        add_action('wp_ajax_cb_run_translation_seeder', array($this, 'ajax_run_translation_seeder'));
-        add_action('wp_ajax_cb_get_seeder_stats', array($this, 'ajax_get_seeder_stats'));
+        add_action('wp_ajax_cb_remove_duplicate_translations', array($this, 'ajax_remove_duplicate_translations'));
         add_action('wp_ajax_cb_clear_translation_cache', array($this, 'ajax_clear_translation_cache'));
         // Import/Export removed per product decision
         
@@ -1059,9 +1058,9 @@ class CB_Admin {
     }
     
     /**
-     * AJAX handler for running translation seeder
+     * AJAX handler for removing duplicate translations
      */
-    public function ajax_run_translation_seeder() {
+    public function ajax_remove_duplicate_translations() {
         check_ajax_referer('cb_admin_nonce', 'nonce');
         
         if (!current_user_can('manage_options')) {
@@ -1069,58 +1068,54 @@ class CB_Admin {
         }
         
         try {
-            // Include seeder class
-            require_once CB_PLUGIN_DIR . 'includes/class-cb-translation-seeder.php';
+            global $wpdb;
             
-            // Run seeder
-            $results = CB_Translation_Seeder::seed_all();
+            $translations_table = $wpdb->prefix . 'cb_translations';
             
-            // Get updated stats
-            $stats = CB_Translation_Seeder::get_stats();
+            // Find duplicates based on English text
+            $duplicates = $wpdb->get_results("
+                SELECT text_en, COUNT(*) as count 
+                FROM {$translations_table} 
+                WHERE text_en IS NOT NULL AND text_en != '' 
+                GROUP BY text_en 
+                HAVING COUNT(*) > 1
+            ");
             
-            // Calculate totals
-            $total_inserted = 0;
-            $total_skipped = 0;
-            foreach ($results as $category => $result) {
-                $total_inserted += $result['inserted'];
-                $total_skipped += $result['skipped'];
+            $removed_count = 0;
+            
+            foreach ($duplicates as $duplicate) {
+                // Get all records with this English text
+                $records = $wpdb->get_results($wpdb->prepare("
+                    SELECT id FROM {$translations_table} 
+                    WHERE text_en = %s 
+                    ORDER BY id ASC
+                ", $duplicate->text_en));
+                
+                // Keep the first record, remove the rest
+                if (count($records) > 1) {
+                    $ids_to_remove = array_slice(array_column($records, 'id'), 1);
+                    
+                    if (!empty($ids_to_remove)) {
+                        $placeholders = implode(',', array_fill(0, count($ids_to_remove), '%d'));
+                        $wpdb->query($wpdb->prepare("
+                            DELETE FROM {$translations_table} 
+                            WHERE id IN ({$placeholders})
+                        ", $ids_to_remove));
+                        
+                        $removed_count += count($ids_to_remove);
+                    }
+                }
             }
             
-            $message = sprintf(
-                __('Seeder completed! Inserted %d new strings, skipped %d existing strings.', 'cleaning-booking'),
-                $total_inserted,
-                $total_skipped
-            );
+            // Clear translation cache after removing duplicates
+            if (class_exists('CB_Translations')) {
+                CB_Translations::clear_all_translation_cache();
+            }
             
             wp_send_json_success(array(
-                'message' => $message,
-                'stats' => $stats,
-                'results' => $results
+                'message' => sprintf(__('Successfully removed %d duplicate translations.', 'cleaning-booking'), $removed_count),
+                'removed_count' => $removed_count
             ));
-            
-        } catch (Exception $e) {
-            wp_send_json_error(array('message' => $e->getMessage()));
-        }
-    }
-    
-    /**
-     * AJAX handler for getting seeder statistics
-     */
-    public function ajax_get_seeder_stats() {
-        check_ajax_referer('cb_admin_nonce', 'nonce');
-        
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(array('message' => __('Insufficient permissions', 'cleaning-booking')));
-        }
-        
-        try {
-            // Include seeder class
-            require_once CB_PLUGIN_DIR . 'includes/class-cb-translation-seeder.php';
-            
-            // Get stats
-            $stats = CB_Translation_Seeder::get_stats();
-            
-            wp_send_json_success(array('stats' => $stats));
             
         } catch (Exception $e) {
             wp_send_json_error(array('message' => $e->getMessage()));
