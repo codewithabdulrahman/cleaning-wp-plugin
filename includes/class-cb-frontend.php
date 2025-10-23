@@ -30,13 +30,7 @@ class CB_Frontend {
         // Add REST API routes
         add_action('rest_api_init', array($this, 'register_rest_routes'));
         
-        // Add a debug endpoint
-        add_action('wp_ajax_cb_debug', array($this, 'ajax_debug'));
-        add_action('wp_ajax_nopriv_cb_debug', array($this, 'ajax_debug'));
         
-        // Add a database check endpoint
-        add_action('wp_ajax_cb_check_database', array($this, 'ajax_check_database'));
-        add_action('wp_ajax_nopriv_cb_check_database', array($this, 'ajax_check_database'));
         
         // Run database migrations for existing installations
         $this->run_database_migrations();
@@ -461,7 +455,6 @@ class CB_Frontend {
         if ($available_truck) {
             $data['truck_id'] = $available_truck->id;
         } else {
-            error_log("CB Debug - No available truck found for booking on {$data['booking_date']} at {$data['booking_time']}");
             wp_send_json_error(array('message' => __('No trucks available for the selected time slot. Please choose another time.', 'cleaning-booking')));
         }
         
@@ -494,7 +487,6 @@ class CB_Frontend {
         wp_send_json_error(array('message' => __('Failed to create booking. Please try again.', 'cleaning-booking')));
             
         } catch (Exception $e) {
-            error_log('CB Debug - Booking creation error: ' . $e->getMessage());
             wp_send_json_error(array('message' => __('An error occurred while creating the booking. Please try again.', 'cleaning-booking')));
         }
     }
@@ -918,14 +910,6 @@ class CB_Frontend {
         ));
     }
     
-    public function ajax_debug() {
-        wp_send_json_success(array(
-            'message' => 'AJAX Debug Endpoint Working',
-            'timestamp' => current_time('mysql'),
-            'request_method' => $_SERVER['REQUEST_METHOD'],
-            'action' => $_POST['action'] ?? 'none'
-        ));
-    }
     
     public function ajax_hold_slot() {
         try {
@@ -1031,7 +1015,6 @@ class CB_Frontend {
                 } else {
                     // If it's a string, try to decode it as JSON or split by comma
                     $extras_string = trim($_POST['extras']);
-                    error_log('CB Debug - Extras as string: ' . $extras_string);
                     if (!empty($extras_string)) {
                         // Try JSON decode first
                         $decoded = json_decode($extras_string, true);
@@ -1040,12 +1023,9 @@ class CB_Frontend {
                         } else {
                             // Fallback: split by comma
                             $extras = array_map('intval', explode(',', $extras_string));
-                            error_log('CB Debug - Extras split by comma: ' . print_r($extras, true));
                         }
                     }
                 }
-            } else {
-                error_log('CB Debug - No extras found in $_POST');
             }
             
             $zip_code = sanitize_text_field($_POST['zip_code']);
@@ -1114,7 +1094,6 @@ class CB_Frontend {
             ));
             
         } catch (Exception $e) {
-            error_log('CB Debug - Price calculation stack trace: ' . $e->getTraceAsString());
             wp_send_json_error(array('message' => __('Unable to calculate price. Please try again.', 'cleaning-booking')));
         }
     }

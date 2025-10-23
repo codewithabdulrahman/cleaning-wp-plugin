@@ -36,6 +36,8 @@ class CB_Admin {
         add_action('wp_ajax_cb_save_translation', array($this, 'ajax_save_translation'));
         add_action('wp_ajax_cb_delete_translation', array($this, 'ajax_delete_translation'));
         add_action('wp_ajax_cb_bulk_update_translations', array($this, 'ajax_bulk_update_translations'));
+        add_action('wp_ajax_cb_run_translation_seeder', array($this, 'ajax_run_translation_seeder'));
+        add_action('wp_ajax_cb_get_seeder_stats', array($this, 'ajax_get_seeder_stats'));
         // Import/Export removed per product decision
         
         // Style Settings AJAX handlers
@@ -1055,4 +1057,72 @@ class CB_Admin {
         }
     }
     
+    /**
+     * AJAX handler for running translation seeder
+     */
+    public function ajax_run_translation_seeder() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Insufficient permissions', 'cleaning-booking')));
+        }
+        
+        try {
+            // Include seeder class
+            require_once CB_PLUGIN_DIR . 'includes/class-cb-translation-seeder.php';
+            
+            // Run seeder
+            $results = CB_Translation_Seeder::seed_all();
+            
+            // Get updated stats
+            $stats = CB_Translation_Seeder::get_stats();
+            
+            // Calculate totals
+            $total_inserted = 0;
+            $total_skipped = 0;
+            foreach ($results as $category => $result) {
+                $total_inserted += $result['inserted'];
+                $total_skipped += $result['skipped'];
+            }
+            
+            $message = sprintf(
+                __('Seeder completed! Inserted %d new strings, skipped %d existing strings.', 'cleaning-booking'),
+                $total_inserted,
+                $total_skipped
+            );
+            
+            wp_send_json_success(array(
+                'message' => $message,
+                'stats' => $stats,
+                'results' => $results
+            ));
+            
+        } catch (Exception $e) {
+            wp_send_json_error(array('message' => $e->getMessage()));
+        }
+    }
+    
+    /**
+     * AJAX handler for getting seeder statistics
+     */
+    public function ajax_get_seeder_stats() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Insufficient permissions', 'cleaning-booking')));
+        }
+        
+        try {
+            // Include seeder class
+            require_once CB_PLUGIN_DIR . 'includes/class-cb-translation-seeder.php';
+            
+            // Get stats
+            $stats = CB_Translation_Seeder::get_stats();
+            
+            wp_send_json_success(array('stats' => $stats));
+            
+        } catch (Exception $e) {
+            wp_send_json_error(array('message' => $e->getMessage()));
+        }
+    }
 }

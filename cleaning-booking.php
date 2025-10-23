@@ -65,6 +65,7 @@ class CleaningBooking {
         require_once CB_PLUGIN_DIR . 'includes/class-cb-woocommerce.php';
         require_once CB_PLUGIN_DIR . 'includes/class-cb-slot-manager.php';
         require_once CB_PLUGIN_DIR . 'includes/class-cb-translations.php';
+        require_once CB_PLUGIN_DIR . 'includes/class-cb-translation-seeder.php';
         require_once CB_PLUGIN_DIR . 'includes/class-cb-form-fields.php';
         require_once CB_PLUGIN_DIR . 'includes/class-cb-style-manager.php';
     }
@@ -106,9 +107,14 @@ class CleaningBooking {
     public function activate() {
         // Include required files for activation
         require_once CB_PLUGIN_DIR . 'includes/class-cb-database.php';
+        require_once CB_PLUGIN_DIR . 'includes/class-cb-translations.php';
+        require_once CB_PLUGIN_DIR . 'includes/class-cb-translation-seeder.php';
         
         // Create database tables
         CB_Database::create_tables();
+        
+        // Seed translation data
+        CB_Translation_Seeder::seed_all();
         
         // Set default options
         $this->set_default_options();

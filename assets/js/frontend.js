@@ -172,7 +172,6 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => {
             if (response.success) {
                 currentSlotSessionId = response.data.session_id;
-                console.log('Slot held successfully:', currentSlotSessionId);
                 
                 // Set up automatic release after configured minutes
                 const holdTimeMinutes = cb_frontend.booking_hold_time || 15;
@@ -203,7 +202,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(response => {
             if (response.success) {
-                console.log('Slot released successfully');
+                // Slot released successfully
             } else {
                 console.error('Failed to release slot:', response.data.message);
             }
@@ -237,7 +236,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // If saved language is different from current, switch to it
         if (savedLanguage !== cb_frontend.current_language) {
-            console.log('Language mismatch, switching to saved language:', savedLanguage);
+            
             switchLanguage(savedLanguage);
         }
     }
@@ -289,7 +288,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 ).join('');
             }
             
-            console.log('Selected extras:', selectedExtrasNames);
+            
         } else {
             // Hide the section if no extras selected
             if (selectedExtrasSection) {
@@ -550,8 +549,8 @@ document.addEventListener('DOMContentLoaded', function() {
         clickedCard.classList.add('selected');
         
         bookingData.service_id = clickedCard.dataset.serviceId;
-        console.log('Service selected - service_id:', bookingData.service_id);
-        console.log('Current bookingData:', bookingData);
+        
+        
         
         // Set square meters to 0 and update the input field
         bookingData.square_meters = 0;
@@ -581,7 +580,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Prevent double-clicking
         if (clickedItem.classList.contains('cb-processing')) {
-            console.log('Extra item is being processed, ignoring click');
+            
             return;
         }
         
@@ -590,38 +589,38 @@ document.addEventListener('DOMContentLoaded', function() {
         const extraId = parseInt(clickedItem.dataset.extraId, 10); // Convert to number immediately
         const extraPrice = parseFloat(clickedItem.dataset.extraPrice);
         
-        console.log('Extra item clicked:', clickedItem, 'extraId:', extraId, 'type:', typeof extraId);
+        
         
         // Ensure extras array exists
         if (!Array.isArray(bookingData.extras)) {
             bookingData.extras = [];
         }
         
-        console.log('Current extras array:', bookingData.extras, 'Looking for ID:', extraId);
+        
         
         if (clickedItem.classList.contains('selected')) {
             // Remove extra
-            console.log('Removing extra:', extraId);
-            console.log('Element classes before removal:', clickedItem.className);
+            
+            
             clickedItem.classList.remove('selected');
-            console.log('Element classes after removal:', clickedItem.className);
+            
             bookingData.extras = bookingData.extras.filter(id => parseInt(id, 10) !== extraId);
         } else {
             // Add extra
-            console.log('Adding extra:', extraId);
-            console.log('Element classes before adding:', clickedItem.className);
+            
+            
             clickedItem.classList.add('selected');
-            console.log('Element classes after adding:', clickedItem.className);
+            
             bookingData.extras.push(extraId);
             
             // Debug: Check if class was actually added
             setTimeout(() => {
                 console.log('Element has selected class after adding:', clickedItem.classList.contains('selected'));
-                console.log('Element classes:', clickedItem.className);
+                
             }, 100);
         }
         
-        console.log('Updated extras array:', bookingData.extras);
+        
         
         // Recalculate price with new extras
         checkAndCalculatePrice();
@@ -697,7 +696,7 @@ document.addEventListener('DOMContentLoaded', function() {
             languageSelector.disabled = true;
         }
         
-        console.log('Switching to language:', targetLanguage);
+        
         
         const formData = new FormData();
         formData.append('action', 'cb_switch_language');
@@ -764,8 +763,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Save language preference
                     localStorage.setItem('cb_language', targetLanguage);
                     
-                    console.log('Language switched to:', targetLanguage);
-                    console.log('Current language is now:', cb_frontend.current_language);
+                    
+                    
                     
                     // Show success message
                     const message = response.data.translations['Language switched successfully'] || response.data.message || 'Language switched successfully';
@@ -788,7 +787,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function updateUITranslations() {
         const translations = cb_frontend.translations;
-        console.log('Current language:', cb_frontend.current_language);
+        
         
         if (!translations || Object.keys(translations).length === 0) {
             return; // No translations available
@@ -1023,7 +1022,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
         formData.append('booking_data', JSON.stringify(sessionData));
     
-        console.log('Storing booking data in session:', sessionData);
+        
     
         // Store booking data in session
         fetch(cb_frontend.ajax_url, {
@@ -1032,7 +1031,7 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(response => {
-            console.log('Session storage response:', response);
+            
     
             if (response.success) {
                 // Release the held slot since we're moving to checkout
@@ -1045,7 +1044,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
                 // Redirect to WooCommerce checkout with session reference
                 if (response.data.checkout_url) {
-                    console.log('Redirecting to checkout URL:', response.data.checkout_url);
+                    
                     window.location.replace(response.data.checkout_url);
                 } else {
                     console.error('No checkout URL provided');
@@ -1259,6 +1258,12 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        // Prevent multiple simultaneous requests
+        if (window.loadingSlots) {
+            return;
+        }
+        window.loadingSlots = true;
+        
         const timeSlotsContainer = document.getElementById('cb-time-slots');
         if (timeSlotsContainer) {
             timeSlotsContainer.innerHTML = '<div class="cb-loading">' + cb_frontend.strings.loading_slots + '</div>';
@@ -1272,58 +1277,66 @@ document.addEventListener('DOMContentLoaded', function() {
         formData.append('booking_date', bookingData.booking_date);
         formData.append('duration', defaultDuration);
         
+        // Create AbortController for timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
         fetch(cb_frontend.ajax_url, {
             method: 'POST',
-            body: formData
+            body: formData,
+            signal: controller.signal
         })
         .then(response => response.json())
         .then(response => {
-                if (response.success && response.data.slots) {
-                    availableSlots = response.data.slots;
-                    displayTimeSlots();
-                } else {
+            clearTimeout(timeoutId); // Clear timeout
+            window.loadingSlots = false; // Reset loading flag
+            
+            console.log('Slots response:', response); // Temporary debug
+            console.log('response.success:', response.success); // Temporary debug
+            console.log('response.data:', response.data); // Temporary debug
+            console.log('response.data.slots:', response.data?.slots); // Temporary debug
+            
+            if (response.success && response.data && response.data.slots) {
+                availableSlots = response.data.slots;
+                console.log('Available slots set:', availableSlots); // Temporary debug
+                console.log('About to call displayTimeSlots()'); // Temporary debug
+                console.log('displayTimeSlots function exists:', typeof displayTimeSlots); // Temporary debug
+                try {
+                    displayTimeSlots(response.data);
+                    console.log('displayTimeSlots() completed successfully'); // Temporary debug
+                } catch (error) {
+                    console.error('Error in displayTimeSlots:', error); // Temporary debug
+                }
+            } else {
+                // Set empty array to prevent infinite loop
+                availableSlots = [];
+                console.log('No slots in response or error:', response); // Temporary debug
                 if (timeSlotsContainer) {
-                    timeSlotsContainer.innerHTML = '<div class="cb-loading">' + (response.data.message || cb_frontend.strings.no_slots_available) + '</div>';
+                    timeSlotsContainer.innerHTML = '<div class="cb-loading">' + (response.data?.message || cb_frontend.strings.no_slots_available) + '</div>';
                 }
             }
         })
         .catch(error => {
-            console.error('Load available slots error:', error);
-            if (timeSlotsContainer) {
-                timeSlotsContainer.innerHTML = '<div class="cb-loading">' + cb_frontend.strings.loading_error + '</div>';
+            clearTimeout(timeoutId); // Clear timeout
+            window.loadingSlots = false; // Reset loading flag
+            
+            if (error.name === 'AbortError') {
+                console.error('Load available slots timeout');
+                if (timeSlotsContainer) {
+                    timeSlotsContainer.innerHTML = '<div class="cb-loading">Request timeout. Please try again.</div>';
+                }
+            } else {
+                console.error('Load available slots error:', error);
+                if (timeSlotsContainer) {
+                    timeSlotsContainer.innerHTML = '<div class="cb-loading">' + cb_frontend.strings.loading_error + '</div>';
+                }
             }
+            
+            // Set empty array to prevent infinite loop
+            availableSlots = [];
         });
     }
     
-    function displayTimeSlots() {
-        const timeSlotsContainer = document.getElementById('cb-time-slots');
-        if (!timeSlotsContainer) return;
-        
-        timeSlotsContainer.innerHTML = '';
-        
-        if (availableSlots.length === 0) {
-            timeSlotsContainer.innerHTML = '<div class="cb-loading">' + cb_frontend.strings.no_slots_available + '</div>';
-            return;
-        }
-        
-        availableSlots.forEach(function(slot) {
-            const slotElement = document.createElement('div');
-            slotElement.className = 'cb-time-slot';
-            slotElement.dataset.time = slot.time;
-            slotElement.textContent = slot.time;
-            
-            if (!slot.available) {
-                slotElement.classList.add('unavailable');
-            }
-            
-            timeSlotsContainer.appendChild(slotElement);
-        });
-        
-        // Apply custom border colors to newly created time slots
-        if (cb_frontend.colors) {
-            applyCustomBorderColors();
-        }
-    }
     
     function updateBookingSummary() {
         const service = services.find(s => s.id == bookingData.service_id);
@@ -1397,11 +1410,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 break;
             case 3:
                 // Service details step
-                console.log('Step 3 - service_id:', bookingData.service_id);
+                
                 
                 // Auto-trigger calculation when entering step 3
                 if (bookingData.service_id) {
-                    console.log('Step 3 - Auto-triggering price calculation');
+                    
                     
                     // Ensure extras is initialized as empty array for base service calculation
                     // Only initialize if it doesn't exist, don't reset existing selections
@@ -1409,15 +1422,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         bookingData.extras = [];
                     }
                     
-                    console.log('Step 3 - Current extras before calculation:', bookingData.extras);
+                    
                     calculatePrice();
                 }
                 
                 if (bookingData.service_id && extras.length === 0) {
-                    console.log('Step 3 - calling loadExtras');
+                    
                     loadExtras();
                 } else {
-                    console.log('Step 3 - calling displayExtras');
+                    
                     displayExtras();
                     
                     // Force update visual state after displaying extras
@@ -1434,7 +1447,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 break;
             case 4:
                 // Date & time step
-                if (bookingData.booking_date && availableSlots.length === 0) {
+                if (bookingData.booking_date && availableSlots.length === 0 && !window.loadingSlots) {
                     loadAvailableSlots();
                 } else {
                     displayTimeSlots();
@@ -1519,25 +1532,8 @@ document.addEventListener('DOMContentLoaded', function() {
             servicesContainer.innerHTML = '<div class="cb-loading">' + cb_frontend.strings.loading_services + '</div>';
         }
         
-        // First test debug endpoint
-        const debugFormData = new FormData();
-        debugFormData.append('action', 'cb_debug');
-        
-        fetch(cb_frontend.ajax_url, {
-            method: 'POST',
-            body: debugFormData
-        })
-        .then(response => response.json())
-        .then(response => {
-                // Now try to get services
-                loadServicesReal();
-        })
-        .catch(error => {
-            console.error('Debug error:', error);
-            if (servicesContainer) {
-                servicesContainer.innerHTML = '<div class="cb-loading">Debug Error: ' + error.message + '</div>';
-            }
-        });
+        // Load services directly
+        loadServicesReal();
     }
     
     function loadServicesReal() {
@@ -1552,7 +1548,7 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(response => {
-            console.log('Services fetch response:', response);
+            
                 if (response.success && response.data.services) {
                     services = response.data.services;
                     displayServices();
@@ -1564,7 +1560,7 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(error => {
             console.error('Services fetch error:', error);
-                console.log('Trying REST API fallback...');
+                
                 
                 // Fallback to REST API
             fetch(cb_frontend.rest_url + 'services', {
@@ -1572,7 +1568,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(response => response.json())
             .then(response => {
-                        console.log('Services REST response:', response);
+                        
                         if (response.success && response.services) {
                             services = response.services;
                             displayServices();
@@ -1705,7 +1701,7 @@ document.addEventListener('DOMContentLoaded', function() {
             extrasContainer.innerHTML = '<div class="cb-loading">' + cb_frontend.strings.loading_extras + '</div>';
         }
         
-        console.log('Making fetch call to load extras for service_id:', bookingData.service_id);
+        
         
         const formData = new FormData();
         formData.append('action', 'cb_get_extras');
@@ -1717,13 +1713,13 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(response => {
-            console.log('Extras fetch response:', response);
+            
                 if (response.success && response.data.extras) {
                     extras = response.data.extras;
-                    console.log('Loaded extras:', extras);
+                    
                     displayExtras();
                 } else {
-                    console.log('No extras available or error:', response.data.message);
+                    
                 if (extrasContainer) {
                     extrasContainer.innerHTML = '<div class="cb-loading">' + (response.data.message || cb_frontend.strings.no_extras_available) + '</div>';
                 }
@@ -1832,7 +1828,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const service = services.find(s => s.id == bookingData.service_id);
         const additionalArea = bookingData.square_meters || 0;
         
-        console.log('Calculating price for service:', bookingData.service_id, 'additional sqm:', additionalArea, 'extras:', bookingData.extras);
+        
         
         const formData = new FormData();
         formData.append('action', 'cb_calculate_price');
@@ -1844,10 +1840,10 @@ document.addEventListener('DOMContentLoaded', function() {
         // Handle extras properly - ensure it's always an array
         if (bookingData.extras && Array.isArray(bookingData.extras) && bookingData.extras.length > 0) {
             formData.append('extras', JSON.stringify(bookingData.extras));
-            console.log('Sending extras:', bookingData.extras);
+            
         } else {
             formData.append('extras', '[]'); // Send empty array as JSON string
-            console.log('No extras to send, sending empty array');
+            
         }
         
         formData.append('zip_code', bookingData.zip_code);
@@ -1871,7 +1867,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             return response.text().then(text => {
-                console.log('Raw server response:', text);
+                
                 try {
                     return JSON.parse(text);
                 } catch (e) {
@@ -1881,10 +1877,10 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         })
         .then(response => {
-                console.log('Price calculation response:', response);
+                
                 if (response.success) {
                     bookingData.pricing = response.data.pricing;
-                    console.log('Price calculated:', bookingData.pricing);
+                    
                     updatePricingDisplay();
                     updateSidebarDisplay();
                 } else {
@@ -1913,9 +1909,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const pricing = bookingData.pricing;
         
         // Debug logging
-        console.log('updatePricingDisplay called with pricing:', pricing);
-        console.log('Extras price:', pricing.extras_price);
-        console.log('Total price:', pricing.total_price);
+        
+        
+        
         
         // Update main pricing display (Step 5)
         const summaryPrice = document.getElementById('cb-summary-price');
@@ -2152,31 +2148,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Add database check function for debugging
-    window.checkDatabaseStatus = function() {
-        const formData = new FormData();
-        formData.append('action', 'cb_check_database');
-        
-        fetch(cb_frontend.ajax_url, {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(response => {
-            console.log('Database Status:', response);
-            if (response.success) {
-                const data = response.data;
-                console.log('Services table exists:', data.services_table_exists);
-                console.log('Extras table exists:', data.extras_table_exists);
-                console.log('Services count:', data.services_count);
-                console.log('Extras count:', data.extras_count);
-                console.log('Pricing class exists:', data.pricing_class_exists);
-            }
-        })
-        .catch(error => {
-            console.error('Database check failed:', error);
-        });
-    };
     
     // Release slot when page is unloaded
     window.addEventListener('beforeunload', function() {
@@ -2260,25 +2231,66 @@ document.addEventListener('DOMContentLoaded', function() {
         // Clear existing slots
         timeSlotsContainer.innerHTML = '';
         
-        // Display slots for each date
-        Object.keys(slotsData).forEach(dateKey => {
-            const dateData = slotsData[dateKey];
-            const dateElement = document.createElement('div');
-            dateElement.className = 'cb-date-group';
-            dateElement.innerHTML = `
-                <h4>${dateData.date}</h4>
-                <div class="cb-time-grid">
-                    ${dateData.slots.map(slot => `
-                        <button class="cb-time-slot ${slot.available ? 'available' : 'unavailable'}" 
-                                data-time="${slot.time}" 
-                                data-date="${dateData.date}"
-                                ${!slot.available ? 'disabled' : ''}>
-                            ${slot.time}
-                        </button>
-                    `).join('')}
-                </div>
-            `;
-            timeSlotsContainer.appendChild(dateElement);
-        });
+        // Handle different data structures
+        if (slotsData.slots && Array.isArray(slotsData.slots)) {
+            // Structure: {slots: [...]}
+            const slots = slotsData.slots;
+            if (slots.length === 0) {
+                timeSlotsContainer.innerHTML = '<div class="cb-loading">' + cb_frontend.strings.no_slots_available + '</div>';
+                return;
+            }
+            
+            // Group slots by date if they have date information
+            const slotsByDate = {};
+            slots.forEach(slot => {
+                const date = slot.date || 'Today'; // Use slot date or default to 'Today'
+                if (!slotsByDate[date]) {
+                    slotsByDate[date] = [];
+                }
+                slotsByDate[date].push(slot);
+            });
+            
+            // Display slots for each date
+            Object.keys(slotsByDate).forEach(dateKey => {
+                const dateData = slotsByDate[dateKey];
+                const dateElement = document.createElement('div');
+                dateElement.className = 'cb-date-group';
+                dateElement.innerHTML = `
+                    <h4>${dateKey}</h4>
+                    <div class="cb-time-grid">
+                        ${dateData.map(slot => `
+                            <button class="cb-time-slot ${slot.available ? 'available' : 'unavailable'}" 
+                                    data-time="${slot.time}" 
+                                    data-date="${dateKey}"
+                                    ${!slot.available ? 'disabled' : ''}>
+                                ${slot.time}
+                            </button>
+                        `).join('')}
+                    </div>
+                `;
+                timeSlotsContainer.appendChild(dateElement);
+            });
+        } else {
+            // Structure: {date1: {slots: [...]}, date2: {slots: [...]}}
+            Object.keys(slotsData).forEach(dateKey => {
+                const dateData = slotsData[dateKey];
+                const dateElement = document.createElement('div');
+                dateElement.className = 'cb-date-group';
+                dateElement.innerHTML = `
+                    <h4>${dateData.date}</h4>
+                    <div class="cb-time-grid">
+                        ${dateData.slots.map(slot => `
+                            <button class="cb-time-slot ${slot.available ? 'available' : 'unavailable'}" 
+                                    data-time="${slot.time}" 
+                                    data-date="${dateData.date}"
+                                    ${!slot.available ? 'disabled' : ''}>
+                                ${slot.time}
+                            </button>
+                        `).join('')}
+                    </div>
+                `;
+                timeSlotsContainer.appendChild(dateElement);
+            });
+        }
     }
 });

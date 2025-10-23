@@ -52,19 +52,16 @@ class CB_WooCommerce {
     
     public function create_booking_order($booking) {
         if (!$booking) {
-            error_log('CB Debug - No booking provided to create_booking_order');
             return false;
         }
         
         // Check if WooCommerce is active
         if (!class_exists('WooCommerce')) {
-            error_log('CB Debug - WooCommerce is not active');
             return false;
         }
         
         // Check if WooCommerce functions are available
         if (!function_exists('wc_get_checkout_url')) {
-            error_log('CB Debug - WooCommerce functions not available');
             return false;
         }
         
@@ -72,11 +69,8 @@ class CB_WooCommerce {
         $product_id = $this->create_booking_product($booking);
         
         if (!$product_id) {
-            error_log('CB Debug - Failed to create booking product');
             return false;
         }
-        
-        error_log('CB Debug - Created product ID: ' . $product_id);
         
         // Create checkout URL with booking data
         $checkout_url = add_query_arg(array(
