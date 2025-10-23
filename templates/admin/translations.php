@@ -657,13 +657,13 @@ jQuery(document).ready(function($) {
                 },
                 success: function(response) {
                     if (response.success) {
-                        showNotification('<?php _e('Translation cache cleared successfully!', 'cleaning-booking'); ?>', 'success');
+                        showSaveIndicator('<?php _e('Translation cache cleared successfully!', 'cleaning-booking'); ?>');
                     } else {
-                        showNotification('<?php _e('Error clearing cache: ', 'cleaning-booking'); ?>' + response.data.message, 'error');
+                        showErrorIndicator('<?php _e('Error clearing cache: ', 'cleaning-booking'); ?>' + response.data.message);
                     }
                 },
                 error: function() {
-                    showNotification('<?php _e('Network error. Please try again.', 'cleaning-booking'); ?>', 'error');
+                    showErrorIndicator('<?php _e('Network error. Please try again.', 'cleaning-booking'); ?>');
                 },
                 complete: function() {
                     $button.prop('disabled', false).text(originalText);
