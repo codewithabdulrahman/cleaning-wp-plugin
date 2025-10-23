@@ -95,6 +95,7 @@ class CB_Database {
             sqm_multiplier decimal(10,4) NOT NULL DEFAULT 0.0000,
             sqm_duration_multiplier decimal(10,4) NOT NULL DEFAULT 0.0000,
             default_area int(11) NOT NULL DEFAULT 0,
+            icon_url varchar(500) DEFAULT NULL,
             is_active tinyint(1) NOT NULL DEFAULT 1,
             sort_order int(11) NOT NULL DEFAULT 0,
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
@@ -343,6 +344,8 @@ class CB_Database {
     }
     
     public static function run_migrations() {
+        error_log('Running database migrations...');
+        
         // Run all migration checks
         self::check_service_extras_table();
         self::check_payment_method_column();
@@ -351,6 +354,9 @@ class CB_Database {
         self::check_form_fields_table();
         self::check_translations_table();
         self::check_style_settings_table();
+        self::check_service_icon_column();
+        
+        error_log('Database migrations completed.');
     }
     
     private static function check_service_extras_table() {
@@ -563,6 +569,24 @@ class CB_Database {
             
             // Insert default style settings
             self::insert_default_style_settings();
+        }
+    }
+    
+    private static function check_service_icon_column() {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'cb_services';
+        $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'icon_url'");
+        
+        error_log('Checking icon_url column. Table: ' . $table_name);
+        error_log('Column exists check result: ' . print_r($column_exists, true));
+        
+        if (empty($column_exists)) {
+            error_log('Adding icon_url column to services table');
+            $result = $wpdb->query("ALTER TABLE $table_name ADD COLUMN icon_url varchar(500) DEFAULT NULL AFTER default_area");
+            error_log('ALTER TABLE result: ' . ($result ? 'SUCCESS' : 'FAILED'));
+        } else {
+            error_log('icon_url column already exists');
         }
     }
     
@@ -1053,7 +1077,12 @@ class CB_Database {
         global $wpdb;
         $table = $wpdb->prefix . 'cb_services';
         $where = $active_only ? 'WHERE is_active = 1' : '';
-        return $wpdb->get_results("SELECT * FROM $table $where ORDER BY sort_order, name");
+        $results = $wpdb->get_results("SELECT * FROM $table $where ORDER BY sort_order, name");
+        
+        // Debug: Log the raw database results
+        error_log('Raw database results: ' . print_r($results, true));
+        
+        return $results;
     }
     
     public static function get_service($service_id) {

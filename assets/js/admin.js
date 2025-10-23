@@ -64,6 +64,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const serviceDefaultAreaInput = document.getElementById('service-default-area');
             const serviceSortOrderInput = document.getElementById('service-sort-order');
             const serviceIsActiveInput = document.getElementById('service-is-active');
+            const serviceIconUrlInput = document.getElementById('service-icon-url');
+            const serviceIconPreview = document.getElementById('service-icon-preview');
+            const serviceIconImg = document.getElementById('service-icon-img');
+            const serviceIconUploadBtn = document.getElementById('service-icon-upload');
             
             if (serviceIdInput) serviceIdInput.value = service.id;
             if (serviceNameInput) serviceNameInput.value = service.name;
@@ -75,6 +79,19 @@ document.addEventListener('DOMContentLoaded', function() {
             if (serviceDefaultAreaInput) serviceDefaultAreaInput.value = service.default_area || 0;
             if (serviceSortOrderInput) serviceSortOrderInput.value = service.sort_order;
             if (serviceIsActiveInput) serviceIsActiveInput.checked = service.is_active == 1;
+            
+            // Handle icon display
+            if (serviceIconUrlInput && service.icon_url) {
+                serviceIconUrlInput.value = service.icon_url;
+                if (serviceIconImg) serviceIconImg.src = service.icon_url;
+                if (serviceIconPreview) serviceIconPreview.style.display = 'block';
+                if (serviceIconUploadBtn) serviceIconUploadBtn.style.display = 'none';
+            } else {
+                if (serviceIconUrlInput) serviceIconUrlInput.value = '';
+                if (serviceIconImg) serviceIconImg.src = '';
+                if (serviceIconPreview) serviceIconPreview.style.display = 'none';
+                if (serviceIconUploadBtn) serviceIconUploadBtn.style.display = 'inline-block';
+            }
             
             const cancelEditBtn = document.getElementById('cb-cancel-edit');
             if (cancelEditBtn) cancelEditBtn.style.display = 'block';
@@ -92,6 +109,50 @@ document.addEventListener('DOMContentLoaded', function() {
             const serviceIdInput = document.getElementById('service-id');
             if (serviceIdInput) serviceIdInput.value = '';
             this.style.display = 'none';
+        });
+    }
+    
+    // Service icon upload handling
+    const iconUploadBtn = document.getElementById('service-icon-upload');
+    const iconRemoveBtn = document.getElementById('service-icon-remove');
+    const iconPreview = document.getElementById('service-icon-preview');
+    const iconImg = document.getElementById('service-icon-img');
+    const iconUrlInput = document.getElementById('service-icon-url');
+    
+    if (iconUploadBtn) {
+        iconUploadBtn.addEventListener('click', function() {
+            const mediaUploader = wp.media({
+                title: 'Select Service Icon',
+                button: {
+                    text: 'Use this icon'
+                },
+                multiple: false,
+                library: {
+                    type: 'image'
+                }
+            });
+            
+            mediaUploader.on('select', function() {
+                const attachment = mediaUploader.state().get('selection').first().toJSON();
+                console.log('Selected attachment:', attachment);
+                console.log('Setting icon URL to:', attachment.url);
+                iconUrlInput.value = attachment.url;
+                iconImg.src = attachment.url;
+                iconPreview.style.display = 'block';
+                iconUploadBtn.style.display = 'none';
+                console.log('Icon URL input value after setting:', iconUrlInput.value);
+            });
+            
+            mediaUploader.open();
+        });
+    }
+    
+    if (iconRemoveBtn) {
+        iconRemoveBtn.addEventListener('click', function() {
+            iconUrlInput.value = '';
+            iconImg.src = '';
+            iconPreview.style.display = 'none';
+            iconUploadBtn.style.display = 'inline-block';
         });
     }
     

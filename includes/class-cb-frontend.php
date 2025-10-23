@@ -540,35 +540,48 @@ class CB_Frontend {
         
         wp_send_json_success(array('slots' => $slots));
     }
+public function ajax_get_services() {
+    // Public endpoint - services listing (no authentication needed)
     
-    public function ajax_get_services() {
-        // Public endpoint - services listing (no authentication needed)
+    try {
+        // Ensure migrations are run before getting services
+        CB_Database::run_migrations();
         
-        // Check if WordPress is blocking this request
-        if (!defined('DOING_AJAX') || !DOING_AJAX) {
-            wp_die('Not an AJAX request');
+        // Get current language
+        $language = $this->get_current_language();
+        
+        // Get translated services WITH icons
+        $services = $this->get_translated_services($language);
+        
+        if ($services === false || empty($services)) {
+            wp_send_json_success(array('services' => array(), 'message' => 'No services found'));
         }
         
-        // Allow cross-origin requests
-        header('Access-Control-Allow-Origin: *');
-        
-        try {
-            // Get current language
-            $language = $this->get_current_language();
+        // Ensure icon_url is properly included in each service
+        $formatted_services = array();
+        foreach ($services as $service) {
+            $formatted_service = array(
+                'id' => $service->id,
+                'name' => $service->name,
+                'description' => $service->description,
+                'base_price' => floatval($service->base_price),
+                'base_duration' => intval($service->base_duration),
+                'sqm_multiplier' => floatval($service->sqm_multiplier),
+                'sqm_duration_multiplier' => floatval($service->sqm_duration_multiplier),
+                'default_area' => isset($service->default_area) ? intval($service->default_area) : 0,
+                'icon_url' => isset($service->icon_url) ? $service->icon_url : '', // Make sure this is included
+                'is_active' => $service->is_active,
+                'sort_order' => $service->sort_order
+            );
             
-            // Get translated services
-            $services = $this->get_translated_services($language);
-            
-            if ($services === false || empty($services)) {
-                wp_send_json_success(array('services' => array(), 'message' => 'No services found'));
-            }
-            
-            wp_send_json_success(array('services' => $services));
-        } catch (Exception $e) {
-            wp_send_json_error(array('message' => 'Database error: ' . $e->getMessage()));
+            $formatted_services[] = $formatted_service;
         }
+        
+        wp_send_json_success(array('services' => $formatted_services));
+    } catch (Exception $e) {
+        wp_send_json_error(array('message' => 'Database error: ' . $e->getMessage()));
     }
-    
+}
     public function ajax_get_extras() {
         // Public endpoint - extras listing for service
         
@@ -788,36 +801,38 @@ class CB_Frontend {
         // Return empty array if no translations found
         return array();
     }
+
+   private function get_translated_services($language) {
+    // Get original services from database WITH icons
+    $services = CB_Database::get_services(true);
     
-    private function get_translated_services($language) {
-        // Get original services from database
-        $services = CB_Database::get_services(true);
-        
-        if (!$services) {
-            return array();
-        }
-        
-        // Fetch translations from db keyed by our stable keys
-        $translated_services = array();
-        foreach ($services as $service) {
-            $service_id = intval($service->id);
-            $translated_services[] = (object) array(
-                'id' => $service_id,
-                'name' => CB_Translations::get_translation('service_name_' . $service_id, $language, 'services') ?: $service->name,
-                'description' => CB_Translations::get_translation('service_desc_' . $service_id, $language, 'services') ?: $service->description,
-                'base_price' => $service->base_price,
-                'base_duration' => $service->base_duration,
-                'sqm_multiplier' => $service->sqm_multiplier,
-                'sqm_duration_multiplier' => $service->sqm_duration_multiplier,
-                'default_area' => isset($service->default_area) ? $service->default_area : 0,
-                'is_active' => $service->is_active,
-                'sort_order' => $service->sort_order
-            );
-        }
-        
-        return $translated_services;
+    if (!$services) {
+        return array();
     }
     
+    $translated_services = array();
+    foreach ($services as $service) {
+        $service_id = intval($service->id);
+        
+        // Create service object with ALL original properties including icon_url
+        $translated_service = new stdClass();
+        $translated_service->id = $service_id;
+        $translated_service->name = CB_Translations::get_translation('service_name_' . $service_id, $language, 'services') ?: $service->name;
+        $translated_service->description = CB_Translations::get_translation('service_desc_' . $service_id, $language, 'services') ?: $service->description;
+        $translated_service->base_price = $service->base_price;
+        $translated_service->base_duration = $service->base_duration;
+        $translated_service->sqm_multiplier = $service->sqm_multiplier;
+        $translated_service->sqm_duration_multiplier = $service->sqm_duration_multiplier;
+        $translated_service->default_area = isset($service->default_area) ? $service->default_area : 0;
+        $translated_service->icon_url = isset($service->icon_url) ? $service->icon_url : ''; // CRITICAL: Preserve icon_url
+        $translated_service->is_active = $service->is_active;
+        $translated_service->sort_order = $service->sort_order;
+        
+        $translated_services[] = $translated_service;
+    }
+    
+    return $translated_services;
+}
     private function get_translated_extras($language = 'en') {
         $extras = CB_Database::get_all_extras(true);
         $translated_extras = array();
@@ -982,19 +997,36 @@ class CB_Frontend {
         ));
     }
     
-    public function rest_get_services($request) {
-        try {
-            $services = CB_Database::get_services(true);
-            
-            return new WP_REST_Response(array(
-                'success' => true,
-                'services' => $services ?: array()
-            ), 200);
-        } catch (Exception $e) {
-            return new WP_Error('error', 'Unable to retrieve services', array('status' => 500));
+public function rest_get_services($request) {
+    try {
+        $services = CB_Database::get_services(true);
+        
+        // Format services to include icon_url
+        $formatted_services = array();
+        foreach ($services as $service) {
+            $formatted_services[] = array(
+                'id' => $service->id,
+                'name' => $service->name,
+                'description' => $service->description,
+                'base_price' => floatval($service->base_price),
+                'base_duration' => intval($service->base_duration),
+                'sqm_multiplier' => floatval($service->sqm_multiplier),
+                'sqm_duration_multiplier' => floatval($service->sqm_duration_multiplier),
+                'default_area' => isset($service->default_area) ? intval($service->default_area) : 0,
+                'icon_url' => isset($service->icon_url) ? $service->icon_url : '', // Make sure this is included
+                'is_active' => $service->is_active,
+                'sort_order' => $service->sort_order
+            );
         }
+        
+        return new WP_REST_Response(array(
+            'success' => true,
+            'services' => $formatted_services
+        ), 200);
+    } catch (Exception $e) {
+        return new WP_Error('error', 'Unable to retrieve services', array('status' => 500));
     }
-    
+}
     public function ajax_calculate_price() {
         try {
             

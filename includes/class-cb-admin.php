@@ -135,7 +135,11 @@ class CB_Admin {
             return;
         }
         
-        wp_enqueue_script('cb-admin', CB_PLUGIN_URL . 'assets/js/admin.js', array(), CB_VERSION, true);
+        // Ensure database migrations are run
+        CB_Database::run_migrations();
+        
+        wp_enqueue_media();
+        wp_enqueue_script('cb-admin', CB_PLUGIN_URL . 'assets/js/admin.js', array('jquery', 'media-upload'), CB_VERSION, true);
         wp_enqueue_style('cb-admin', CB_PLUGIN_URL . 'assets/css/admin.css', array(), CB_VERSION);
         
         wp_localize_script('cb-admin', 'cb_admin', array(
@@ -293,6 +297,9 @@ class CB_Admin {
         global $wpdb;
         $table = $wpdb->prefix . 'cb_services';
         
+        // Debug: Log all POST data
+        error_log('Admin save service POST data: ' . print_r($_POST, true));
+        
         $data = array(
             'name' => sanitize_text_field($_POST['name']),
             'description' => sanitize_textarea_field($_POST['description']),
@@ -300,13 +307,22 @@ class CB_Admin {
             'base_duration' => intval($_POST['base_duration']),
             'sqm_multiplier' => floatval($_POST['sqm_multiplier']),
             'sqm_duration_multiplier' => floatval($_POST['sqm_duration_multiplier']),
+            'default_area' => intval($_POST['default_area']),
+            'icon_url' => esc_url_raw($_POST['icon_url']),
             'is_active' => isset($_POST['is_active']) ? 1 : 0,
             'sort_order' => intval($_POST['sort_order'])
         );
         
+        // Debug: Log the data being saved
+        error_log('Admin save service data array: ' . print_r($data, true));
+        
         if (isset($_POST['id']) && !empty($_POST['id'])) {
             // Update existing
             $result = $wpdb->update($table, $data, array('id' => intval($_POST['id'])));
+            error_log('Database update result: ' . ($result ? 'SUCCESS' : 'FAILED'));
+            if ($wpdb->last_error) {
+                error_log('Database error: ' . $wpdb->last_error);
+            }
             $message = $result ? __('Service updated successfully!', 'cleaning-booking') : __('Error updating service', 'cleaning-booking');
             // Persist translations for service name/description (default both languages to provided values)
             $service_id = intval($_POST['id']);
@@ -701,7 +717,8 @@ class CB_Admin {
                 'id' => $service->id,
                 'name' => $service->name,
                 'description' => $service->description,
-                'base_price' => floatval($service->base_price)
+                'base_price' => floatval($service->base_price),
+                'icon_url' => isset($service->icon_url) ? $service->icon_url : ''
             );
         }
         
