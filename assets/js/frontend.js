@@ -964,9 +964,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Update placeholders
-        if (translations['Enter additional space beyond the default area, or leave as 0 to skip']) {
+        if (translations['Enter total space beyond the default area, or leave as 0 to skip']) {
             const spacePlaceholder = document.querySelector('#cb-square-meters + small');
-            if (spacePlaceholder) spacePlaceholder.textContent = translations['Enter additional space beyond the default area, or leave as 0 to skip'];
+            if (spacePlaceholder) spacePlaceholder.textContent = translations['Enter total space beyond the default area, or leave as 0 to skip'];
         }
         
         // Update Step 3 pricing labels
@@ -1687,7 +1687,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Show hint about additional area
         if (hintElement) {
             hintElement.style.display = 'block';
-            const hintText = cb_frontend.translations['Enter additional space beyond the default area, or leave as 0 to skip'] || 'Εισάγετε επιπλέον χώρο πέρα από την προεπιλεγμένη περιοχή, ή αφήστε 0 για παράλειψη';
+            const hintText = cb_frontend.translations['Enter total space beyond the default area, or leave as 0 to skip'] || 'Εισάγετε Σύνολο χώρο πέρα από την προεπιλεγμένη περιοχή, ή αφήστε 0 για παράλειψη';
             hintElement.innerHTML = `<small>${hintText.replace('default area', `default ${service.default_area} m²`)}</small>`;
         }
         
@@ -1695,9 +1695,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (baseAreaInfo && baseAreaMessage && basePriceDisplay && baseDurationDisplay) {
             baseAreaInfo.style.display = 'block';
             
-            // Set base area message with skip option
-            const baseMessage = cb_frontend.translations['This service includes 50 m² at base price. Enter additional space above if needed, or skip to proceed with base service.'] || 'Αυτή η υπηρεσία περιλαμβάνει 50 m² σε βασική τιμή. Εισάγετε επιπλέον χώρο παραπάνω αν χρειάζεται, ή παραλείψτε για να προχωρήσετε με τη βασική υπηρεσία.';
-            baseAreaMessage.textContent = baseMessage.replace('50 m²', `${service.default_area} m²`);
+            
             
             // Calculate and display base pricing
             const basePrice = parseFloat(service.base_price) || 0;
