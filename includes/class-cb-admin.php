@@ -36,7 +36,8 @@ class CB_Admin {
         add_action('wp_ajax_cb_save_translation', array($this, 'ajax_save_translation'));
         add_action('wp_ajax_cb_delete_translation', array($this, 'ajax_delete_translation'));
         add_action('wp_ajax_cb_bulk_update_translations', array($this, 'ajax_bulk_update_translations'));
-        add_action('wp_ajax_cb_remove_duplicate_translations', array($this, 'ajax_remove_duplicate_translations'));
+        add_action('wp_ajax_cb_bulk_delete_translations', array($this, 'ajax_bulk_delete_translations'));
+        add_action('wp_ajax_cb_seed_translations', array($this, 'ajax_seed_translations'));
         add_action('wp_ajax_cb_clear_translation_cache', array($this, 'ajax_clear_translation_cache'));
         // Import/Export removed per product decision
         
@@ -163,6 +164,7 @@ class CB_Admin {
         
         $bookings_table = $wpdb->prefix . 'cb_bookings';
         $services_table = $wpdb->prefix . 'cb_services';
+        $booking_services_table = $wpdb->prefix . 'cb_booking_services';
         
         // Handle booking creation (AJAX will handle most cases, this is fallback)
         if (isset($_POST['create_booking']) && wp_verify_nonce($_POST['_wpnonce'], 'cb_create_booking')) {
@@ -177,11 +179,15 @@ class CB_Admin {
             echo '<div class="notice notice-success"><p>' . __('Booking status updated!', 'cleaning-booking') . '</p></div>';
         }
         
-        // Get bookings
+        // Get bookings with their services
         $bookings = $wpdb->get_results("
-            SELECT b.*, s.name as service_name 
+            SELECT b.*, 
+                   GROUP_CONCAT(s.name SEPARATOR ', ') as service_names,
+                   GROUP_CONCAT(bs.quantity SEPARATOR ', ') as service_quantities
             FROM $bookings_table b 
-            LEFT JOIN $services_table s ON b.service_id = s.id 
+            LEFT JOIN $booking_services_table bs ON b.id = bs.booking_id 
+            LEFT JOIN $services_table s ON bs.service_id = s.id 
+            GROUP BY b.id
             ORDER BY b.created_at DESC 
             LIMIT 50
         ");
@@ -613,12 +619,17 @@ class CB_Admin {
         global $wpdb;
         $bookings_table = $wpdb->prefix . 'cb_bookings';
         $services_table = $wpdb->prefix . 'cb_services';
+        $booking_services_table = $wpdb->prefix . 'cb_booking_services';
         
         $booking = $wpdb->get_row($wpdb->prepare(
-            "SELECT b.*, s.name as service_name 
+            "SELECT b.*, 
+                    GROUP_CONCAT(s.name SEPARATOR ', ') as service_names,
+                    GROUP_CONCAT(bs.quantity SEPARATOR ', ') as service_quantities
              FROM $bookings_table b 
-             LEFT JOIN $services_table s ON b.service_id = s.id 
-             WHERE b.id = %d",
+             LEFT JOIN $booking_services_table bs ON b.id = bs.booking_id 
+             LEFT JOIN $services_table s ON bs.service_id = s.id 
+             WHERE b.id = %d
+             GROUP BY b.id",
             $booking_id
         ));
         
@@ -631,7 +642,7 @@ class CB_Admin {
                 'customer_email' => $booking->customer_email,
                 'customer_phone' => $booking->customer_phone,
                 'address' => $booking->address,
-                'service_name' => $booking->service_name,
+                'service_name' => $booking->service_names,
                 'square_meters' => $booking->square_meters,
                 'booking_date' => date('M j, Y', strtotime($booking->booking_date)),
                 'booking_time' => date('g:i A', strtotime($booking->booking_time)),
@@ -798,7 +809,7 @@ class CB_Admin {
             'field_key' => sanitize_text_field($_POST['field_key']),
             'field_type' => sanitize_text_field($_POST['field_type']),
             'label_en' => sanitize_text_field($_POST['label_en']),
-            'label_el' => sanitize_text_field($_POST['label_el']),
+            'label_el' => '', // Greek labels are managed through translations page
             'placeholder_en' => sanitize_text_field($_POST['placeholder_en']),
             'placeholder_el' => sanitize_text_field($_POST['placeholder_el']),
             'is_required' => isset($_POST['is_required']) ? 1 : 0,
@@ -860,6 +871,32 @@ class CB_Admin {
     
     // Translations Page Methods
     public function translations_page() {
+        // Debug: Check what's in the database
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_translations';
+        
+        $total_count = $wpdb->get_var("SELECT COUNT(*) FROM $table");
+        $active_count = $wpdb->get_var("SELECT COUNT(*) FROM $table WHERE is_active = 1");
+        
+        error_log("CB_Admin: Total translations in DB: $total_count");
+        error_log("CB_Admin: Active translations in DB: $active_count");
+        
+        // If we have translations but none are active, fix them
+        if ($total_count > 0 && $active_count == 0) {
+            error_log("CB_Admin: Found $total_count translations but none are active. Fixing...");
+            $wpdb->query("UPDATE $table SET is_active = 1 WHERE is_active IS NULL OR is_active = 0");
+            $active_count = $wpdb->get_var("SELECT COUNT(*) FROM $table WHERE is_active = 1");
+            error_log("CB_Admin: After fix - Active translations: $active_count");
+        }
+        
+        // Check a few sample records
+        $sample_records = $wpdb->get_results("SELECT id, string_key, text_en, is_active FROM $table LIMIT 5");
+        error_log("CB_Admin: Sample records: " . print_r($sample_records, true));
+        
+        // Check what get_admin_translations returns
+        $admin_translations = CB_Translations::get_admin_translations();
+        error_log("CB_Admin: get_admin_translations returned: " . count($admin_translations) . " records");
+        
         include CB_PLUGIN_DIR . 'templates/admin/translations.php';
     }
     
@@ -903,6 +940,50 @@ class CB_Admin {
             wp_send_json_success(array('message' => __('Translation deleted successfully!', 'cleaning-booking')));
         } else {
             wp_send_json_error(array('message' => __('Error deleting translation.', 'cleaning-booking')));
+        }
+    }
+    
+    public function ajax_seed_translations() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.'));
+        }
+        
+        try {
+            if (class_exists('CB_Translation_Seeder')) {
+                CB_Translation_Seeder::seed_all();
+                wp_send_json_success(array('message' => __('Translations seeded successfully!', 'cleaning-booking')));
+            } else {
+                wp_send_json_error(array('message' => __('Translation seeder class not found.', 'cleaning-booking')));
+            }
+        } catch (Exception $e) {
+            wp_send_json_error(array('message' => __('Error seeding translations: ', 'cleaning-booking') . $e->getMessage()));
+        }
+    }
+    
+    public function ajax_bulk_delete_translations() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions to access this page.'));
+        }
+        
+        $translation_ids = isset($_POST['translation_ids']) ? $_POST['translation_ids'] : array();
+        
+        if (empty($translation_ids) || !is_array($translation_ids)) {
+            wp_send_json_error(array('message' => __('No translations selected for deletion.', 'cleaning-booking')));
+        }
+        
+        $deleted_count = CB_Translation_Seeder::bulk_delete_translations($translation_ids);
+        
+        if ($deleted_count > 0) {
+            wp_send_json_success(array(
+                'message' => sprintf(__('%d translations deleted successfully!', 'cleaning-booking'), $deleted_count),
+                'deleted_count' => $deleted_count
+            ));
+        } else {
+            wp_send_json_error(array('message' => __('Error deleting translations.', 'cleaning-booking')));
         }
     }
     
@@ -1075,71 +1156,6 @@ class CB_Admin {
     }
     
     /**
-     * AJAX handler for removing duplicate translations
-     */
-    public function ajax_remove_duplicate_translations() {
-        check_ajax_referer('cb_admin_nonce', 'nonce');
-        
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(array('message' => __('Insufficient permissions', 'cleaning-booking')));
-        }
-        
-        try {
-            global $wpdb;
-            
-            $translations_table = $wpdb->prefix . 'cb_translations';
-            
-            // Find duplicates based on English text
-            $duplicates = $wpdb->get_results("
-                SELECT text_en, COUNT(*) as count 
-                FROM {$translations_table} 
-                WHERE text_en IS NOT NULL AND text_en != '' 
-                GROUP BY text_en 
-                HAVING COUNT(*) > 1
-            ");
-            
-            $removed_count = 0;
-            
-            foreach ($duplicates as $duplicate) {
-                // Get all records with this English text
-                $records = $wpdb->get_results($wpdb->prepare("
-                    SELECT id FROM {$translations_table} 
-                    WHERE text_en = %s 
-                    ORDER BY id ASC
-                ", $duplicate->text_en));
-                
-                // Keep the first record, remove the rest
-                if (count($records) > 1) {
-                    $ids_to_remove = array_slice(array_column($records, 'id'), 1);
-                    
-                    if (!empty($ids_to_remove)) {
-                        $placeholders = implode(',', array_fill(0, count($ids_to_remove), '%d'));
-                        $wpdb->query($wpdb->prepare("
-                            DELETE FROM {$translations_table} 
-                            WHERE id IN ({$placeholders})
-                        ", $ids_to_remove));
-                        
-                        $removed_count += count($ids_to_remove);
-                    }
-                }
-            }
-            
-            // Clear translation cache after removing duplicates
-            if (class_exists('CB_Translations')) {
-                CB_Translations::clear_all_translation_cache();
-            }
-            
-            wp_send_json_success(array(
-                'message' => sprintf(__('Successfully removed %d duplicate translations.', 'cleaning-booking'), $removed_count),
-                'removed_count' => $removed_count
-            ));
-            
-        } catch (Exception $e) {
-            wp_send_json_error(array('message' => $e->getMessage()));
-        }
-    }
-    
-    /**
      * AJAX handler for clearing translation cache
      */
     public function ajax_clear_translation_cache() {
@@ -1158,5 +1174,30 @@ class CB_Admin {
         } catch (Exception $e) {
             wp_send_json_error(array('message' => $e->getMessage()));
         }
+    }
+    
+    /**
+     * Validate admin permissions
+     */
+    private function validate_admin_permissions() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            throw new Exception(__('Insufficient permissions', 'cleaning-booking'));
+        }
+    }
+    
+    /**
+     * Clear translation cache
+     */
+    private function clear_translation_cache() {
+        CB_Translations::clear_all_translation_cache();
+    }
+    
+    /**
+     * Log error
+     */
+    private function log_error($context, $exception) {
+        error_log("CB_Admin::{$context} error: " . $exception->getMessage());
     }
 }

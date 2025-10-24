@@ -56,7 +56,6 @@ $stats = CB_Form_Fields::get_field_stats();
                     <th style="width: 150px;"><?php _e('Field Key', 'cleaning-booking'); ?></th>
                     <th style="width: 100px;"><?php _e('Type', 'cleaning-booking'); ?></th>
                     <th><?php _e('English Label', 'cleaning-booking'); ?></th>
-                    <th><?php _e('Greek Label', 'cleaning-booking'); ?></th>
                     <th style="width: 80px;"><?php _e('Required', 'cleaning-booking'); ?></th>
                     <th style="width: 80px;"><?php _e('Visible', 'cleaning-booking'); ?></th>
                     <th style="width: 120px;"><?php _e('Actions', 'cleaning-booking'); ?></th>
@@ -82,11 +81,6 @@ $stats = CB_Form_Fields::get_field_stats();
                         <td>
                             <div class="cb-field-label" data-field="label_en" data-field-id="<?php echo $field->id; ?>">
                                 <?php echo esc_html($field->label_en); ?>
-                            </div>
-                        </td>
-                        <td>
-                            <div class="cb-field-label" data-field="label_el" data-field-id="<?php echo $field->id; ?>">
-                                <?php echo esc_html($field->label_el); ?>
                             </div>
                         </td>
                         <td>
@@ -159,14 +153,6 @@ $stats = CB_Form_Fields::get_field_stats();
                     </td>
                 </tr>
                 
-                <tr>
-                    <th scope="row">
-                        <label for="cb-label-el"><?php _e('Greek Label', 'cleaning-booking'); ?></label>
-                    </th>
-                    <td>
-                        <input type="text" id="cb-label-el" name="label_el" class="regular-text" required>
-                    </td>
-                </tr>
                 
                 <tr id="cb-placeholder-row">
                     <th scope="row">
@@ -288,7 +274,6 @@ jQuery(document).ready(function($) {
             $('#cb-field-key').val(field.field_key);
             $('#cb-field-type').val(field.field_type);
             $('#cb-label-en').val(field.label_en);
-            $('#cb-label-el').val(field.label_el);
             $('#cb-placeholder-en').val(field.placeholder_en);
             $('#cb-placeholder-el').val(field.placeholder_el);
             $('#cb-sort-order').val(field.sort_order);

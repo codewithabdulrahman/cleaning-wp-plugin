@@ -47,13 +47,7 @@ class CB_Database {
         try {
             $charset_collate = $wpdb->get_charset_collate();
             
-            // Run migrations first for existing installations
-            self::run_migrations();
-            
-            // Update existing data to Greek if needed
-            self::update_existing_data_to_greek();
-            
-            // Create tables
+            // Create tables first
             $tables_created = self::create_services_table($charset_collate);
             $tables_created &= self::create_service_extras_table($charset_collate);
             $tables_created &= self::create_bookings_table($charset_collate);
@@ -62,8 +56,15 @@ class CB_Database {
             $tables_created &= self::create_trucks_table($charset_collate);
             $tables_created &= self::create_zip_codes_table($charset_collate);
             $tables_created &= self::create_translations_table($charset_collate);
+            $tables_created &= self::create_slot_holds_table($charset_collate);
             
             if ($tables_created) {
+                // Run migrations after tables are created
+                self::run_migrations();
+                
+                // Seed default translations
+                self::seed_default_translations();
+                
                 update_option('cb_db_version', self::DB_VERSION);
                 return true;
             }
@@ -174,23 +175,32 @@ class CB_Database {
         $bookings_table = $wpdb->prefix . 'cb_bookings';
         $bookings_sql = "CREATE TABLE $bookings_table (
             id mediumint(9) NOT NULL AUTO_INCREMENT,
+            booking_reference varchar(50) NOT NULL,
             customer_name varchar(255) NOT NULL,
             customer_email varchar(255) NOT NULL,
             customer_phone varchar(50) NOT NULL,
             booking_date date NOT NULL,
             booking_time time NOT NULL,
-            zipcode varchar(20) NOT NULL,
+            zip_code varchar(20) NOT NULL,
             address text NOT NULL,
-            notes text,
+            service_id mediumint(9) NOT NULL,
+            square_meters int(11) NOT NULL DEFAULT 0,
             total_price decimal(10,2) NOT NULL DEFAULT 0.00,
             total_duration int(11) NOT NULL DEFAULT 0,
             status varchar(20) NOT NULL DEFAULT 'pending',
+            truck_id mediumint(9) DEFAULT NULL,
+            extras_data text,
+            notes text,
+            payment_method varchar(50) DEFAULT NULL,
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
             updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
+            UNIQUE KEY booking_reference (booking_reference),
             KEY booking_date (booking_date),
             KEY status (status),
-            KEY customer_email (customer_email)
+            KEY customer_email (customer_email),
+            KEY service_id (service_id),
+            KEY truck_id (truck_id)
         ) $charset_collate;";
         
         return self::execute_create_table($bookings_table, $bookings_sql);
@@ -262,7 +272,8 @@ class CB_Database {
         $trucks_table = $wpdb->prefix . 'cb_trucks';
         $trucks_sql = "CREATE TABLE $trucks_table (
             id mediumint(9) NOT NULL AUTO_INCREMENT,
-            name varchar(255) NOT NULL,
+            truck_name varchar(255) NOT NULL,
+            truck_number varchar(50) DEFAULT NULL,
             capacity int(11) NOT NULL DEFAULT 1,
             is_active tinyint(1) NOT NULL DEFAULT 1,
             sort_order int(11) NOT NULL DEFAULT 0,
@@ -289,14 +300,15 @@ class CB_Database {
         $zip_codes_table = $wpdb->prefix . 'cb_zip_codes';
         $zip_codes_sql = "CREATE TABLE $zip_codes_table (
             id mediumint(9) NOT NULL AUTO_INCREMENT,
-            zipcode varchar(20) NOT NULL,
+            zip_code varchar(20) NOT NULL,
             city varchar(255) NOT NULL,
+            surcharge decimal(10,2) NOT NULL DEFAULT 0.00,
             is_active tinyint(1) NOT NULL DEFAULT 1,
             sort_order int(11) NOT NULL DEFAULT 0,
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
             updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            UNIQUE KEY zipcode (zipcode),
+            UNIQUE KEY zip_code (zip_code),
             KEY is_active (is_active),
             KEY sort_order (sort_order)
         ) $charset_collate;";
@@ -334,6 +346,35 @@ class CB_Database {
     }
     
     /**
+     * Create slot holds table
+     * 
+     * @param string $charset_collate Database charset collate
+     * @return bool True on success, false on failure
+     */
+    private static function create_slot_holds_table($charset_collate) {
+        global $wpdb;
+        
+        // Slot holds table for temporary booking holds
+        $slot_holds_table = $wpdb->prefix . 'cb_slot_holds';
+        $slot_holds_sql = "CREATE TABLE $slot_holds_table (
+            id mediumint(9) NOT NULL AUTO_INCREMENT,
+            booking_date date NOT NULL,
+            booking_time time NOT NULL,
+            duration int(11) NOT NULL DEFAULT 60,
+            truck_id mediumint(9) DEFAULT NULL,
+            expires_at datetime NOT NULL,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY booking_date (booking_date),
+            KEY booking_time (booking_time),
+            KEY truck_id (truck_id),
+            KEY expires_at (expires_at)
+        ) $charset_collate;";
+        
+        return self::execute_create_table($slot_holds_table, $slot_holds_sql);
+    }
+    
+    /**
      * Migrate database to specific version
      * 
      * @param string $version Target version
@@ -355,6 +396,9 @@ class CB_Database {
         self::check_translations_table();
         self::check_style_settings_table();
         self::check_service_icon_column();
+        self::check_zip_codes_table();
+        self::check_trucks_table();
+        self::check_bookings_table();
         
         error_log('Database migrations completed.');
     }
@@ -461,6 +505,15 @@ class CB_Database {
         global $wpdb;
         
         $slot_holds_table = $wpdb->prefix . 'cb_slot_holds';
+        
+        // Check if table exists first
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$slot_holds_table'") == $slot_holds_table;
+        
+        if (!$table_exists) {
+            // Table doesn't exist, it will be created by create_slot_holds_table()
+            return;
+        }
+        
         $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $slot_holds_table LIKE 'truck_id'");
         
         if (empty($column_exists)) {
@@ -590,15 +643,152 @@ class CB_Database {
         }
     }
     
+    private static function check_zip_codes_table() {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'cb_zip_codes';
+        
+        // Check if table exists
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'");
+        if (!$table_exists) {
+            error_log('ZIP codes table does not exist, skipping migration');
+            return;
+        }
+        
+        // Check if zipcode column exists (old structure)
+        $zipcode_column = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'zipcode'");
+        $zip_code_column = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'zip_code'");
+        
+        if (!empty($zipcode_column) && empty($zip_code_column)) {
+            error_log('Migrating zip_codes table: zipcode -> zip_code');
+            
+            // Rename zipcode to zip_code
+            $wpdb->query("ALTER TABLE $table_name CHANGE zipcode zip_code varchar(20) NOT NULL");
+            
+            // Update the unique key
+            $wpdb->query("ALTER TABLE $table_name DROP INDEX zipcode");
+            $wpdb->query("ALTER TABLE $table_name ADD UNIQUE KEY zip_code (zip_code)");
+        }
+        
+        // Check if surcharge column exists
+        $surcharge_column = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'surcharge'");
+        if (empty($surcharge_column)) {
+            error_log('Adding surcharge column to zip_codes table');
+            $wpdb->query("ALTER TABLE $table_name ADD COLUMN surcharge decimal(10,2) NOT NULL DEFAULT 0.00 AFTER city");
+        }
+    }
+    
+    private static function check_trucks_table() {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'cb_trucks';
+        
+        // Check if table exists
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'");
+        if (!$table_exists) {
+            error_log('Trucks table does not exist, skipping migration');
+            return;
+        }
+        
+        // Check if name column exists (old structure)
+        $name_column = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'name'");
+        $truck_name_column = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'truck_name'");
+        
+        if (!empty($name_column) && empty($truck_name_column)) {
+            error_log('Migrating trucks table: name -> truck_name');
+            
+            // Rename name to truck_name
+            $wpdb->query("ALTER TABLE $table_name CHANGE name truck_name varchar(255) NOT NULL");
+        }
+        
+        // Check if truck_number column exists
+        $truck_number_column = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'truck_number'");
+        if (empty($truck_number_column)) {
+            error_log('Adding truck_number column to trucks table');
+            $wpdb->query("ALTER TABLE $table_name ADD COLUMN truck_number varchar(50) DEFAULT NULL AFTER truck_name");
+        }
+        
+        error_log('Trucks table migration completed');
+    }
+    
+    private static function check_bookings_table() {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'cb_bookings';
+        
+        // Check if table exists
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'");
+        if (!$table_exists) {
+            error_log('Bookings table does not exist, skipping migration');
+            return;
+        }
+        
+        // Check if booking_reference column exists
+        $booking_ref_column = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'booking_reference'");
+        if (empty($booking_ref_column)) {
+            error_log('Adding booking_reference column to bookings table');
+            $wpdb->query("ALTER TABLE $table_name ADD COLUMN booking_reference varchar(50) NOT NULL DEFAULT '' AFTER id");
+            $wpdb->query("ALTER TABLE $table_name ADD UNIQUE KEY booking_reference (booking_reference)");
+        }
+        
+        // Check if zipcode column exists (old structure)
+        $zipcode_column = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'zipcode'");
+        $zip_code_column = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'zip_code'");
+        
+        if (!empty($zipcode_column) && empty($zip_code_column)) {
+            error_log('Migrating bookings table: zipcode -> zip_code');
+            $wpdb->query("ALTER TABLE $table_name CHANGE zipcode zip_code varchar(20) NOT NULL");
+        }
+        
+        // Check if service_id column exists
+        $service_id_column = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'service_id'");
+        if (empty($service_id_column)) {
+            error_log('Adding service_id column to bookings table');
+            $wpdb->query("ALTER TABLE $table_name ADD COLUMN service_id mediumint(9) NOT NULL DEFAULT 0 AFTER address");
+            $wpdb->query("ALTER TABLE $table_name ADD KEY service_id (service_id)");
+        }
+        
+        // Check if square_meters column exists
+        $square_meters_column = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'square_meters'");
+        if (empty($square_meters_column)) {
+            error_log('Adding square_meters column to bookings table');
+            $wpdb->query("ALTER TABLE $table_name ADD COLUMN square_meters int(11) NOT NULL DEFAULT 0 AFTER service_id");
+        }
+        
+        // Check if truck_id column exists
+        $truck_id_column = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'truck_id'");
+        if (empty($truck_id_column)) {
+            error_log('Adding truck_id column to bookings table');
+            $wpdb->query("ALTER TABLE $table_name ADD COLUMN truck_id mediumint(9) DEFAULT NULL AFTER status");
+            $wpdb->query("ALTER TABLE $table_name ADD KEY truck_id (truck_id)");
+        }
+        
+        // Check if extras_data column exists
+        $extras_data_column = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'extras_data'");
+        if (empty($extras_data_column)) {
+            error_log('Adding extras_data column to bookings table');
+            $wpdb->query("ALTER TABLE $table_name ADD COLUMN extras_data text AFTER truck_id");
+        }
+        
+        // Check if payment_method column exists
+        $payment_method_column = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'payment_method'");
+        if (empty($payment_method_column)) {
+            error_log('Adding payment_method column to bookings table');
+            $wpdb->query("ALTER TABLE $table_name ADD COLUMN payment_method varchar(50) DEFAULT NULL AFTER notes");
+        }
+        
+        error_log('Bookings table migration completed');
+    }
+    
     private static function insert_default_data() {
         global $wpdb;
         
-        // Insert default services
+        // Insert default services (English only - translations handled separately)
         $services_table = $wpdb->prefix . 'cb_services';
         $default_services = array(
             array(
-                'name' => 'Καθαρισμός Σπιτιού',
-                'description' => 'Πλήρης υπηρεσία καθαρισμού σπιτιού',
+                'name' => 'House Cleaning',
+                'description' => 'Complete house cleaning service',
                 'base_price' => 80.00,
                 'base_duration' => 120,
                 'sqm_multiplier' => 0.50,
@@ -606,8 +796,8 @@ class CB_Database {
                 'sort_order' => 1
             ),
             array(
-                'name' => 'Καθαρισμός Διαμερίσματος',
-                'description' => 'Υπηρεσία καθαρισμού διαμερίσματος',
+                'name' => 'Apartment Cleaning',
+                'description' => 'Apartment cleaning service',
                 'base_price' => 60.00,
                 'base_duration' => 90,
                 'sqm_multiplier' => 0.40,
@@ -615,8 +805,8 @@ class CB_Database {
                 'sort_order' => 2
             ),
             array(
-                'name' => 'Καθαρισμός Γραφείου',
-                'description' => 'Καθαρισμός γραφείου και χώρου εργασίας',
+                'name' => 'Office Cleaning',
+                'description' => 'Office and workspace cleaning',
                 'base_price' => 100.00,
                 'base_duration' => 150,
                 'sqm_multiplier' => 0.60,
@@ -637,13 +827,13 @@ class CB_Database {
             }
         }
         
-        // Insert default extras for each service
+        // Insert default extras for each service (English only - translations handled separately)
         $service_extras_table = $wpdb->prefix . 'cb_service_extras';
         $default_extras = array(
-            array('name' => 'Πλύσιμο Πιάτων', 'description' => 'Πλύσιμο και τακτοποίηση πιάτων', 'price' => 15.00, 'duration' => 30, 'sort_order' => 1),
-            array('name' => 'Σιδέρωμα', 'description' => 'Σιδέρωμα ρούχων και λινών', 'price' => 20.00, 'duration' => 45, 'sort_order' => 2),
-            array('name' => 'Μαγείρεμα', 'description' => 'Προετοιμασία απλών γευμάτων', 'price' => 25.00, 'duration' => 60, 'sort_order' => 3),
-            array('name' => 'Καθαρισμός Παραθύρων', 'description' => 'Καθαρισμός εσωτερικών και εξωτερικών παραθύρων', 'price' => 30.00, 'duration' => 45, 'sort_order' => 4)
+            array('name' => 'Dishwashing', 'description' => 'Wash and put away dishes', 'price' => 15.00, 'duration' => 30, 'sort_order' => 1),
+            array('name' => 'Ironing', 'description' => 'Iron clothes and linens', 'price' => 20.00, 'duration' => 45, 'sort_order' => 2),
+            array('name' => 'Cooking', 'description' => 'Prepare simple meals', 'price' => 25.00, 'duration' => 60, 'sort_order' => 3),
+            array('name' => 'Window Cleaning', 'description' => 'Clean interior and exterior windows', 'price' => 30.00, 'duration' => 45, 'sort_order' => 4)
         );
         
         // Get default services to assign extras to
@@ -667,14 +857,14 @@ class CB_Database {
             }
         }
         
-        // Insert some default ZIP codes
+        // Insert some default ZIP codes (English only - translations handled separately)
         $zip_codes_table = $wpdb->prefix . 'cb_zip_codes';
         $default_zips = array(
-            array('zip_code' => '10431', 'city' => 'Αθήνα', 'surcharge' => 0.00),
-            array('zip_code' => '10432', 'city' => 'Αθήνα', 'surcharge' => 0.00),
-            array('zip_code' => '10433', 'city' => 'Αθήνα', 'surcharge' => 0.00),
-            array('zip_code' => '54621', 'city' => 'Θεσσαλονίκη', 'surcharge' => 0.00),
-            array('zip_code' => '54622', 'city' => 'Θεσσαλονίκη', 'surcharge' => 0.00)
+            array('zip_code' => '10431', 'city' => 'Athens', 'surcharge' => 0.00),
+            array('zip_code' => '10432', 'city' => 'Athens', 'surcharge' => 0.00),
+            array('zip_code' => '10433', 'city' => 'Athens', 'surcharge' => 0.00),
+            array('zip_code' => '54621', 'city' => 'Thessaloniki', 'surcharge' => 0.00),
+            array('zip_code' => '54622', 'city' => 'Thessaloniki', 'surcharge' => 0.00)
         );
         
         foreach ($default_zips as $zip) {
@@ -699,9 +889,9 @@ class CB_Database {
                 'field_key' => 'zip_code',
                 'field_type' => 'text',
                 'label_en' => 'ZIP Code',
-                'label_el' => 'Ταχυδρομικός Κώδικας',
+                'label_el' => '', // Empty - translations handled separately
                 'placeholder_en' => '12345',
-                'placeholder_el' => '12345',
+                'placeholder_el' => '', // Empty - translations handled separately
                 'is_required' => 1,
                 'is_visible' => 1,
                 'sort_order' => 1,
@@ -711,9 +901,9 @@ class CB_Database {
                 'field_key' => 'service_selection',
                 'field_type' => 'select',
                 'label_en' => 'Select Your Service',
-                'label_el' => 'Επιλέξτε την Υπηρεσία σας',
+                'label_el' => '', // Empty - translations handled separately
                 'placeholder_en' => 'Choose a service',
-                'placeholder_el' => 'Επιλέξτε υπηρεσία',
+                'placeholder_el' => '', // Empty - translations handled separately
                 'is_required' => 1,
                 'is_visible' => 1,
                 'sort_order' => 2,
@@ -723,9 +913,9 @@ class CB_Database {
                 'field_key' => 'square_meters',
                 'field_type' => 'number',
                 'label_en' => 'Space (m²)',
-                'label_el' => 'Χώρος (m²)',
+                'label_el' => '', // Empty - translations handled separately
                 'placeholder_en' => '0',
-                'placeholder_el' => '0',
+                'placeholder_el' => '', // Empty - translations handled separately
                 'is_required' => 0,
                 'is_visible' => 1,
                 'sort_order' => 3,
@@ -735,7 +925,7 @@ class CB_Database {
                 'field_key' => 'extras',
                 'field_type' => 'checkbox',
                 'label_en' => 'Additional Services',
-                'label_el' => 'Επιπλέον Υπηρεσίες',
+                'label_el' => '', // Empty - translations handled separately
                 'placeholder_en' => '',
                 'placeholder_el' => '',
                 'is_required' => 0,
@@ -747,7 +937,7 @@ class CB_Database {
                 'field_key' => 'booking_date',
                 'field_type' => 'date',
                 'label_en' => 'Date',
-                'label_el' => 'Ημερομηνία',
+                'label_el' => '', // Empty - translations handled separately
                 'placeholder_en' => '',
                 'placeholder_el' => '',
                 'is_required' => 1,
@@ -759,9 +949,9 @@ class CB_Database {
                 'field_key' => 'booking_time',
                 'field_type' => 'select',
                 'label_en' => 'Available Time Slots',
-                'label_el' => 'Διαθέσιμες Χρονικές Περιόδους',
+                'label_el' => '', // Empty - translations handled separately
                 'placeholder_en' => 'Select time',
-                'placeholder_el' => 'Επιλέξτε ώρα',
+                'placeholder_el' => '', // Empty - translations handled separately
                 'is_required' => 1,
                 'is_visible' => 1,
                 'sort_order' => 6,
@@ -771,9 +961,9 @@ class CB_Database {
                 'field_key' => 'customer_name',
                 'field_type' => 'text',
                 'label_en' => 'Full Name',
-                'label_el' => 'Ονοματεπώνυμο',
+                'label_el' => '', // Empty - translations handled separately
                 'placeholder_en' => 'Enter your full name',
-                'placeholder_el' => 'Εισάγετε το ονοματεπώνυμό σας',
+                'placeholder_el' => '', // Empty - translations handled separately
                 'is_required' => 1,
                 'is_visible' => 1,
                 'sort_order' => 7,
@@ -783,9 +973,9 @@ class CB_Database {
                 'field_key' => 'customer_email',
                 'field_type' => 'email',
                 'label_en' => 'Email Address',
-                'label_el' => 'Διεύθυνση Email',
+                'label_el' => '', // Empty - translations handled separately
                 'placeholder_en' => 'your@email.com',
-                'placeholder_el' => 'το@email.com',
+                'placeholder_el' => '', // Empty - translations handled separately
                 'is_required' => 1,
                 'is_visible' => 1,
                 'sort_order' => 8,
@@ -795,7 +985,7 @@ class CB_Database {
                 'field_key' => 'customer_phone',
                 'field_type' => 'tel',
                 'label_en' => 'Phone Number',
-                'label_el' => 'Τηλεφωνικός Αριθμός',
+                'label_el' => '', // Empty - translations handled separately
                 'placeholder_en' => '+30 123 456 7890',
                 'placeholder_el' => '+30 123 456 7890',
                 'is_required' => 1,
@@ -807,9 +997,9 @@ class CB_Database {
                 'field_key' => 'address',
                 'field_type' => 'textarea',
                 'label_en' => 'Address',
-                'label_el' => 'Διεύθυνση',
+                'label_el' => '', // Empty - translations handled separately
                 'placeholder_en' => 'Street address, apartment, etc.',
-                'placeholder_el' => 'Οδική διεύθυνση, διαμέρισμα, κλπ.',
+                'placeholder_el' => '', // Empty - translations handled separately
                 'is_required' => 0,
                 'is_visible' => 1,
                 'sort_order' => 10,
@@ -819,9 +1009,9 @@ class CB_Database {
                 'field_key' => 'notes',
                 'field_type' => 'textarea',
                 'label_en' => 'Special Instructions',
-                'label_el' => 'Ειδικές Οδηγίες',
+                'label_el' => '', // Empty - translations handled separately
                 'placeholder_en' => 'Any special requests or instructions...',
-                'placeholder_el' => 'Οποιεσδήποτε ειδικές αιτήσεις ή οδηγίες...',
+                'placeholder_el' => '', // Empty - translations handled separately
                 'is_required' => 0,
                 'is_visible' => 1,
                 'sort_order' => 11,
@@ -997,90 +1187,20 @@ class CB_Database {
         }
     }
     
-    private static function update_existing_data_to_greek() {
-        global $wpdb;
-        
-        // Update existing services to Greek names
-        $services_table = $wpdb->prefix . 'cb_services';
-        $service_updates = array(
-            'House Cleaning' => 'Καθαρισμός Σπιτιού',
-            'Apartment Cleaning' => 'Καθαρισμός Διαμερίσματος',
-            'Office Cleaning' => 'Καθαρισμός Γραφείου'
-        );
-        
-        foreach ($service_updates as $english_name => $greek_name) {
-            $wpdb->update(
-                $services_table,
-                array('name' => $greek_name),
-                array('name' => $english_name),
-                array('%s'),
-                array('%s')
-            );
-        }
-        
-        // Update service descriptions
-        $description_updates = array(
-            'Complete house cleaning service' => 'Πλήρης υπηρεσία καθαρισμού σπιτιού',
-            'Apartment cleaning service' => 'Υπηρεσία καθαρισμού διαμερίσματος',
-            'Office and workspace cleaning' => 'Καθαρισμός γραφείου και χώρου εργασίας'
-        );
-        
-        foreach ($description_updates as $english_desc => $greek_desc) {
-            $wpdb->update(
-                $services_table,
-                array('description' => $greek_desc),
-                array('description' => $english_desc),
-                array('%s'),
-                array('%s')
-            );
-        }
-        
-        // Update existing extras to Greek names
-        $service_extras_table = $wpdb->prefix . 'cb_service_extras';
-        $extra_updates = array(
-            'Dishwashing' => 'Πλύσιμο Πιάτων',
-            'Ironing' => 'Σιδέρωμα',
-            'Cooking' => 'Μαγείρεμα',
-            'Window Cleaning' => 'Καθαρισμός Παραθύρων'
-        );
-        
-        foreach ($extra_updates as $english_name => $greek_name) {
-            $wpdb->update(
-                $service_extras_table,
-                array('name' => $greek_name),
-                array('name' => $english_name),
-                array('%s'),
-                array('%s')
-            );
-        }
-        
-        // Update extra descriptions
-        $extra_description_updates = array(
-            'Wash and put away dishes' => 'Πλύσιμο και τακτοποίηση πιάτων',
-            'Iron clothes and linens' => 'Σιδέρωμα ρούχων και λινών',
-            'Prepare simple meals' => 'Προετοιμασία απλών γευμάτων',
-            'Clean interior and exterior windows' => 'Καθαρισμός εσωτερικών και εξωτερικών παραθύρων'
-        );
-        
-        foreach ($extra_description_updates as $english_desc => $greek_desc) {
-            $wpdb->update(
-                $service_extras_table,
-                array('description' => $greek_desc),
-                array('description' => $english_desc),
-                array('%s'),
-                array('%s')
-            );
-        }
-    }
     
-    public static function get_services($active_only = true) {
+    public static function get_services($active_only = true, $language = 'en') {
         global $wpdb;
         $table = $wpdb->prefix . 'cb_services';
         $where = $active_only ? 'WHERE is_active = 1' : '';
         $results = $wpdb->get_results("SELECT * FROM $table $where ORDER BY sort_order, name");
         
-        // Debug: Log the raw database results
-        error_log('Raw database results: ' . print_r($results, true));
+        // Apply translations if not English
+        if ($language !== 'en') {
+            foreach ($results as $service) {
+                $service->name = self::get_translation($service->name, $language, 'services') ?: $service->name;
+                $service->description = self::get_translation($service->description, $language, 'services') ?: $service->description;
+            }
+        }
         
         return $results;
     }
@@ -1092,11 +1212,20 @@ class CB_Database {
     }
     
     
-    public static function get_zip_codes($active_only = true) {
+    public static function get_zip_codes($active_only = true, $language = 'en') {
         global $wpdb;
         $table = $wpdb->prefix . 'cb_zip_codes';
         $where = $active_only ? 'WHERE is_active = 1' : '';
-        return $wpdb->get_results("SELECT * FROM $table $where ORDER BY zip_code");
+        $results = $wpdb->get_results("SELECT * FROM $table $where ORDER BY zip_code");
+        
+        // Apply translations if not English
+        if ($language !== 'en') {
+            foreach ($results as $zip) {
+                $zip->city = self::get_translation($zip->city, $language, 'locations') ?: $zip->city;
+            }
+        }
+        
+        return $results;
     }
     
     public static function is_zip_code_allowed($zip_code) {
@@ -1262,7 +1391,7 @@ class CB_Database {
         return $wpdb->update($table, $update_data, array('id' => $booking_id));
     }
     
-    public static function get_service_extras($service_id, $active_only = false) {
+    public static function get_service_extras($service_id, $active_only = false, $language = 'en') {
         global $wpdb;
         $table = $wpdb->prefix . 'cb_service_extras';
         $where = $wpdb->prepare("WHERE service_id = %d", $service_id);
@@ -1271,7 +1400,17 @@ class CB_Database {
             $where .= " AND is_active = 1";
         }
         
-        return $wpdb->get_results("SELECT * FROM $table $where ORDER BY id DESC");
+        $results = $wpdb->get_results("SELECT * FROM $table $where ORDER BY id DESC");
+        
+        // Apply translations if not English
+        if ($language !== 'en') {
+            foreach ($results as $extra) {
+                $extra->name = self::get_translation($extra->name, $language, 'extras') ?: $extra->name;
+                $extra->description = self::get_translation($extra->description, $language, 'extras') ?: $extra->description;
+            }
+        }
+        
+        return $results;
     }
     
     public static function get_all_extras($active_only = false) {
@@ -1522,17 +1661,35 @@ class CB_Database {
     }
     
     // Form Fields Management Methods
-    public static function get_form_fields($visible_only = true) {
+    public static function get_form_fields($visible_only = true, $language = 'en') {
         global $wpdb;
         $table = $wpdb->prefix . 'cb_form_fields';
         $where = $visible_only ? 'WHERE is_visible = 1' : '';
-        return $wpdb->get_results("SELECT * FROM $table $where ORDER BY sort_order, id");
+        $results = $wpdb->get_results("SELECT * FROM $table $where ORDER BY sort_order, id");
+        
+        // Apply translations if not English
+        if ($language !== 'en') {
+            foreach ($results as $field) {
+                $field->label_el = self::get_translation($field->label_en, $language, 'form_fields') ?: $field->label_el;
+                $field->placeholder_el = self::get_translation($field->placeholder_en, $language, 'form_fields') ?: $field->placeholder_el;
+            }
+        }
+        
+        return $results;
     }
     
-    public static function get_form_field($field_key) {
+    public static function get_form_field($field_key, $language = 'en') {
         global $wpdb;
         $table = $wpdb->prefix . 'cb_form_fields';
-        return $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE field_key = %s", $field_key));
+        $field = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE field_key = %s", $field_key));
+        
+        // Apply translations if not English
+        if ($field && $language !== 'en') {
+            $field->label_el = self::get_translation($field->label_en, $language, 'form_fields') ?: $field->label_el;
+            $field->placeholder_el = self::get_translation($field->placeholder_en, $language, 'form_fields') ?: $field->placeholder_el;
+        }
+        
+        return $field;
     }
     
     public static function save_form_field($data) {
@@ -1735,5 +1892,14 @@ class CB_Database {
         }
         
         return $categories;
+    }
+    
+    /**
+     * Seed default translations from POT file
+     */
+    private static function seed_default_translations() {
+        if (class_exists('CB_Translation_Seeder')) {
+            CB_Translation_Seeder::seed_all();
+        }
     }
 }

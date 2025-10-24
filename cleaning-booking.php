@@ -139,16 +139,15 @@ class CleaningBooking {
     
     /**
      * Load plugin text domain
+     * Note: Translations are now loaded from database only, not from .po/.mo files
      */
     private function load_textdomain() {
-        $domain = 'cleaning-booking';
-        $locale = apply_filters('plugin_locale', get_locale(), $domain);
+        // Translations are handled through database and gettext filters
+        // No need to load .po/.mo files anymore
         
-        // Load from wp-content/languages/plugins/ if available
-        load_textdomain($domain, WP_LANG_DIR . '/plugins/' . $domain . '-' . $locale . '.mo');
-        
-        // Load from plugin languages directory
-        load_plugin_textdomain($domain, false, dirname(plugin_basename(__FILE__)) . '/languages');
+        // Override WordPress translation functions to use database
+        add_filter('gettext', array($this, 'override_translations'), 10, 3);
+        add_filter('gettext_with_context', array($this, 'override_translations_with_context'), 10, 4);
     }
     
     /**
@@ -166,6 +165,7 @@ class CleaningBooking {
             'class-cb-woocommerce.php',
             'class-cb-slot-manager.php',
             'class-cb-translations.php',
+            'class-cb-translation-seeder.php',
             'class-cb-form-fields.php',
             'class-cb-style-manager.php'
         );
@@ -346,6 +346,94 @@ class CleaningBooking {
                 add_option($key, $value);
             }
         }
+    }
+    
+    /**
+     * Override WordPress gettext to use database translations
+     */
+    public function override_translations($translated, $text, $domain) {
+        return $this->get_database_translation($text, $domain);
+    }
+    
+    /**
+     * Override WordPress gettext_with_context to use database translations
+     */
+    public function override_translations_with_context($translated, $text, $context, $domain) {
+        return $this->get_database_translation($text, $domain, $context);
+    }
+    
+    /**
+     * Get translation from database
+     */
+    private function get_database_translation($text, $domain, $context = '') {
+        if ($domain !== 'cleaning-booking') {
+            return $text;
+        }
+        
+        $language = $this->get_current_language();
+        
+        if ($context) {
+            return CB_Translations::get_translation_by_text($text, $language, $context) ?: $text;
+        }
+        
+        return CB_Translations::get_translation_by_text($text, $language) ?: $text;
+    }
+    
+    /**
+     * Get current language
+     */
+    private function get_current_language() {
+        if (!get_option('cb_enable_translations', true)) {
+            return 'en';
+        }
+        
+        $language_sources = array(
+            'url' => $this->get_language_from_url(),
+            'session' => $this->get_language_from_session(),
+            'option' => get_option('cb_default_language', 'en')
+        );
+        
+        foreach ($language_sources as $source => $lang) {
+            if ($this->is_valid_language($lang)) {
+                if ($source === 'url') {
+                    $this->set_session_language($lang);
+                }
+                return $lang;
+            }
+        }
+        
+        return 'en';
+    }
+    
+    /**
+     * Get language from URL parameter
+     */
+    private function get_language_from_url() {
+        return isset($_GET['lang']) ? sanitize_text_field($_GET['lang']) : null;
+    }
+    
+    /**
+     * Get language from session
+     */
+    private function get_language_from_session() {
+        return isset($_SESSION['cb_language']) ? $_SESSION['cb_language'] : null;
+    }
+    
+    /**
+     * Set language in session
+     */
+    private function set_session_language($language) {
+        if (!isset($_SESSION)) {
+            session_start();
+        }
+        $_SESSION['cb_language'] = $language;
+    }
+    
+    /**
+     * Validate language code
+     */
+    private function is_valid_language($language) {
+        return in_array($language, array('en', 'el'), true);
     }
 }
 

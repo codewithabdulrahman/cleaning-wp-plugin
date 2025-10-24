@@ -136,12 +136,18 @@ class CB_Translations {
         global $wpdb;
         $table = $wpdb->prefix . 'cb_translations';
         
-        $where = "WHERE is_active = 1";
         if ($category) {
-            $where .= $wpdb->prepare(" AND category = %s", $category);
+            $results = $wpdb->get_results($wpdb->prepare(
+                "SELECT * FROM $table WHERE is_active = 1 AND category = %s ORDER BY category, string_key",
+                $category
+            ));
+        } else {
+            $results = $wpdb->get_results("SELECT * FROM $table WHERE is_active = 1 ORDER BY category, string_key");
         }
         
-        return $wpdb->get_results("SELECT * FROM $table $where ORDER BY category, string_key");
+        error_log('CB_Translations: get_admin_translations returned ' . count($results) . ' translations');
+        
+        return $results;
     }
     
     // Import/Export removed per product decision. All translations are managed in DB via admin UI.
@@ -280,5 +286,48 @@ class CB_Translations {
         $stats['missing_el'] = $wpdb->get_var("SELECT COUNT(*) FROM $table WHERE is_active = 1 AND (text_el = '' OR text_el = text_en)");
         
         return $stats;
+    }
+    
+    /**
+     * Get translation by English text (for gettext override)
+     */
+    public static function get_translation_by_text($text, $language = 'en', $context = '') {
+        $cache_key = "cb_translation_text_{$text}_{$language}_{$context}";
+        
+        // Check cache first
+        $cached = get_transient($cache_key);
+        if ($cached !== false) {
+            return $cached;
+        }
+        
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_translations';
+        
+        $where = "WHERE text_en = %s AND is_active = 1";
+        $params = array($text);
+        
+        if ($context) {
+            $where .= " AND context = %s";
+            $params[] = $context;
+        }
+        
+        $result = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $table $where",
+            $params
+        ));
+        
+        if ($result) {
+            $translation = $language === 'el' ? $result->text_el : $result->text_en;
+            
+            // Cache the result
+            set_transient($cache_key, $translation, self::$cache_expiry);
+            
+            return $translation;
+        }
+        
+        // Cache empty result to avoid repeated queries
+        set_transient($cache_key, '', self::$cache_expiry);
+        
+        return '';
     }
 }

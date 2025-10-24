@@ -19,8 +19,8 @@ class CB_Form_Fields {
     /**
      * Get all form fields
      */
-    public static function get_all_fields($visible_only = true) {
-        $cache_key = "cb_form_fields_" . ($visible_only ? 'visible' : 'all');
+    public static function get_all_fields($visible_only = true, $language = 'en') {
+        $cache_key = "cb_form_fields_" . ($visible_only ? 'visible' : 'all') . "_" . $language;
         
         // Check cache first
         $cached = get_transient($cache_key);
@@ -28,7 +28,7 @@ class CB_Form_Fields {
             return $cached;
         }
         
-        $fields = CB_Database::get_form_fields($visible_only);
+        $fields = CB_Database::get_form_fields($visible_only, $language);
         
         // Cache the result
         set_transient($cache_key, $fields, self::$cache_expiry);
@@ -39,8 +39,8 @@ class CB_Form_Fields {
     /**
      * Get a specific form field by key
      */
-    public static function get_field($field_key) {
-        $cache_key = "cb_form_field_{$field_key}";
+    public static function get_field($field_key, $language = 'en') {
+        $cache_key = "cb_form_field_{$field_key}_{$language}";
         
         // Check cache first
         $cached = get_transient($cache_key);
@@ -48,7 +48,7 @@ class CB_Form_Fields {
             return $cached;
         }
         
-        $field = CB_Database::get_form_field($field_key);
+        $field = CB_Database::get_form_field($field_key, $language);
         
         // Cache the result
         set_transient($cache_key, $field, self::$cache_expiry);
@@ -60,15 +60,15 @@ class CB_Form_Fields {
      * Get form fields for frontend rendering
      */
     public static function get_frontend_fields($language = 'en') {
-        $fields = self::get_all_fields(true);
+        $fields = self::get_all_fields(true, $language);
         $frontend_fields = array();
         
         foreach ($fields as $field) {
             $frontend_fields[] = array(
                 'key' => $field->field_key,
                 'type' => $field->field_type,
-                'label' => $language === 'el' ? $field->label_el : $field->label_en,
-                'placeholder' => $language === 'el' ? $field->placeholder_el : $field->placeholder_en,
+                'label' => $language === 'el' ? ($field->label_el ?: $field->label_en) : $field->label_en,
+                'placeholder' => $language === 'el' ? ($field->placeholder_el ?: $field->placeholder_en) : $field->placeholder_en,
                 'required' => (bool) $field->is_required,
                 'visible' => (bool) $field->is_visible,
                 'order' => $field->sort_order,
@@ -278,9 +278,7 @@ class CB_Form_Fields {
             $errors[] = 'English label is required';
         }
         
-        if (empty($data['label_el'])) {
-            $errors[] = 'Greek label is required';
-        }
+        // Greek label is optional - translations are managed separately
         
         // Validate field key uniqueness (if not updating)
         if (empty($data['id'])) {

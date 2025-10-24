@@ -67,9 +67,14 @@ $missing_translations = CB_Translations::get_missing_translations('el');
             <?php _e('Clear Cache', 'cleaning-booking'); ?>
         </button>
         
-        <button type="button" class="button button-secondary" id="cb-remove-duplicates">
+        <button type="button" class="button button-secondary" id="cb-bulk-delete" style="display: none;">
             <span class="dashicons dashicons-trash" style="vertical-align: middle; margin-right: 5px;"></span>
-            <?php _e('Remove Duplicates', 'cleaning-booking'); ?>
+            <?php _e('Delete Selected', 'cleaning-booking'); ?>
+        </button>
+        
+        <button type="button" class="button button-primary" id="cb-seed-translations">
+            <span class="dashicons dashicons-plus-alt" style="vertical-align: middle; margin-right: 5px;"></span>
+            <?php _e('Seed Translations', 'cleaning-booking'); ?>
         </button>
         
         <div id="cb-duplicate-status" style="margin-left: 15px; font-weight: bold; display: none;"></div>
@@ -753,28 +758,42 @@ jQuery(document).ready(function($) {
         }
     });
     
-    // Duplicate removal functionality
-    $('#cb-remove-duplicates').on('click', function() {
-        if (confirm('<?php _e('This will remove duplicate translations based on English text. This action cannot be undone. Continue?', 'cleaning-booking'); ?>')) {
+    // Initialize
+    updateRowCount();
+    
+    // Bulk delete functionality
+    $('#cb-bulk-delete').on('click', function() {
+        var selectedIds = [];
+        $('.cb-translation-checkbox:checked').each(function() {
+            selectedIds.push($(this).val());
+        });
+        
+        if (selectedIds.length === 0) {
+            alert('<?php _e('Please select translations to delete.', 'cleaning-booking'); ?>');
+            return;
+        }
+        
+        if (confirm('<?php _e('Are you sure you want to delete the selected translations? This action cannot be undone.', 'cleaning-booking'); ?>')) {
             var $button = $(this);
             var originalText = $button.text();
-            $button.prop('disabled', true).html('<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite;"></span> <?php _e('Removing Duplicates...', 'cleaning-booking'); ?>');
+            $button.prop('disabled', true).html('<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite;"></span> <?php _e('Deleting...', 'cleaning-booking'); ?>');
             
             $.ajax({
                 url: ajaxurl,
                 type: 'POST',
                 data: {
-                    action: 'cb_remove_duplicate_translations',
-                    nonce: '<?php echo wp_create_nonce('cb_admin_nonce'); ?>'
+                    action: 'cb_bulk_delete_translations',
+                    nonce: '<?php echo wp_create_nonce('cb_admin_nonce'); ?>',
+                    translation_ids: selectedIds
                 },
                 success: function(response) {
                     if (response.success) {
-                        $('#cb-duplicate-status').text('<?php _e('Duplicates removed successfully! Removed ', 'cleaning-booking'); ?>' + response.data.removed_count + ' <?php _e('duplicate(s)', 'cleaning-booking'); ?>').css('color', '#00a32a').show();
+                        $('#cb-duplicate-status').text(response.data.message).css('color', '#00a32a').show();
                         setTimeout(function() {
                             location.reload();
                         }, 2000);
                     } else {
-                        $('#cb-duplicate-status').text('<?php _e('Error removing duplicates: ', 'cleaning-booking'); ?>' + response.data.message).css('color', '#d63638').show();
+                        $('#cb-duplicate-status').text('<?php _e('Error deleting: ', 'cleaning-booking'); ?>' + response.data.message).css('color', '#d63638').show();
                     }
                 },
                 error: function() {
@@ -787,14 +806,83 @@ jQuery(document).ready(function($) {
         }
     });
     
-    // Initialize
-    updateRowCount();
+    // Select all functionality
+    $('#cb-select-all-translations').on('change', function() {
+        var isChecked = $(this).is(':checked');
+        $('.cb-translation-checkbox').prop('checked', isChecked);
+        updateBulkDeleteButton();
+    });
+    
+    // Individual checkbox change
+    $(document).on('change', '.cb-translation-checkbox', function() {
+        updateBulkDeleteButton();
+        updateSelectAllCheckbox();
+    });
+    
+    // Update bulk delete button visibility
+    function updateBulkDeleteButton() {
+        var checkedCount = $('.cb-translation-checkbox:checked').length;
+        if (checkedCount > 0) {
+            $('#cb-bulk-delete').show();
+        } else {
+            $('#cb-bulk-delete').hide();
+        }
+    }
+    
+    // Update select all checkbox state
+    function updateSelectAllCheckbox() {
+        var totalCheckboxes = $('.cb-translation-checkbox').length;
+        var checkedCheckboxes = $('.cb-translation-checkbox:checked').length;
+        
+        if (checkedCheckboxes === 0) {
+            $('#cb-select-all-translations').prop('indeterminate', false).prop('checked', false);
+        } else if (checkedCheckboxes === totalCheckboxes) {
+            $('#cb-select-all-translations').prop('indeterminate', false).prop('checked', true);
+        } else {
+            $('#cb-select-all-translations').prop('indeterminate', true);
+        }
+    }
+    
+    // Initialize bulk delete button state
+    updateBulkDeleteButton();
+    
+    // Seed translations functionality
+    $('#cb-seed-translations').on('click', function() {
+        if (confirm('<?php _e('This will seed all default translations. Existing translations will be skipped. Continue?', 'cleaning-booking'); ?>')) {
+            var $button = $(this);
+            var originalText = $button.text();
+            $button.prop('disabled', true).html('<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite;"></span> <?php _e('Seeding...', 'cleaning-booking'); ?>');
+            
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'cb_seed_translations',
+                    nonce: '<?php echo wp_create_nonce('cb_admin_nonce'); ?>'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        $('#cb-duplicate-status').text(response.data.message).css('color', '#00a32a').show();
+                        setTimeout(function() {
+                            location.reload();
+                        }, 2000);
+                    } else {
+                        $('#cb-duplicate-status').text('<?php _e('Error seeding: ', 'cleaning-booking'); ?>' + response.data.message).css('color', '#d63638').show();
+                    }
+                },
+                error: function() {
+                    $('#cb-duplicate-status').text('<?php _e('Network error. Please try again.', 'cleaning-booking'); ?>').css('color', '#d63638').show();
+                },
+                complete: function() {
+                    $button.prop('disabled', false).text(originalText);
+                }
+            });
+        }
+    });
 });
 
 // CSS Animation for loading spinner
 var style = document.createElement('style');
 style.textContent = '@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }';
 document.head.appendChild(style);
-</script>
-
 </script>

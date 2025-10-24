@@ -777,29 +777,11 @@ public function ajax_get_services() {
     }
     
     private function get_translations_for_language($language) {
-        // Try to get translations from database first
+        // Get translations from database only
         $db_translations = CB_Translations::get_all_translations($language);
         
-        if (!empty($db_translations)) {
-            return $db_translations;
-        }
-        
-        // Fallback to JSON files if database is empty
-        $file_mapping = array(
-            'en' => 'cleaning-booking-en.json',
-            'el' => 'cleaning-booking-el_GR.json'
-        );
-        
-        $filename = isset($file_mapping[$language]) ? $file_mapping[$language] : "cleaning-booking-{$language}.json";
-        $translation_file = CB_PLUGIN_DIR . "languages/{$filename}";
-        
-        if (file_exists($translation_file)) {
-            $translations = json_decode(file_get_contents($translation_file), true);
-            return $translations ?: array();
-        }
-        
-        // Return empty array if no translations found
-        return array();
+        // Return database translations or empty array if none found
+        return $db_translations ?: array();
     }
 
    private function get_translated_services($language) {

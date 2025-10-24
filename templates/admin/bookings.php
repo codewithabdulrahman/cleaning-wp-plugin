@@ -165,7 +165,7 @@ if (!defined('ABSPATH')) {
                                     </div>
                                 </td>
                                 <td>
-                                    <?php echo esc_html($booking->service_name); ?><br>
+                                    <?php echo esc_html($booking->service_names); ?><br>
                                     <small><?php echo esc_html($booking->square_meters); ?> m²</small>
                                 </td>
                                 <td>
