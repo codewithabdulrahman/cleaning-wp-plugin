@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
             <table class="form-table">
                 <tr>
                     <th scope="row">
-                        <label for="service-name"><?php _e('Service Name', 'cleaning-booking'); ?></label>
+                        <label for="service-name"><?php _e('Service Name (English/Greek)', 'cleaning-booking'); ?></label>
                     </th>
                     <td>
                         <input type="text" id="service-name" name="name" class="regular-text" required>
@@ -29,7 +29,7 @@ if (!defined('ABSPATH')) {
                 </tr>
                 <tr>
                     <th scope="row">
-                        <label for="service-description"><?php _e('Description', 'cleaning-booking'); ?></label>
+                        <label for="service-description"><?php _e('Description (English/Greek)', 'cleaning-booking'); ?></label>
                     </th>
                     <td>
                         <textarea id="service-description" name="description" rows="3" class="large-text"></textarea>

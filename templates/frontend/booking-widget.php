@@ -104,7 +104,7 @@ if (!defined('ABSPATH')) {
                             <label for="cb-square-meters"><?php _e('Space (m²)', 'cleaning-booking'); ?></label>
                             <input type="number" id="cb-square-meters" name="square_meters" class="cb-input" min="0" max="1000" placeholder="0" value="0">
                             <div class="cb-field-hint" id="cb-sqm-hint" style="display: none;">
-                                <small><?php _e('Enter additional space beyond the default area, or leave as 0 to skip', 'cleaning-booking'); ?></small>
+                                <small><?php _e('Enter total space beyond the default area, or leave as 0 to skip', 'cleaning-booking'); ?></small>
                             </div>
                             <div class="cb-base-area-info" id="cb-base-area-info" style="display: none;">
                                 <div class="cb-base-info-card">
