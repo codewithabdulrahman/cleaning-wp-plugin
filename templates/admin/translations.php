@@ -9,11 +9,23 @@ if (!defined('ABSPATH')) {
 
 // Get translations data
 $translations = CB_Translations::get_admin_translations();
-$categories = CB_Translations::get_categories();
 $stats = CB_Translations::get_translation_stats();
 
-// Get missing translations for better filtering
-$missing_translations = CB_Translations::get_missing_translations('el');
+// Get current filter status
+$current_status = isset($_GET['status']) ? sanitize_text_field($_GET['status']) : 'all';
+
+// Filter translations based on status
+if ($current_status === 'translated') {
+    $translations = array_filter($translations, function($translation) {
+        return !empty($translation->text_en) && !empty($translation->text_el);
+    });
+} elseif ($current_status === 'untranslated') {
+    $translations = array_filter($translations, function($translation) {
+        return empty($translation->text_en) || empty($translation->text_el);
+    });
+}
+
+// Import/Export removed. No form actions handled here.
 ?>
 
 <div class="wrap">
@@ -72,9 +84,8 @@ $missing_translations = CB_Translations::get_missing_translations('el');
             <?php _e('Delete Selected', 'cleaning-booking'); ?>
         </button>
         
-        <button type="button" class="button button-primary" id="cb-seed-translations">
-            <span class="dashicons dashicons-plus-alt" style="vertical-align: middle; margin-right: 5px;"></span>
-            <?php _e('Seed Translations', 'cleaning-booking'); ?>
+        <button type="button" class="button button-primary" id="cb-save-all-translations" style="display: none;">
+            <?php _e('Save All Changes', 'cleaning-booking'); ?>
         </button>
         
         <div id="cb-duplicate-status" style="margin-left: 15px; font-weight: bold; display: none;"></div>
@@ -87,38 +98,25 @@ $missing_translations = CB_Translations::get_missing_translations('el');
         </div>
     </div>
     
-    <!-- Enhanced Filters -->
-    <div class="cb-filters" style="background: #fff; padding: 20px; border: 1px solid #ddd; margin: 20px 0; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; align-items: end;">
+    <!-- Filters -->
+    <div class="cb-filters" style="background: #fff; padding: 15px; border: 1px solid #ddd; margin: 20px 0;">
+        <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
             <div>
-                <label for="cb-category-filter" style="display: block; margin-bottom: 5px; font-weight: 600;"><?php _e('Category', 'cleaning-booking'); ?></label>
-                <select id="cb-category-filter" style="width: 100%;">
-                    <option value=""><?php _e('All Categories', 'cleaning-booking'); ?></option>
-                    <?php foreach ($categories as $category): ?>
-                        <option value="<?php echo esc_attr($category); ?>"><?php echo esc_html(ucfirst($category)); ?></option>
-                    <?php endforeach; ?>
+                <label for="cb-search-translations"><?php _e('Search:', 'cleaning-booking'); ?></label>
+                <input type="text" id="cb-search-translations" placeholder="<?php _e('Search translations...', 'cleaning-booking'); ?>" style="margin-left: 5px; width: 300px;">
+            </div>
+            
+            <div>
+                <label for="cb-status-filter"><?php _e('Status:', 'cleaning-booking'); ?></label>
+                <select id="cb-status-filter" style="margin-left: 5px;">
+                    <option value="all" <?php selected($current_status, 'all'); ?>><?php _e('All Translations', 'cleaning-booking'); ?></option>
+                    <option value="translated" <?php selected($current_status, 'translated'); ?>><?php _e('Fully Translated', 'cleaning-booking'); ?></option>
+                    <option value="untranslated" <?php selected($current_status, 'untranslated'); ?>><?php _e('Untranslated', 'cleaning-booking'); ?></option>
                 </select>
             </div>
             
             <div>
-                <label for="cb-status-filter" style="display: block; margin-bottom: 5px; font-weight: 600;"><?php _e('Translation Status', 'cleaning-booking'); ?></label>
-                <select id="cb-status-filter" style="width: 100%;">
-                    <option value=""><?php _e('All', 'cleaning-booking'); ?></option>
-                    <option value="translated"><?php _e('Translated', 'cleaning-booking'); ?></option>
-                    <option value="untranslated"><?php _e('Untranslated', 'cleaning-booking'); ?></option>
-                </select>
-            </div>
-            
-            <div>
-                <label for="cb-search-translations" style="display: block; margin-bottom: 5px; font-weight: 600;"><?php _e('Search', 'cleaning-booking'); ?></label>
-                <input type="text" id="cb-search-translations" placeholder="<?php _e('Search in English or Greek...', 'cleaning-booking'); ?>" style="width: 100%;">
-            </div>
-            
-            <div>
-                <button type="button" class="button" id="cb-clear-filters" style="width: 100%;">
-                    <span class="dashicons dashicons-filter" style="vertical-align: middle; margin-right: 5px;"></span>
-                    <?php _e('Clear Filters', 'cleaning-booking'); ?>
-                </button>
+                <a href="<?php echo admin_url('admin.php?page=cleaning-booking-translations'); ?>" class="button button-secondary"><?php _e('Reset Filters', 'cleaning-booking'); ?></a>
             </div>
         </div>
     </div>
@@ -135,78 +133,62 @@ $missing_translations = CB_Translations::get_missing_translations('el');
         <div style="overflow-x: auto;">
             <table class="wp-list-table widefat fixed striped" id="cb-translations-table" style="margin: 0;">
             <thead>
-                    <tr style="background: #f1f1f1;">
-                        <th style="width: 30px; padding: 12px 8px;">
-                        <input type="checkbox" id="cb-select-all-translations">
-                    </th>
-                        <th style="width: 100px; padding: 12px 8px;"><?php _e('Category', 'cleaning-booking'); ?></th>
-                        <th style="width: 45%; padding: 12px 8px;">
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <span class="dashicons dashicons-translation" style="color: #0073aa;"></span>
-                                <?php _e('English (Original)', 'cleaning-booking'); ?>
-                            </div>
-                        </th>
-                        <th style="width: 45%; padding: 12px 8px;">
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <span class="dashicons dashicons-translation" style="color: #d63638;"></span>
-                                <?php _e('Greek (Translation)', 'cleaning-booking'); ?>
-                            </div>
-                        </th>
-                        <th style="width: 80px; padding: 12px 8px;"><?php _e('Status', 'cleaning-booking'); ?></th>
-                        <th style="width: 80px; padding: 12px 8px;"><?php _e('Actions', 'cleaning-booking'); ?></th>
+                <tr>
+                    <th style="width: 200px;"><?php _e('String Key', 'cleaning-booking'); ?></th>
+                    <th><?php _e('English Text', 'cleaning-booking'); ?></th>
+                    <th><?php _e('Greek Text', 'cleaning-booking'); ?></th>
+                    <th style="width: 120px;"><?php _e('Status', 'cleaning-booking'); ?></th>
+                    <th style="width: 100px;"><?php _e('Actions', 'cleaning-booking'); ?></th>
                 </tr>
             </thead>
             <tbody>
-                    <?php foreach ($translations as $translation): 
-                        $is_translated = !empty($translation->text_el) && $translation->text_el !== $translation->text_en;
-                        $status_class = $is_translated ? 'translated' : 'untranslated';
-                        $status_text = $is_translated ? __('Translated', 'cleaning-booking') : __('Untranslated', 'cleaning-booking');
-                    ?>
-                        <tr data-translation-id="<?php echo $translation->id; ?>" 
-                            data-category="<?php echo esc_attr($translation->category); ?>"
-                            data-status="<?php echo $status_class; ?>"
-                            class="cb-translation-row">
-                            <td style="padding: 12px 8px; vertical-align: top;">
-                            <input type="checkbox" class="cb-translation-checkbox" value="<?php echo $translation->id; ?>">
+                <?php foreach ($translations as $translation): 
+                    $is_translated = !empty($translation->text_en) && !empty($translation->text_el);
+                    $status_class = $is_translated ? 'cb-status-translated' : 'cb-status-untranslated';
+                    $status_text = $is_translated ? __('Translated', 'cleaning-booking') : __('Untranslated', 'cleaning-booking');
+                ?>
+                    <tr data-translation-id="<?php echo $translation->id; ?>">
+                        <td>
+                            <strong><?php echo esc_html($translation->string_key); ?></strong>
+                            <?php if ($translation->context): ?>
+                                <br><small style="color: #666;"><?php echo esc_html($translation->context); ?></small>
+                            <?php endif; ?>
                         </td>
-                            <td style="padding: 12px 8px; vertical-align: top;">
-                                <span class="cb-category-badge" style="background: #0073aa; color: white; padding: 4px 8px; border-radius: 3px; font-size: 11px; font-weight: 500;">
-                                <?php echo esc_html(ucfirst($translation->category)); ?>
+                        <td>
+                            <input type="text" 
+                                   class="cb-translation-input regular-text" 
+                                   data-field="text_en" 
+                                   data-original-value="<?php echo esc_attr($translation->text_en); ?>"
+                                   value="<?php echo esc_attr($translation->text_en); ?>"
+                                   data-translation-id="<?php echo $translation->id; ?>"
+                                   placeholder="<?php _e('Enter English text...', 'cleaning-booking'); ?>">
+                            <?php if (empty($translation->text_en)): ?>
+                                <div class="cb-field-warning" style="color: #d63638; font-size: 12px; margin-top: 5px;">
+                                    <?php _e('Missing English translation', 'cleaning-booking'); ?>
+                                </div>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <input type="text" 
+                                   class="cb-translation-input regular-text" 
+                                   data-field="text_el" 
+                                   data-original-value="<?php echo esc_attr($translation->text_el); ?>"
+                                   value="<?php echo esc_attr($translation->text_el); ?>"
+                                   data-translation-id="<?php echo $translation->id; ?>"
+                                   placeholder="<?php _e('Enter Greek text...', 'cleaning-booking'); ?>">
+                            <?php if (empty($translation->text_el)): ?>
+                                <div class="cb-field-warning" style="color: #d63638; font-size: 12px; margin-top: 5px;">
+                                    <?php _e('Missing Greek translation', 'cleaning-booking'); ?>
+                                </div>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <span class="cb-status-badge <?php echo $status_class; ?>" style="padding: 4px 8px; border-radius: 3px; font-size: 12px; font-weight: bold; display: inline-block;">
+                                <?php echo $status_text; ?>
                             </span>
                         </td>
-                            <td style="padding: 12px 8px; vertical-align: top;">
-                                <div class="cb-translation-text cb-original-text" 
-                                     data-field="text_en" 
-                                     data-translation-id="<?php echo $translation->id; ?>"
-                                     style="min-height: 40px; padding: 8px; border: 1px solid #e1e1e1; border-radius: 3px; background: #f9f9f9; cursor: pointer; transition: all 0.2s ease;">
-                                <?php echo esc_html($translation->text_en); ?>
-                            </div>
-                        </td>
-                            <td style="padding: 12px 8px; vertical-align: top;">
-                                <div class="cb-translation-text cb-translation-text" 
-                                     data-field="text_el" 
-                                     data-translation-id="<?php echo $translation->id; ?>"
-                                     style="min-height: 40px; padding: 8px; border: 1px solid #e1e1e1; border-radius: 3px; background: <?php echo $is_translated ? '#f0f8f0' : '#fff5f5'; ?>; cursor: pointer; transition: all 0.2s ease;"
-                                     data-original-text="<?php echo esc_attr($translation->text_el); ?>">
-                                    <?php if (empty($translation->text_el) || $translation->text_el === $translation->text_en): ?>
-                                        <span style="color: #999; font-style: italic;"><?php _e('Click to add translation', 'cleaning-booking'); ?></span>
-                                    <?php else: ?>
-                                <?php echo esc_html($translation->text_el); ?>
-                                    <?php endif; ?>
-                            </div>
-                        </td>
-                            <td style="padding: 12px 8px; vertical-align: top; text-align: center;">
-                                <span class="cb-status-badge cb-status-<?php echo $status_class; ?>" 
-                                      style="padding: 4px 8px; border-radius: 3px; font-size: 11px; font-weight: 500; text-transform: uppercase;">
-                                    <?php echo $status_text; ?>
-                                </span>
-                        </td>
-                        <td style="padding: 12px 8px; vertical-align: top; text-align: center;">
-                            <button type="button" class="button button-small cb-delete-translation" 
-                                    data-translation-id="<?php echo $translation->id; ?>"
-                                    data-translation-text="<?php echo esc_attr($translation->text_en); ?>"
-                                    style="color: #d63638; border-color: #d63638; background: transparent; padding: 4px 8px; font-size: 11px;">
-                                <span class="dashicons dashicons-trash" style="font-size: 12px; vertical-align: middle;"></span>
+                        <td>
+                            <button type="button" class="button button-small button-link-delete cb-delete-translation" data-translation-id="<?php echo $translation->id; ?>">
                                 <?php _e('Delete', 'cleaning-booking'); ?>
                             </button>
                         </td>
@@ -226,7 +208,7 @@ $missing_translations = CB_Translations::get_missing_translations('el');
     </div>
 </div>
 
-<!-- Add/Edit Translation Modal -->
+<!-- Add Translation Modal -->
 <div id="cb-translation-modal" class="cb-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999;">
     <div class="cb-modal-content" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 4px; width: 90%; max-width: 600px; max-height: 80%; overflow-y: auto;">
         <h2 id="cb-modal-title"><?php _e('Add New Translation', 'cleaning-booking'); ?></h2>
@@ -242,20 +224,6 @@ $missing_translations = CB_Translations::get_missing_translations('el');
                     <td>
                         <input type="text" id="cb-string-key" name="string_key" class="regular-text" required>
                         <p class="description"><?php _e('Unique identifier for this translation string.', 'cleaning-booking'); ?></p>
-                    </td>
-                </tr>
-                
-                <tr>
-                    <th scope="row">
-                        <label for="cb-category"><?php _e('Category', 'cleaning-booking'); ?></label>
-                    </th>
-                    <td>
-                        <select id="cb-category" name="category" required>
-                            <option value=""><?php _e('Select Category', 'cleaning-booking'); ?></option>
-                            <?php foreach ($categories as $category): ?>
-                                <option value="<?php echo esc_attr($category); ?>"><?php echo esc_html(ucfirst($category)); ?></option>
-                            <?php endforeach; ?>
-                        </select>
                     </td>
                 </tr>
                 
@@ -286,16 +254,6 @@ $missing_translations = CB_Translations::get_missing_translations('el');
                         <p class="description"><?php _e('Optional context information for translators.', 'cleaning-booking'); ?></p>
                     </td>
                 </tr>
-                
-                <tr>
-                    <th scope="row">
-                        <label for="cb-is-active"><?php _e('Active', 'cleaning-booking'); ?></label>
-                    </th>
-                    <td>
-                        <input type="checkbox" id="cb-is-active" name="is_active" value="1" checked>
-                        <label for="cb-is-active"><?php _e('Enable this translation', 'cleaning-booking'); ?></label>
-                    </td>
-                </tr>
             </table>
             
             <div class="cb-modal-actions" style="margin-top: 20px; text-align: right;">
@@ -306,132 +264,27 @@ $missing_translations = CB_Translations::get_missing_translations('el');
     </div>
 </div>
 
-<!-- Import Modal -->
-<div id="cb-import-modal" class="cb-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999;">
-    <div class="cb-modal-content" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 4px; width: 90%; max-width: 500px;">
-        <h2><?php _e('Import Translations', 'cleaning-booking'); ?></h2>
-        
-        <form id="cb-import-form" enctype="multipart/form-data">
-            <table class="form-table">
-                <tr>
-                    <th scope="row">
-                        <label for="cb-import-language"><?php _e('Language', 'cleaning-booking'); ?></label>
-                    </th>
-                    <td>
-                        <select id="cb-import-language" name="language" required>
-                            <option value="en"><?php _e('English', 'cleaning-booking'); ?></option>
-                            <option value="el"><?php _e('Greek', 'cleaning-booking'); ?></option>
-                        </select>
-                    </td>
-                </tr>
-                
-                <tr>
-                    <th scope="row">
-                        <label for="cb-import-file"><?php _e('JSON File', 'cleaning-booking'); ?></label>
-                    </th>
-                    <td>
-                        <input type="file" id="cb-import-file" name="translation_file" accept=".json" required>
-                        <p class="description"><?php _e('Select a JSON file containing translations.', 'cleaning-booking'); ?></p>
-                    </td>
-                </tr>
-            </table>
-            
-            <div class="cb-modal-actions" style="margin-top: 20px; text-align: right;">
-                <button type="button" class="button" id="cb-cancel-import"><?php _e('Cancel', 'cleaning-booking'); ?></button>
-                <button type="submit" class="button button-primary"><?php _e('Import', 'cleaning-booking'); ?></button>
-            </div>
-        </form>
-    </div>
-</div>
-
 <style>
-/* Enhanced Translation Interface Styles */
-.cb-translation-text:hover {
-    border-color: #0073aa !important;
-    background: #fff !important;
-    box-shadow: 0 0 0 1px #0073aa !important;
-}
-
-.cb-translation-text.editing {
-    border-color: #0073aa !important;
-    background: #fff !important;
-    box-shadow: 0 0 0 2px #0073aa !important;
-}
-
 .cb-status-translated {
-    background: #00a32a !important;
-    color: white !important;
+    background-color: #d1f7c4;
+    color: #0e5c0e;
 }
 
 .cb-status-untranslated {
-    background: #d63638 !important;
-    color: white !important;
+    background-color: #ffd7d7;
+    color: #8a1a1a;
 }
 
-.cb-changes-indicator {
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.7; }
-    100% { opacity: 1; }
-}
-
-.cb-translation-row.changed {
-    background-color: #fff3cd !important;
-}
-
-.cb-translation-row.changed .cb-translation-text {
-    border-color: #ffc107 !important;
-}
-
-.cb-save-indicator {
-    position: fixed;
-    top: 32px;
-    right: 20px;
-    background: #00a32a;
-    color: white;
-    padding: 10px 15px;
-    border-radius: 4px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-    z-index: 10000;
-    display: none;
-}
-
-.cb-error-indicator {
-    position: fixed;
-    top: 32px;
-    right: 20px;
-    background: #d63638;
-    color: white;
-    padding: 10px 15px;
-    border-radius: 4px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-    z-index: 10000;
-    display: none;
+.cb-field-warning {
+    font-style: italic;
 }
 </style>
 
-<div class="cb-save-indicator" id="cb-save-indicator">
-    <span class="dashicons dashicons-yes" style="vertical-align: middle; margin-right: 5px;"></span>
-    <span id="cb-save-message"><?php _e('Changes saved!', 'cleaning-booking'); ?></span>
-</div>
-
-<div class="cb-error-indicator" id="cb-error-indicator">
-    <span class="dashicons dashicons-warning" style="vertical-align: middle; margin-right: 5px;"></span>
-    <span id="cb-error-message"><?php _e('Error saving changes', 'cleaning-booking'); ?></span>
-</div>
-
 <script>
 jQuery(document).ready(function($) {
-    // Enhanced Translation Management
-    var translationsData = <?php echo json_encode($translations); ?>;
-    var pendingChanges = {};
-    var changeCount = 0;
-    
-    // Initialize
-    updateChangeIndicator();
+    // Track changes for bulk save
+    var changes = {};
+    var saveButton = $('#cb-save-all-translations');
     
     // Add new translation
     $('#cb-add-translation').on('click', function() {
@@ -441,293 +294,7 @@ jQuery(document).ready(function($) {
         $('#cb-translation-modal').show();
     });
     
-    // Enhanced filter functionality
-    function applyFilters() {
-        var category = $('#cb-category-filter').val();
-        var status = $('#cb-status-filter').val();
-        var search = $('#cb-search-translations').val().toLowerCase();
-        
-        $('#cb-translations-table tbody tr').each(function() {
-            var row = $(this);
-            var rowCategory = row.data('category');
-            var rowStatus = row.data('status');
-            var rowText = row.text().toLowerCase();
-            
-            var categoryMatch = !category || rowCategory === category;
-            var statusMatch = !status || rowStatus === status;
-            var searchMatch = !search || rowText.includes(search);
-            
-            if (categoryMatch && statusMatch && searchMatch) {
-                row.show();
-            } else {
-                row.hide();
-            }
-        });
-        
-        updateRowCount();
-    }
-    
-    // Clear filters
-    $('#cb-clear-filters').on('click', function() {
-        $('#cb-category-filter').val('');
-        $('#cb-status-filter').val('');
-        $('#cb-search-translations').val('');
-        applyFilters();
-    });
-    
-    // Apply filters on change
-    $('#cb-category-filter, #cb-status-filter').on('change', applyFilters);
-    $('#cb-search-translations').on('keyup', function() {
-        clearTimeout(this.searchTimeout);
-        this.searchTimeout = setTimeout(applyFilters, 300);
-    });
-    
-    // Enhanced inline editing
-    $('.cb-translation-text').on('click', function() {
-        if ($(this).hasClass('editing')) return;
-        
-        var $this = $(this);
-        var currentText = $this.data('original-text') || $this.text().trim();
-        var field = $this.data('field');
-        var translationId = $this.data('translation-id');
-        
-        // Handle empty translation case
-        if (field === 'text_el' && (currentText === '<?php _e('Click to add translation', 'cleaning-booking'); ?>' || !currentText)) {
-            currentText = '';
-        }
-        
-        $this.addClass('editing');
-        $this.html('<textarea style="width: 100%; min-height: 60px; border: none; resize: vertical; font-family: inherit; font-size: inherit; padding: 0;">' + currentText + '</textarea>');
-        
-        var $textarea = $this.find('textarea');
-        $textarea.focus().select();
-        
-        // Auto-resize textarea
-        $textarea.on('input', function() {
-            this.style.height = 'auto';
-            this.style.height = Math.max(60, this.scrollHeight) + 'px';
-        });
-        
-        $textarea.on('blur keydown', function(e) {
-            if (e.type === 'keydown' && e.keyCode !== 13 && !(e.keyCode === 13 && e.ctrlKey)) return;
-            
-            var newText = $textarea.val().trim();
-            var originalText = $this.data('original-text') || '';
-            
-            if (newText !== originalText) {
-                // Mark as changed
-                markAsChanged(translationId, field, newText);
-                $this.closest('tr').addClass('changed');
-                
-                // Update display
-                if (field === 'text_el') {
-                    if (newText) {
-                        $this.html(newText);
-                        $this.css('background', '#f0f8f0');
-                        $this.closest('tr').find('.cb-status-badge').removeClass('cb-status-untranslated').addClass('cb-status-translated').text('<?php _e('Translated', 'cleaning-booking'); ?>');
-                        $this.closest('tr').attr('data-status', 'translated');
-                    } else {
-                        $this.html('<span style="color: #999; font-style: italic;"><?php _e('Click to add translation', 'cleaning-booking'); ?></span>');
-                        $this.css('background', '#fff5f5');
-                        $this.closest('tr').find('.cb-status-badge').removeClass('cb-status-translated').addClass('cb-status-untranslated').text('<?php _e('Untranslated', 'cleaning-booking'); ?>');
-                        $this.closest('tr').attr('data-status', 'untranslated');
-                    }
-                } else {
-                    $this.html(newText);
-                }
-                
-                $this.data('original-text', newText);
-            } else {
-                // Restore original
-                if (field === 'text_el' && !originalText) {
-                    $this.html('<span style="color: #999; font-style: italic;"><?php _e('Click to add translation', 'cleaning-booking'); ?></span>');
-                } else {
-                    $this.html(originalText);
-                }
-            }
-            
-            $this.removeClass('editing');
-        });
-    });
-    
-    // Mark changes for bulk save
-    function markAsChanged(translationId, field, value) {
-        if (!pendingChanges[translationId]) {
-            pendingChanges[translationId] = {};
-        }
-        pendingChanges[translationId][field] = value;
-        changeCount++;
-        updateChangeIndicator();
-    }
-    
-    // Update change indicator
-    function updateChangeIndicator() {
-        if (changeCount > 0) {
-            $('.cb-changes-indicator').show();
-            $('.cb-changes-count').text(changeCount);
-            $('#cb-bulk-save, #cb-cancel-bulk').show();
-        } else {
-            $('.cb-changes-indicator').hide();
-            $('#cb-bulk-save, #cb-cancel-bulk').hide();
-        }
-    }
-    
-    // Bulk save
-    $('#cb-bulk-save').on('click', function() {
-        if (Object.keys(pendingChanges).length === 0) return;
-        
-        var $button = $(this);
-        var originalText = $button.text();
-        $button.prop('disabled', true).html('<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite;"></span> <?php _e('Saving...', 'cleaning-booking'); ?>');
-        
-        var updates = [];
-        $.each(pendingChanges, function(translationId, changes) {
-            updates.push({
-                id: translationId,
-                text_en: changes.text_en || translationsData.find(t => t.id == translationId).text_en,
-                text_el: changes.text_el || translationsData.find(t => t.id == translationId).text_el
-            });
-        });
-        
-        $.ajax({
-            url: ajaxurl,
-            type: 'POST',
-            data: {
-                action: 'cb_bulk_update_translations',
-                updates: updates,
-                nonce: '<?php echo wp_create_nonce('cb_admin_nonce'); ?>'
-            },
-            success: function(response) {
-                if (response.success) {
-                    // Clear changes
-                    pendingChanges = {};
-                    changeCount = 0;
-                    updateChangeIndicator();
-                    
-                    // Remove changed classes
-                    $('.cb-translation-row.changed').removeClass('changed');
-                    
-                    // Show success message
-                    showSaveIndicator(response.data.message);
-                    
-                    // Update statistics
-                    setTimeout(function() {
-                        location.reload();
-                    }, 1500);
-                } else {
-                    showErrorIndicator(response.data.message);
-                }
-            },
-            error: function() {
-                showErrorIndicator('<?php _e('Network error. Please try again.', 'cleaning-booking'); ?>');
-            },
-            complete: function() {
-                $button.prop('disabled', false).text(originalText);
-            }
-        });
-    });
-    
-    // Cancel changes
-    $('#cb-cancel-bulk').on('click', function() {
-        if (confirm('<?php _e('Are you sure you want to cancel all unsaved changes?', 'cleaning-booking'); ?>')) {
-            location.reload();
-        }
-    });
-    
-    // Clear cache
-    $('#cb-clear-cache').on('click', function() {
-        if (confirm('<?php _e('This will clear all translation caches. Continue?', 'cleaning-booking'); ?>')) {
-            var $button = $(this);
-            var originalText = $button.text();
-            $button.prop('disabled', true).html('<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite;"></span> <?php _e('Clearing...', 'cleaning-booking'); ?>');
-            
-            $.ajax({
-                url: ajaxurl,
-                type: 'POST',
-                data: {
-                    action: 'cb_clear_translation_cache',
-                    nonce: '<?php echo wp_create_nonce('cb_admin_nonce'); ?>'
-                },
-                success: function(response) {
-                    if (response.success) {
-                        showSaveIndicator('<?php _e('Translation cache cleared successfully!', 'cleaning-booking'); ?>');
-                    } else {
-                        showErrorIndicator('<?php _e('Error clearing cache: ', 'cleaning-booking'); ?>' + response.data.message);
-                    }
-                },
-                error: function() {
-                    showErrorIndicator('<?php _e('Network error. Please try again.', 'cleaning-booking'); ?>');
-                },
-                complete: function() {
-                    $button.prop('disabled', false).text(originalText);
-                }
-            });
-        }
-    });
-    
-    // Delete translation
-    $(document).on('click', '.cb-delete-translation', function() {
-        var $button = $(this);
-        var translationId = $button.data('translation-id');
-        var translationText = $button.data('translation-text');
-        
-        if (confirm('<?php _e('Are you sure you want to delete this translation?', 'cleaning-booking'); ?>\n\n"' + translationText + '"')) {
-            $button.prop('disabled', true).html('<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite;"></span> <?php _e('Deleting...', 'cleaning-booking'); ?>');
-            
-            $.ajax({
-                url: ajaxurl,
-                type: 'POST',
-                data: {
-                    action: 'cb_delete_translation',
-                    translation_id: translationId,
-                    nonce: '<?php echo wp_create_nonce('cb_admin_nonce'); ?>'
-                },
-                success: function(response) {
-                    if (response.success) {
-                        // Remove the row from table
-                        $button.closest('tr').fadeOut(300, function() {
-                            $(this).remove();
-                            updateRowCount();
-                        });
-                        showSaveIndicator('<?php _e('Translation deleted successfully!', 'cleaning-booking'); ?>');
-                    } else {
-                        showErrorIndicator('<?php _e('Error deleting translation: ', 'cleaning-booking'); ?>' + response.data.message);
-                        $button.prop('disabled', false).html('<span class="dashicons dashicons-trash" style="font-size: 12px; vertical-align: middle;"></span> <?php _e('Delete', 'cleaning-booking'); ?>');
-                    }
-                },
-                error: function() {
-                    showErrorIndicator('<?php _e('Network error. Please try again.', 'cleaning-booking'); ?>');
-                    $button.prop('disabled', false).html('<span class="dashicons dashicons-trash" style="font-size: 12px; vertical-align: middle;"></span> <?php _e('Delete', 'cleaning-booking'); ?>');
-                }
-            });
-        }
-    });
-    
-    // Show save indicator
-    function showSaveIndicator(message) {
-        $('#cb-save-message').text(message);
-        $('#cb-save-indicator').fadeIn().delay(3000).fadeOut();
-    }
-    
-    // Show error indicator
-    function showErrorIndicator(message) {
-        $('#cb-error-message').text(message);
-        $('#cb-error-indicator').fadeIn().delay(5000).fadeOut();
-    }
-    
-    // Update row count
-    function updateRowCount() {
-        var visibleRows = $('#cb-translations-table tbody tr:visible').length;
-        var totalRows = $('#cb-translations-table tbody tr').length;
-        
-        if (visibleRows < totalRows) {
-            $('.cb-table-header p').html('<?php _e('Click on any text to edit it directly. Changes are saved automatically.', 'cleaning-booking'); ?> <strong>(' + visibleRows + ' of ' + totalRows + ' <?php _e('strings shown', 'cleaning-booking'); ?>)</strong>');
-        } else {
-            $('.cb-table-header p').html('<?php _e('Click on any text to edit it directly. Changes are saved automatically.', 'cleaning-booking'); ?>');
-        }
-    }
-    
-    // Modal functionality (existing)
+    // Save translation (for new entries)
     $('#cb-translation-form').on('submit', function(e) {
         e.preventDefault();
         
@@ -806,77 +373,149 @@ jQuery(document).ready(function($) {
         }
     });
     
-    // Select all functionality
-    $('#cb-select-all-translations').on('change', function() {
-        var isChecked = $(this).is(':checked');
-        $('.cb-translation-checkbox').prop('checked', isChecked);
-        updateBulkDeleteButton();
-    });
-    
-    // Individual checkbox change
-    $(document).on('change', '.cb-translation-checkbox', function() {
-        updateBulkDeleteButton();
-        updateSelectAllCheckbox();
-    });
-    
-    // Update bulk delete button visibility
-    function updateBulkDeleteButton() {
-        var checkedCount = $('.cb-translation-checkbox:checked').length;
-        if (checkedCount > 0) {
-            $('#cb-bulk-delete').show();
-        } else {
-            $('#cb-bulk-delete').hide();
-        }
-    }
-    
-    // Update select all checkbox state
-    function updateSelectAllCheckbox() {
-        var totalCheckboxes = $('.cb-translation-checkbox').length;
-        var checkedCheckboxes = $('.cb-translation-checkbox:checked').length;
+    // Track input changes for bulk save - FIXED VERSION
+    $('.cb-translation-input').on('input', function() {
+        var $this = $(this);
+        var translationId = $this.data('translation-id');
+        var field = $this.data('field');
+        var newValue = $this.val();
         
-        if (checkedCheckboxes === 0) {
-            $('#cb-select-all-translations').prop('indeterminate', false).prop('checked', false);
-        } else if (checkedCheckboxes === totalCheckboxes) {
-            $('#cb-select-all-translations').prop('indeterminate', false).prop('checked', true);
+        // Get the current values for both fields
+        var row = $this.closest('tr');
+        var textEn = row.find('[data-field="text_en"]').val();
+        var textEl = row.find('[data-field="text_el"]').val();
+        
+        // Get original values for comparison
+        var originalEn = row.find('[data-field="text_en"]').data('original-value');
+        var originalEl = row.find('[data-field="text_el"]').data('original-value');
+        
+        // Check if any value in this row has changed
+        var hasChanges = (textEn !== originalEn) || (textEl !== originalEl);
+        
+        if (hasChanges) {
+            // Add to changes object with BOTH current values
+            changes[translationId] = {
+                id: translationId,
+                text_en: textEn,
+                text_el: textEl
+            };
+            
+            // Show save button
+            saveButton.show();
         } else {
-            $('#cb-select-all-translations').prop('indeterminate', true);
+            // Remove from changes if no changes in this row
+            delete changes[translationId];
+            
+            // Hide save button if no changes
+            if (Object.keys(changes).length === 0) {
+                saveButton.hide();
+            }
         }
+    });
+    
+    // Save all changes - FIXED VERSION
+    saveButton.on('click', function() {
+        if (Object.keys(changes).length === 0) {
+            alert('<?php _e('No changes to save.', 'cleaning-booking'); ?>');
+            return;
+        }
+        
+        // Convert changes object to array
+        var updates = Object.values(changes);
+        
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'cb_bulk_update_translations',
+                updates: updates,
+                nonce: '<?php echo wp_create_nonce('cb_admin_nonce'); ?>'
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Update original values for ALL fields in changed rows
+                    Object.keys(changes).forEach(function(translationId) {
+                        var row = $('tr[data-translation-id="' + translationId + '"]');
+                        var change = changes[translationId];
+                        
+                        row.find('[data-field="text_en"]').data('original-value', change.text_en);
+                        row.find('[data-field="text_el"]').data('original-value', change.text_el);
+                    });
+                    
+                    changes = {};
+                    saveButton.hide();
+                    alert('<?php _e('All changes saved successfully!', 'cleaning-booking'); ?>');
+                    
+                    // Update status badges after save
+                    updateStatusBadges();
+                } else {
+                    alert(response.data.message);
+                }
+            }
+        });
+    });
+    
+    // Search functionality
+    $('#cb-search-translations').on('keyup', function() {
+        var search = $(this).val().toLowerCase();
+        
+        $('#cb-translations-table tbody tr').each(function() {
+            var row = $(this);
+            var rowText = row.text().toLowerCase();
+            
+            if (!search || rowText.includes(search)) {
+                row.show();
+            } else {
+                row.hide();
+            }
+        });
+    });
+    
+    // Status filter functionality
+    $('#cb-status-filter').on('change', function() {
+        var status = $(this).val();
+        var currentUrl = new URL(window.location.href);
+        
+        if (status === 'all') {
+            currentUrl.searchParams.delete('status');
+        } else {
+            currentUrl.searchParams.set('status', status);
+        }
+        
+        window.location.href = currentUrl.toString();
+    });
+    
+    // Function to update status badges
+    function updateStatusBadges() {
+        $('#cb-translations-table tbody tr').each(function() {
+            var row = $(this);
+            var textEn = row.find('[data-field="text_en"]').val();
+            var textEl = row.find('[data-field="text_el"]').val();
+            var isTranslated = textEn && textEl;
+            
+            var statusBadge = row.find('.cb-status-badge');
+            statusBadge.removeClass('cb-status-translated cb-status-untranslated');
+            
+            if (isTranslated) {
+                statusBadge.addClass('cb-status-translated').text('<?php _e('Translated', 'cleaning-booking'); ?>');
+            } else {
+                statusBadge.addClass('cb-status-untranslated').text('<?php _e('Untranslated', 'cleaning-booking'); ?>');
+            }
+        });
     }
     
-    // Initialize bulk delete button state
-    updateBulkDeleteButton();
+    // Update status badges on page load
+    updateStatusBadges();
     
-    // Seed translations functionality
-    $('#cb-seed-translations').on('click', function() {
-        if (confirm('<?php _e('This will seed all default translations. Existing translations will be skipped. Continue?', 'cleaning-booking'); ?>')) {
-            var $button = $(this);
-            var originalText = $button.text();
-            $button.prop('disabled', true).html('<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite;"></span> <?php _e('Seeding...', 'cleaning-booking'); ?>');
-            
-            $.ajax({
-                url: ajaxurl,
-                type: 'POST',
-                data: {
-                    action: 'cb_seed_translations',
-                    nonce: '<?php echo wp_create_nonce('cb_admin_nonce'); ?>'
-                },
-                success: function(response) {
-                    if (response.success) {
-                        $('#cb-duplicate-status').text(response.data.message).css('color', '#00a32a').show();
-                        setTimeout(function() {
-                            location.reload();
-                        }, 2000);
-                    } else {
-                        $('#cb-duplicate-status').text('<?php _e('Error seeding: ', 'cleaning-booking'); ?>' + response.data.message).css('color', '#d63638').show();
-                    }
-                },
-                error: function() {
-                    $('#cb-duplicate-status').text('<?php _e('Network error. Please try again.', 'cleaning-booking'); ?>').css('color', '#d63638').show();
-                },
-                complete: function() {
-                    $button.prop('disabled', false).text(originalText);
-                }
-            });
+    // Modal handlers
+    $('#cb-cancel-translation').on('click', function() {
+        $('#cb-translation-modal').hide();
+    });
+    
+    // Close modal when clicking outside
+    $(window).on('click', function(e) {
+        if ($(e.target).hasClass('cb-modal')) {
+            $(e.target).hide();
         }
     });
 });

@@ -907,6 +907,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 '<td><strong>' + extra.name + '</strong>' +
                 (extra.description ? '<br><small>' + extra.description + '</small>' : '') + '</td>' +
                 '<td>p€' + parseFloat(extra.price).toFixed(2) + '</td>' +
+                '<td>€' + parseFloat(extra.price).toFixed(2) + '</td>' +
                 '<td>' + extra.duration + ' min</td>' +
                 '<td>' +
                     '<label style="display: inline-flex; align-items: center;">' +

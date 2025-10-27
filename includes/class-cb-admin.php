@@ -142,6 +142,7 @@ class CB_Admin {
         wp_enqueue_media();
         wp_enqueue_script('cb-admin', CB_PLUGIN_URL . 'assets/js/admin.js', array('jquery', 'media-upload'), CB_VERSION, true);
         wp_enqueue_style('cb-admin', CB_PLUGIN_URL . 'assets/css/admin.css', array(), CB_VERSION);
+
         
         wp_localize_script('cb-admin', 'cb_admin', array(
             'ajax_url' => admin_url('admin-ajax.php'),
@@ -907,22 +908,31 @@ class CB_Admin {
             wp_die(__('You do not have sufficient permissions to access this page.'));
         }
         
+        // Validate required fields
+        if (empty($_POST['string_key']) || empty($_POST['text_en']) || empty($_POST['text_el'])) {
+            wp_send_json_error(array('message' => __('String Key, English Text, and Greek Text are required fields.', 'cleaning-booking')));
+        }
+        
         $data = array(
             'id' => isset($_POST['translation_id']) ? intval($_POST['translation_id']) : '',
             'string_key' => sanitize_text_field($_POST['string_key']),
-            'category' => sanitize_text_field($_POST['category']),
+            'category' => 'general', // Default category since we removed category selection
             'text_en' => sanitize_textarea_field($_POST['text_en']),
             'text_el' => sanitize_textarea_field($_POST['text_el']),
-            'context' => sanitize_text_field($_POST['context']),
-            'is_active' => isset($_POST['is_active']) ? 1 : 0
+            'context' => isset($_POST['context']) ? sanitize_text_field($_POST['context']) : '',
+            'is_active' => 1
         );
         
-        $result = CB_Translations::save_translation($data);
-        
-        if ($result !== false) {
-            wp_send_json_success(array('message' => __('Translation saved successfully!', 'cleaning-booking')));
-        } else {
-            wp_send_json_error(array('message' => __('Error saving translation.', 'cleaning-booking')));
+        try {
+            $result = CB_Translations::save_translation($data);
+            
+            if ($result !== false) {
+                wp_send_json_success(array('message' => __('Translation saved successfully!', 'cleaning-booking')));
+            } else {
+                wp_send_json_error(array('message' => __('Error saving translation to database.', 'cleaning-booking')));
+            }
+        } catch (Exception $e) {
+            wp_send_json_error(array('message' => __('Database error: ', 'cleaning-booking') . $e->getMessage()));
         }
     }
     
@@ -994,13 +1004,34 @@ class CB_Admin {
             wp_die(__('You do not have sufficient permissions to access this page.'));
         }
         
-        $updates = $_POST['updates'];
-        $updated = CB_Translations::bulk_update_translations($updates);
-        
-        wp_send_json_success(array(
-            'message' => sprintf(__('%d translations updated successfully!', 'cleaning-booking'), $updated),
-            'updated' => $updated
-        ));
+        if (isset($_POST['updates']) && is_array($_POST['updates'])) {
+            $updates = array();
+            
+            foreach ($_POST['updates'] as $update) {
+                $updates[] = array(
+                    'id' => intval($update['id']),
+                    'text_en' => sanitize_textarea_field($update['text_en']),
+                    'text_el' => sanitize_textarea_field($update['text_el'])
+                );
+            }
+            
+            $updated = CB_Translations::bulk_update_translations($updates);
+            
+            if ($updated > 0) {
+                wp_send_json_success(array(
+                    'message' => sprintf(__('%d translations updated successfully!', 'cleaning-booking'), $updated),
+                    'updated' => $updated
+                ));
+            } else {
+                wp_send_json_error(array(
+                    'message' => __('No translations were updated.', 'cleaning-booking')
+                ));
+            }
+        } else {
+            wp_send_json_error(array(
+                'message' => __('No updates provided.', 'cleaning-booking')
+            ));
+        }
     }
     
     // Import/Export translations removed
@@ -1155,49 +1186,4 @@ class CB_Admin {
         }
     }
     
-    /**
-     * AJAX handler for clearing translation cache
-     */
-    public function ajax_clear_translation_cache() {
-        check_ajax_referer('cb_admin_nonce', 'nonce');
-        
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(array('message' => __('Insufficient permissions', 'cleaning-booking')));
-        }
-        
-        try {
-            // Clear all translation caches
-            CB_Translations::clear_all_translation_cache();
-            
-            wp_send_json_success(array('message' => __('Translation cache cleared successfully!', 'cleaning-booking')));
-            
-        } catch (Exception $e) {
-            wp_send_json_error(array('message' => $e->getMessage()));
-        }
-    }
-    
-    /**
-     * Validate admin permissions
-     */
-    private function validate_admin_permissions() {
-        check_ajax_referer('cb_admin_nonce', 'nonce');
-        
-        if (!current_user_can('manage_options')) {
-            throw new Exception(__('Insufficient permissions', 'cleaning-booking'));
-        }
-    }
-    
-    /**
-     * Clear translation cache
-     */
-    private function clear_translation_cache() {
-        CB_Translations::clear_all_translation_cache();
-    }
-    
-    /**
-     * Log error
-     */
-    private function log_error($context, $exception) {
-        error_log("CB_Admin::{$context} error: " . $exception->getMessage());
-    }
 }
