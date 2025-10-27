@@ -33,7 +33,18 @@ class CB_Database {
      * Constructor
      */
     public function __construct() {
-        // Constructor for future use
+        // Run migrations on admin init to ensure database is up to date
+        if (is_admin()) {
+            add_action('admin_init', array($this, 'run_migrations_on_init'), 1);
+        }
+    }
+    
+    /**
+     * Run migrations on admin init
+     */
+    public function run_migrations_on_init() {
+        // Run migrations to ensure all columns exist
+        self::run_migrations();
     }
     
     /**
@@ -385,7 +396,6 @@ class CB_Database {
     }
     
     public static function run_migrations() {
-        error_log('Running database migrations...');
         
         // Run all migration checks
         self::check_service_extras_table();
@@ -399,8 +409,61 @@ class CB_Database {
         self::check_zip_codes_table();
         self::check_trucks_table();
         self::check_bookings_table();
+        self::check_greek_columns();
+        self::check_extras_pricing_columns();
         
         error_log('Database migrations completed.');
+    }
+    
+    private static function check_greek_columns() {
+        global $wpdb;
+        
+        // Add Greek columns to services table
+        $services_table = $wpdb->prefix . 'cb_services';
+        $name_el_exists = $wpdb->get_results("SHOW COLUMNS FROM $services_table LIKE 'name_el'");
+        
+        if (empty($name_el_exists)) {
+            error_log('Adding Greek columns to services table');
+            $wpdb->query("ALTER TABLE $services_table ADD COLUMN name_el varchar(255) DEFAULT NULL AFTER name");
+            $wpdb->query("ALTER TABLE $services_table ADD COLUMN description_el text DEFAULT NULL AFTER description");
+        }
+        
+        // Add Greek columns to service_extras table
+        $service_extras_table = $wpdb->prefix . 'cb_service_extras';
+        $name_el_exists_extras = $wpdb->get_results("SHOW COLUMNS FROM $service_extras_table LIKE 'name_el'");
+        
+        if (empty($name_el_exists_extras)) {
+            error_log('Adding Greek columns to service_extras table');
+            $wpdb->query("ALTER TABLE $service_extras_table ADD COLUMN name_el varchar(255) DEFAULT NULL AFTER name");
+            $wpdb->query("ALTER TABLE $service_extras_table ADD COLUMN description_el text DEFAULT NULL AFTER description");
+        }
+    }
+    
+    private static function check_extras_pricing_columns() {
+        global $wpdb;
+        
+        $service_extras_table = $wpdb->prefix . 'cb_service_extras';
+        
+        // Check if pricing_type column exists
+        $pricing_type_exists = $wpdb->get_results("SHOW COLUMNS FROM $service_extras_table LIKE 'pricing_type'");
+        
+        if (empty($pricing_type_exists)) {
+            error_log('Adding pricing columns to service_extras table');
+            // Add pricing_type: 'fixed' or 'per_sqm'
+            $wpdb->query("ALTER TABLE $service_extras_table ADD COLUMN pricing_type varchar(20) DEFAULT 'fixed' AFTER price");
+            // Add price_per_sqm for extras calculated by square meter
+            $wpdb->query("ALTER TABLE $service_extras_table ADD COLUMN price_per_sqm decimal(10,2) DEFAULT NULL AFTER pricing_type");
+            // Add duration_per_sqm for extras calculated by square meter
+            $wpdb->query("ALTER TABLE $service_extras_table ADD COLUMN duration_per_sqm int(11) DEFAULT NULL AFTER price_per_sqm");
+        } else {
+            // Check if duration_per_sqm exists (it might not have been added in the first migration)
+            $duration_per_sqm_exists = $wpdb->get_results("SHOW COLUMNS FROM $service_extras_table LIKE 'duration_per_sqm'");
+            
+            if (empty($duration_per_sqm_exists)) {
+                error_log('Adding duration_per_sqm column to service_extras table');
+                $wpdb->query("ALTER TABLE $service_extras_table ADD COLUMN duration_per_sqm int(11) DEFAULT NULL AFTER price_per_sqm");
+            }
+        }
     }
     
     private static function check_service_extras_table() {
@@ -631,13 +694,8 @@ class CB_Database {
         $table_name = $wpdb->prefix . 'cb_services';
         $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'icon_url'");
         
-        error_log('Checking icon_url column. Table: ' . $table_name);
-        error_log('Column exists check result: ' . print_r($column_exists, true));
-        
         if (empty($column_exists)) {
-            error_log('Adding icon_url column to services table');
             $result = $wpdb->query("ALTER TABLE $table_name ADD COLUMN icon_url varchar(500) DEFAULT NULL AFTER default_area");
-            error_log('ALTER TABLE result: ' . ($result ? 'SUCCESS' : 'FAILED'));
         } else {
             error_log('icon_url column already exists');
         }
@@ -707,8 +765,6 @@ class CB_Database {
             error_log('Adding truck_number column to trucks table');
             $wpdb->query("ALTER TABLE $table_name ADD COLUMN truck_number varchar(50) DEFAULT NULL AFTER truck_name");
         }
-        
-        error_log('Trucks table migration completed');
     }
     
     private static function check_bookings_table() {
@@ -726,7 +782,6 @@ class CB_Database {
         // Check if booking_reference column exists
         $booking_ref_column = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'booking_reference'");
         if (empty($booking_ref_column)) {
-            error_log('Adding booking_reference column to bookings table');
             $wpdb->query("ALTER TABLE $table_name ADD COLUMN booking_reference varchar(50) NOT NULL DEFAULT '' AFTER id");
             $wpdb->query("ALTER TABLE $table_name ADD UNIQUE KEY booking_reference (booking_reference)");
         }
@@ -736,14 +791,12 @@ class CB_Database {
         $zip_code_column = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'zip_code'");
         
         if (!empty($zipcode_column) && empty($zip_code_column)) {
-            error_log('Migrating bookings table: zipcode -> zip_code');
             $wpdb->query("ALTER TABLE $table_name CHANGE zipcode zip_code varchar(20) NOT NULL");
         }
         
         // Check if service_id column exists
         $service_id_column = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'service_id'");
         if (empty($service_id_column)) {
-            error_log('Adding service_id column to bookings table');
             $wpdb->query("ALTER TABLE $table_name ADD COLUMN service_id mediumint(9) NOT NULL DEFAULT 0 AFTER address");
             $wpdb->query("ALTER TABLE $table_name ADD KEY service_id (service_id)");
         }
@@ -751,14 +804,12 @@ class CB_Database {
         // Check if square_meters column exists
         $square_meters_column = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'square_meters'");
         if (empty($square_meters_column)) {
-            error_log('Adding square_meters column to bookings table');
             $wpdb->query("ALTER TABLE $table_name ADD COLUMN square_meters int(11) NOT NULL DEFAULT 0 AFTER service_id");
         }
         
         // Check if truck_id column exists
         $truck_id_column = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'truck_id'");
         if (empty($truck_id_column)) {
-            error_log('Adding truck_id column to bookings table');
             $wpdb->query("ALTER TABLE $table_name ADD COLUMN truck_id mediumint(9) DEFAULT NULL AFTER status");
             $wpdb->query("ALTER TABLE $table_name ADD KEY truck_id (truck_id)");
         }
@@ -776,8 +827,6 @@ class CB_Database {
             error_log('Adding payment_method column to bookings table');
             $wpdb->query("ALTER TABLE $table_name ADD COLUMN payment_method varchar(50) DEFAULT NULL AFTER notes");
         }
-        
-        error_log('Bookings table migration completed');
     }
     
     private static function insert_default_data() {
@@ -1194,14 +1243,7 @@ class CB_Database {
         $where = $active_only ? 'WHERE is_active = 1' : '';
         $results = $wpdb->get_results("SELECT * FROM $table $where ORDER BY sort_order, name");
         
-        // Apply translations if not English
-        if ($language !== 'en') {
-            foreach ($results as $service) {
-                $service->name = self::get_translation($service->name, $language, 'services') ?: $service->name;
-                $service->description = self::get_translation($service->description, $language, 'services') ?: $service->description;
-            }
-        }
-        
+        // Return raw data - translations are handled in frontend class based on database columns
         return $results;
     }
     
@@ -1400,16 +1442,11 @@ class CB_Database {
             $where .= " AND is_active = 1";
         }
         
-        $results = $wpdb->get_results("SELECT * FROM $table $where ORDER BY id DESC");
+        $sql = "SELECT * FROM $table $where ORDER BY id DESC";
         
-        // Apply translations if not English
-        if ($language !== 'en') {
-            foreach ($results as $extra) {
-                $extra->name = self::get_translation($extra->name, $language, 'extras') ?: $extra->name;
-                $extra->description = self::get_translation($extra->description, $language, 'extras') ?: $extra->description;
-            }
-        }
+        $results = $wpdb->get_results($sql);
         
+        // Return raw data - translations are handled in frontend class based on database columns
         return $results;
     }
     
@@ -1418,6 +1455,7 @@ class CB_Database {
         $table = $wpdb->prefix . 'cb_service_extras';
         $where = $active_only ? "WHERE is_active = 1" : "";
         
+        // Return raw data with all columns (including name_el, description_el)
         return $wpdb->get_results("SELECT * FROM $table $where ORDER BY service_id, id DESC");
     }
     
@@ -1446,10 +1484,15 @@ class CB_Database {
             'service_id' => $service_id,
             'name' => sanitize_text_field($extra_data['name']),
             'description' => sanitize_textarea_field($extra_data['description']),
+            'name_el' => isset($extra_data['name_el']) ? sanitize_text_field($extra_data['name_el']) : '',
+            'description_el' => isset($extra_data['description_el']) ? sanitize_textarea_field($extra_data['description_el']) : '',
             'price' => floatval($extra_data['price']),
             'duration' => intval($extra_data['duration']),
             'is_active' => isset($extra_data['is_active']) ? intval($extra_data['is_active']) : 1,
-            'sort_order' => isset($extra_data['sort_order']) ? intval($extra_data['sort_order']) : 0
+            'sort_order' => isset($extra_data['sort_order']) ? intval($extra_data['sort_order']) : 0,
+            'pricing_type' => isset($extra_data['pricing_type']) ? sanitize_text_field($extra_data['pricing_type']) : 'fixed',
+            'price_per_sqm' => isset($extra_data['price_per_sqm']) ? floatval($extra_data['price_per_sqm']) : null,
+            'duration_per_sqm' => isset($extra_data['duration_per_sqm']) ? intval($extra_data['duration_per_sqm']) : null
         );
         
         return $wpdb->insert($table, $data);
@@ -1472,10 +1515,19 @@ class CB_Database {
         $update_data = array();
         if (isset($data['name'])) $update_data['name'] = sanitize_text_field($data['name']);
         if (isset($data['description'])) $update_data['description'] = sanitize_textarea_field($data['description']);
+        if (isset($data['name_el'])) $update_data['name_el'] = sanitize_text_field($data['name_el']);
+        if (isset($data['description_el'])) $update_data['description_el'] = sanitize_textarea_field($data['description_el']);
         if (isset($data['price'])) $update_data['price'] = floatval($data['price']);
         if (isset($data['duration'])) $update_data['duration'] = intval($data['duration']);
         if (isset($data['is_active'])) $update_data['is_active'] = intval($data['is_active']);
         if (isset($data['sort_order'])) $update_data['sort_order'] = intval($data['sort_order']);
+        if (isset($data['pricing_type'])) $update_data['pricing_type'] = sanitize_text_field($data['pricing_type']);
+        if (isset($data['price_per_sqm'])) {
+            $update_data['price_per_sqm'] = !empty($data['price_per_sqm']) ? floatval($data['price_per_sqm']) : null;
+        }
+        if (isset($data['duration_per_sqm'])) {
+            $update_data['duration_per_sqm'] = !empty($data['duration_per_sqm']) ? intval($data['duration_per_sqm']) : null;
+        }
         
         return $wpdb->update($table, $update_data, array(
             'id' => $extra_id,
@@ -1765,10 +1817,12 @@ class CB_Database {
         ));
         
         if ($result) {
-            return $language === 'el' ? $result->text_el : $result->text_en;
+            $translated_text = $language === 'el' ? $result->text_el : $result->text_en;
+            // Return empty string if translation doesn't exist or is empty
+            return !empty($translated_text) ? $translated_text : null;
         }
         
-        return $string_key; // Fallback to key if translation not found
+        return null; // Return null if translation not found - let caller handle fallback
     }
     
     public static function save_translation($data) {

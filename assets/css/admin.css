@@ -860,7 +860,7 @@
     object-fit: contain;
     display: block;
     margin: 0 auto;
-    border-radius: 8px;
+    border-radius: 8px !important;
 }
 
 .cb-service-icon {

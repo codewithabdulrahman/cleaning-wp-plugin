@@ -594,11 +594,43 @@ public function ajax_get_services() {
         // Get current language
         $language = $this->get_current_language();
         
-        // Get active extras for the selected service
+        // Get active extras for the selected service only
         $extras = CB_Database::get_service_extras($service_id, true);
         
-        // Translate extras
-        $translated_extras = $this->get_translated_extras($language);
+        if (!$extras) {
+            wp_send_json_success(array('extras' => array()));
+        }
+        
+        // Translate extras based on language
+        $translated_extras = array();
+        foreach ($extras as $extra) {
+            $extra_id = intval($extra->id);
+            
+            // Use database columns directly based on language
+            if ($language === 'el') {
+                // Greek: use Greek columns, fallback to English if empty
+                $translated_name = !empty($extra->name_el) ? $extra->name_el : $extra->name;
+                $translated_description = !empty($extra->description_el) ? $extra->description_el : $extra->description;
+            } else {
+                // English: use English columns
+                $translated_name = $extra->name;
+                $translated_description = $extra->description;
+            }
+            
+            $translated_extras[] = array(
+                'id' => $extra_id,
+                'service_id' => intval($extra->service_id),
+                'name' => $translated_name,
+                'description' => $translated_description,
+                'price' => $extra->price,
+                'duration' => isset($extra->duration) ? intval($extra->duration) : 0,
+                'is_active' => isset($extra->is_active) ? intval($extra->is_active) : 1,
+                'sort_order' => isset($extra->sort_order) ? intval($extra->sort_order) : 0,
+                'pricing_type' => isset($extra->pricing_type) ? $extra->pricing_type : 'fixed',
+                'price_per_sqm' => isset($extra->price_per_sqm) ? $extra->price_per_sqm : null,
+                'duration_per_sqm' => isset($extra->duration_per_sqm) ? $extra->duration_per_sqm : null
+            );
+        }
         
         wp_send_json_success(array('extras' => $translated_extras));
     }
@@ -796,11 +828,22 @@ public function ajax_get_services() {
     foreach ($services as $service) {
         $service_id = intval($service->id);
         
+        // Use database columns directly based on language
+        if ($language === 'el') {
+            // Greek: use Greek columns, fallback to English if empty
+            $translated_name = !empty($service->name_el) ? $service->name_el : $service->name;
+            $translated_description = !empty($service->description_el) ? $service->description_el : $service->description;
+        } else {
+            // English: use English columns
+            $translated_name = $service->name;
+            $translated_description = $service->description;
+        }
+        
         // Create service object with ALL original properties including icon_url
         $translated_service = new stdClass();
         $translated_service->id = $service_id;
-        $translated_service->name = CB_Translations::get_translation('service_name_' . $service_id, $language, 'services') ?: $service->name;
-        $translated_service->description = CB_Translations::get_translation('service_desc_' . $service_id, $language, 'services') ?: $service->description;
+        $translated_service->name = $translated_name;
+        $translated_service->description = $translated_description;
         $translated_service->base_price = $service->base_price;
         $translated_service->base_duration = $service->base_duration;
         $translated_service->sqm_multiplier = $service->sqm_multiplier;
@@ -821,15 +864,30 @@ public function ajax_get_services() {
         
         foreach ($extras as $extra) {
             $extra_id = intval($extra->id);
+            
+            // Use database columns directly based on language
+            if ($language === 'el') {
+                // Greek: use Greek columns, fallback to English if empty
+                $translated_name = !empty($extra->name_el) ? $extra->name_el : $extra->name;
+                $translated_description = !empty($extra->description_el) ? $extra->description_el : $extra->description;
+            } else {
+                // English: use English columns
+                $translated_name = $extra->name;
+                $translated_description = $extra->description;
+            }
+            
             $translated_extras[] = array(
                 'id' => $extra_id,
                 'service_id' => intval($extra->service_id),
-                'name' => CB_Translations::get_translation('extra_name_' . $extra_id, $language, 'extras') ?: $extra->name,
-                'description' => CB_Translations::get_translation('extra_desc_' . $extra_id, $language, 'extras') ?: $extra->description,
+                'name' => $translated_name,
+                'description' => $translated_description,
                 'price' => $extra->price,
                 'duration' => isset($extra->duration) ? intval($extra->duration) : 0,
                 'is_active' => isset($extra->is_active) ? intval($extra->is_active) : 1,
-                'sort_order' => isset($extra->sort_order) ? intval($extra->sort_order) : 0
+                'sort_order' => isset($extra->sort_order) ? intval($extra->sort_order) : 0,
+                'pricing_type' => isset($extra->pricing_type) ? $extra->pricing_type : 'fixed',
+                'price_per_sqm' => isset($extra->price_per_sqm) ? $extra->price_per_sqm : null,
+                'duration_per_sqm' => isset($extra->duration_per_sqm) ? $extra->duration_per_sqm : null
             );
         }
         
@@ -1060,40 +1118,65 @@ public function rest_get_services($request) {
                 wp_send_json_error(array('message' => __('Service not found.', 'cleaning-booking')));
             }
             
+            // Treat entered area as total space and calculate actual additional area
             $total_area = $additional_area;
             $base_area_included = 0;
+            $actual_additional_area = $additional_area; // Default: treat as additional
             
             if ($use_smart_area && $service->default_area > 0) {
-                // Smart area calculation: base area + additional area
+                // Smart area calculation: compare entered space with base space
                 $base_area_included = $service->default_area;
-                $total_area = $base_area_included + $additional_area;
+                $total_area = $additional_area; // User enters total area
+                
+                // Only charge for area BEYOND the base area
+                // If entered space <= base space, additional = 0
+                // If entered space > base space, additional = entered - base
+                if ($total_area <= $base_area_included) {
+                    // User hasn't exceeded base space, no additional charge
+                    $actual_additional_area = 0;
+                } else {
+                    // User exceeded base space, charge only for the excess
+                    $actual_additional_area = $total_area - $base_area_included;
+                }
             }
             
-            // Calculate pricing breakdown using ONLY additional area (not total area)
+            // Get extra spaces for per m² extras
+            $extra_spaces = isset($_POST['extra_spaces']) && !empty($_POST['extra_spaces']) ? $_POST['extra_spaces'] : array();
+            if (is_string($extra_spaces)) {
+                $extra_spaces = json_decode(stripslashes($extra_spaces), true);
+            }
+            
+            // Calculate pricing breakdown using ONLY the actual additional area (not total area)
             // The base service is handled separately in smart_area calculation
-            $pricing = CB_Pricing::get_pricing_breakdown($service_id, $additional_area, $extras, $zip_code);
+            // Pass extras as structured data with extra_spaces
+            $extras_data = array(
+                'extras' => $extras,
+                'extra_spaces' => $extra_spaces
+            );
+            $pricing = CB_Pricing::get_pricing_breakdown($service_id, $actual_additional_area, $extras_data, $zip_code);
             
             // Add smart area info to response
             $pricing['smart_area'] = array(
                 'use_smart_area' => $use_smart_area,
                 'base_area_included' => $base_area_included,
-                'additional_area' => $additional_area,
-                'total_area' => $total_area,
+                'entered_area' => $total_area,
+                'additional_area' => $actual_additional_area,
+                'total_area' => $base_area_included + $actual_additional_area,
                 'base_price' => $service->base_price,
                 'base_duration' => $service->base_duration,
-                'additional_price' => $use_smart_area && $additional_area > 0 ? ($additional_area * $service->sqm_multiplier) : 0,
-                'additional_duration' => $use_smart_area && $additional_area > 0 ? ($additional_area * $service->sqm_duration_multiplier) : 0
+                'additional_price' => $actual_additional_area > 0 ? ($actual_additional_area * $service->sqm_multiplier) : 0,
+                'additional_duration' => $actual_additional_area > 0 ? ($actual_additional_area * $service->sqm_duration_multiplier) : 0
             );
             
             // Override pricing for smart area calculation
             if ($use_smart_area && $service->default_area > 0) {
-                // For smart area, we want base service + additional area pricing
-                // Only add additional area pricing if additional_area > 0
-                if ($additional_area > 0) {
-                    $pricing['service_price'] = floatval($service->base_price) + ($additional_area * floatval($service->sqm_multiplier));
-                    $pricing['service_duration'] = intval($service->base_duration) + ($additional_area * floatval($service->sqm_duration_multiplier));
+                // For smart area, we want base service + actual additional area pricing
+                // Only add additional area pricing if actual_additional_area > 0
+                if ($actual_additional_area > 0) {
+                    $pricing['service_price'] = floatval($service->base_price) + ($actual_additional_area * floatval($service->sqm_multiplier));
+                    $pricing['service_duration'] = intval($service->base_duration) + ($actual_additional_area * floatval($service->sqm_duration_multiplier));
                 } else {
-                    // When additional_area is 0, use base service only
+                    // When no additional area, use base service only
                     $pricing['service_price'] = floatval($service->base_price);
                     $pricing['service_duration'] = intval($service->base_duration);
                 }

@@ -4,7 +4,7 @@
  * Plugin URI: https://example.com/cleaning-booking
  * Description: Professional booking system for cleaning services with WooCommerce integration, multi-language support, and advanced scheduling features.
  * Version: 1.0.0
- * Author: Your Name
+ * Author: Cleaning Booking System
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: cleaning-booking
@@ -188,7 +188,6 @@ class CleaningBooking {
             // Initialize logger
             if (class_exists('CB_Logger')) {
                 CB_Logger::init();
-                CB_Logger::info('Cleaning Booking System initialized');
             }
             
             // Initialize database

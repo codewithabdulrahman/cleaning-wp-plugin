@@ -55,8 +55,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const service = JSON.parse(editBtn.dataset.service);
             
             const serviceIdInput = document.getElementById('service-id');
-            const serviceNameInput = document.getElementById('service-name');
-            const serviceDescriptionInput = document.getElementById('service-description');
+            const serviceNameEnInput = document.getElementById('service-name-en');
+            const serviceNameElInput = document.getElementById('service-name-el');
+            const serviceDescriptionEnInput = document.getElementById('service-description-en');
+            const serviceDescriptionElInput = document.getElementById('service-description-el');
             const serviceBasePriceInput = document.getElementById('service-base-price');
             const serviceBaseDurationInput = document.getElementById('service-base-duration');
             const serviceSqmMultiplierInput = document.getElementById('service-sqm-multiplier');
@@ -70,8 +72,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const serviceIconUploadBtn = document.getElementById('service-icon-upload');
             
             if (serviceIdInput) serviceIdInput.value = service.id;
-            if (serviceNameInput) serviceNameInput.value = service.name;
-            if (serviceDescriptionInput) serviceDescriptionInput.value = service.description;
+            
+            // Populate English fields from service object
+            if (serviceNameEnInput) serviceNameEnInput.value = service.name || '';
+            if (serviceDescriptionEnInput) serviceDescriptionEnInput.value = service.description || '';
+            
+            // Populate Greek fields from service object (if available)
+            if (serviceNameElInput) serviceNameElInput.value = service.name_el || '';
+            if (serviceDescriptionElInput) serviceDescriptionElInput.value = service.description_el || '';
             if (serviceBasePriceInput) serviceBasePriceInput.value = service.base_price;
             if (serviceBaseDurationInput) serviceBaseDurationInput.value = service.base_duration;
             if (serviceSqmMultiplierInput) serviceSqmMultiplierInput.value = service.sqm_multiplier;
@@ -747,6 +755,54 @@ document.addEventListener('DOMContentLoaded', function() {
             const submitBtn = form.querySelector('input[type="submit"]');
             const originalText = submitBtn.value;
             
+            // Validate based on pricing type
+            const pricingType = document.getElementById('create-extra-pricing-type').value;
+            const nameEn = document.getElementById('create-extra-name-en').value.trim();
+            const nameEl = document.getElementById('create-extra-name-el').value.trim();
+            let isValid = true;
+            let errorMessage = '';
+            
+            // Validate names
+            if (!nameEn) {
+                errorMessage = 'Please enter the extra name in English';
+                isValid = false;
+            } else if (!nameEl) {
+                errorMessage = 'Please enter the extra name in Greek';
+                isValid = false;
+            }
+            
+            if (isValid) {
+                if (pricingType === 'fixed') {
+                    // Fixed pricing - validate fixed price and duration
+                    const price = parseFloat(document.getElementById('create-extra-price').value);
+                    const duration = parseInt(document.getElementById('create-extra-duration').value);
+                    if (isNaN(price) || price <= 0) {
+                        errorMessage = 'Please enter a valid fixed price greater than 0';
+                        isValid = false;
+                    } else if (isNaN(duration) || duration < 0) {
+                        errorMessage = 'Please enter a valid duration (minimum 0)';
+                        isValid = false;
+                    }
+                } else if (pricingType === 'per_sqm') {
+                    // Per sqm pricing - validate price per sqm and duration per sqm
+                    const pricePerSqm = parseFloat(document.getElementById('create-extra-price-per-sqm').value);
+                    const durationPerSqm = parseInt(document.getElementById('create-extra-duration-per-sqm').value);
+                    if (isNaN(pricePerSqm) || pricePerSqm <= 0) {
+                        errorMessage = 'Please enter a valid price per m² greater than 0';
+                        isValid = false;
+                    } else if (isNaN(durationPerSqm) || durationPerSqm < 0) {
+                        errorMessage = 'Please enter a valid duration per m² (minimum 0)';
+                        isValid = false;
+                    }
+                }
+            }
+            
+            if (!isValid) {
+                showNotice(errorMessage, 'error');
+                if (submitBtn) submitBtn.disabled = false;
+                return;
+            }
+            
             submitBtn.value = cb_admin.strings.saving;
             submitBtn.disabled = true;
             
@@ -794,19 +850,45 @@ document.addEventListener('DOMContentLoaded', function() {
             const editBtn = e.target.closest('.cb-edit-extra-inline');
             const extra = JSON.parse(editBtn.dataset.extra);
             
+            // Debug: Log the extra object
+            console.log('Editing extra:', extra);
+            console.log('Has name_el:', 'name_el' in extra, 'Value:', extra.name_el);
+            console.log('Has description_el:', 'description_el' in extra, 'Value:', extra.description_el);
+            
             const createExtraIdInput = document.getElementById('create-extra-id');
-            const createExtraNameInput = document.getElementById('create-extra-name');
-            const createExtraDescriptionInput = document.getElementById('create-extra-description');
+            const createExtraNameEnInput = document.getElementById('create-extra-name-en');
+            const createExtraNameElInput = document.getElementById('create-extra-name-el');
+            const createExtraDescriptionEnInput = document.getElementById('create-extra-description-en');
+            const createExtraDescriptionElInput = document.getElementById('create-extra-description-el');
             const createExtraPriceInput = document.getElementById('create-extra-price');
             const createExtraDurationInput = document.getElementById('create-extra-duration');
             const createExtraIsActiveInput = document.getElementById('create-extra-is-active');
+            const createExtraPricingTypeInput = document.getElementById('create-extra-pricing-type');
+            const createExtraPricePerSqmInput = document.getElementById('create-extra-price-per-sqm');
+            const createExtraDurationPerSqmInput = document.getElementById('create-extra-duration-per-sqm');
+            const createExtraPricePerSqmRow = document.getElementById('create-extra-price-per-sqm-row');
+            const createExtraPriceDesc = document.getElementById('create-extra-price-desc');
             
             if (createExtraIdInput) createExtraIdInput.value = extra.id;
-            if (createExtraNameInput) createExtraNameInput.value = extra.name;
-            if (createExtraDescriptionInput) createExtraDescriptionInput.value = extra.description;
+            if (createExtraNameEnInput) createExtraNameEnInput.value = extra.name || '';
+            if (createExtraNameElInput) createExtraNameElInput.value = extra.name_el || '';
+            if (createExtraDescriptionEnInput) createExtraDescriptionEnInput.value = extra.description || '';
+            if (createExtraDescriptionElInput) createExtraDescriptionElInput.value = extra.description_el || '';
             if (createExtraPriceInput) createExtraPriceInput.value = extra.price;
             if (createExtraDurationInput) createExtraDurationInput.value = extra.duration;
             if (createExtraIsActiveInput) createExtraIsActiveInput.checked = parseInt(extra.is_active) === 1;
+            
+            // Handle pricing type
+            if (createExtraPricingTypeInput) {
+                createExtraPricingTypeInput.value = extra.pricing_type || 'fixed';
+                togglePricingTypeFields(createExtraPricingTypeInput.value);
+            }
+            if (createExtraPricePerSqmInput) {
+                createExtraPricePerSqmInput.value = extra.price_per_sqm || '';
+            }
+            if (createExtraDurationPerSqmInput) {
+                createExtraDurationPerSqmInput.value = extra.duration_per_sqm || '';
+            }
             
             const showCreateFormBtn = document.getElementById('cb-show-create-form');
             if (showCreateFormBtn) showCreateFormBtn.style.display = 'none';
@@ -889,6 +971,38 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    function togglePricingTypeFields(pricingType) {
+        const pricePerSqmRow = document.getElementById('create-extra-price-per-sqm-row');
+        const durationPerSqmRow = document.getElementById('create-extra-duration-per-sqm-row');
+        const priceRow = document.getElementById('create-extra-price-row');
+        const durationRow = document.getElementById('create-extra-duration-row');
+        const priceDesc = document.getElementById('create-extra-price-desc');
+        
+        if (pricingType === 'per_sqm') {
+            // Show price and duration per sqm fields, hide fixed price/duration
+            if (pricePerSqmRow) pricePerSqmRow.style.display = '';
+            if (durationPerSqmRow) durationPerSqmRow.style.display = '';
+            if (priceRow) priceRow.style.display = 'none';
+            if (durationRow) durationRow.style.display = 'none';
+            if (priceDesc) priceDesc.textContent = 'Price per square meter in USD (leave 0 if not used)';
+        } else {
+            // Show fixed price/duration, hide per sqm fields
+            if (pricePerSqmRow) pricePerSqmRow.style.display = 'none';
+            if (durationPerSqmRow) durationPerSqmRow.style.display = 'none';
+            if (priceRow) priceRow.style.display = '';
+            if (durationRow) durationRow.style.display = '';
+            if (priceDesc) priceDesc.textContent = 'Fixed price in USD';
+        }
+    }
+    
+    // Handle pricing type dropdown change
+    const pricingTypeSelect = document.getElementById('create-extra-pricing-type');
+    if (pricingTypeSelect) {
+        pricingTypeSelect.addEventListener('change', function(e) {
+            togglePricingTypeFields(e.target.value);
+        });
+    }
+    
     function displayServiceExtras(extras) {
         const tbody = document.getElementById('service-extras-tbody');
         if (!tbody) return;
@@ -906,7 +1020,7 @@ document.addEventListener('DOMContentLoaded', function() {
             row.innerHTML = 
                 '<td><strong>' + extra.name + '</strong>' +
                 (extra.description ? '<br><small>' + extra.description + '</small>' : '') + '</td>' +
-                '<td>p€' + parseFloat(extra.price).toFixed(2) + '</td>' +
+                '<td>€' + parseFloat(extra.price).toFixed(2) + '</td>' +
                 '<td>' + extra.duration + ' min</td>' +
                 '<td>' +
                     '<label style="display: inline-flex; align-items: center;">' +
@@ -1201,6 +1315,38 @@ function initializeSearchFunctionality() {
         });
     }
     
+    // Extras search
+    const extrasSearch = document.getElementById('cb-extras-search');
+    const searchExtrasBtn = document.getElementById('cb-search-extras');
+    const clearExtrasSearch = document.getElementById('cb-clear-extras-search');
+    
+    if (extrasSearch && clearExtrasSearch) {
+        // Real-time search as you type
+        extrasSearch.addEventListener('input', function() {
+            searchExtras(this.value);
+        });
+        
+        // Search button
+        if (searchExtrasBtn) {
+            searchExtrasBtn.addEventListener('click', function() {
+                searchExtras(extrasSearch.value);
+            });
+        }
+        
+        // Clear button
+        clearExtrasSearch.addEventListener('click', function() {
+            extrasSearch.value = '';
+            searchExtras('');
+        });
+        
+        // Enter key to search
+        extrasSearch.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchExtras(this.value);
+            }
+        });
+    }
+    
     // ZIP codes search
     const zipCodesSearch = document.getElementById('cb-zip-codes-search');
     const searchZipCodesBtn = document.getElementById('cb-search-zip-codes');
@@ -1323,6 +1469,27 @@ function updateColorPreview() {
 
 function searchServices(searchTerm) {
     const table = document.querySelector('#cb-services-list table');
+    if (!table) return;
+    
+    const rows = table.querySelectorAll('tbody tr');
+    const searchLower = searchTerm.toLowerCase();
+    
+    rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        let found = false;
+        
+        cells.forEach(cell => {
+            if (cell.textContent.toLowerCase().includes(searchLower)) {
+                found = true;
+            }
+        });
+        
+        row.style.display = found ? '' : 'none';
+    });
+}
+
+function searchExtras(searchTerm) {
+    const table = document.querySelector('#cb-service-extras-list table');
     if (!table) return;
     
     const rows = table.querySelectorAll('tbody tr');

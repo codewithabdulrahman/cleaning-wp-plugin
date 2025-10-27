@@ -39,6 +39,7 @@ class CB_Admin {
         add_action('wp_ajax_cb_bulk_delete_translations', array($this, 'ajax_bulk_delete_translations'));
         add_action('wp_ajax_cb_seed_translations', array($this, 'ajax_seed_translations'));
         add_action('wp_ajax_cb_clear_translation_cache', array($this, 'ajax_clear_translation_cache'));
+        add_action('wp_ajax_cb_get_translations', array($this, 'ajax_get_translations'));
         // Import/Export removed per product decision
         
         // Style Settings AJAX handlers
@@ -306,9 +307,18 @@ class CB_Admin {
         // Debug: Log all POST data
         error_log('Admin save service POST data: ' . print_r($_POST, true));
         
+        // Get bilingual fields
+        $name_en = sanitize_text_field($_POST['name_en']);
+        $name_el = sanitize_text_field($_POST['name_el']);
+        $description_en = sanitize_textarea_field($_POST['description_en']);
+        $description_el = sanitize_textarea_field($_POST['description_el']);
+        
+        // Save both English and Greek in database
         $data = array(
-            'name' => sanitize_text_field($_POST['name']),
-            'description' => sanitize_textarea_field($_POST['description']),
+            'name' => $name_en,
+            'description' => $description_en,
+            'name_el' => $name_el,
+            'description_el' => $description_el,
             'base_price' => floatval($_POST['base_price']),
             'base_duration' => intval($_POST['base_duration']),
             'sqm_multiplier' => floatval($_POST['sqm_multiplier']),
@@ -322,55 +332,27 @@ class CB_Admin {
         // Debug: Log the data being saved
         error_log('Admin save service data array: ' . print_r($data, true));
         
-        if (isset($_POST['id']) && !empty($_POST['id'])) {
+        $service_id = isset($_POST['id']) && !empty($_POST['id']) ? intval($_POST['id']) : null;
+        
+        if ($service_id) {
             // Update existing
-            $result = $wpdb->update($table, $data, array('id' => intval($_POST['id'])));
+            $result = $wpdb->update($table, $data, array('id' => $service_id));
             error_log('Database update result: ' . ($result ? 'SUCCESS' : 'FAILED'));
             if ($wpdb->last_error) {
                 error_log('Database error: ' . $wpdb->last_error);
             }
             $message = $result ? __('Service updated successfully!', 'cleaning-booking') : __('Error updating service', 'cleaning-booking');
-            // Persist translations for service name/description (default both languages to provided values)
-            $service_id = intval($_POST['id']);
-            if ($service_id) {
-                CB_Translations::save_translation(array(
-                    'string_key' => 'service_name_' . $service_id,
-                    'category' => 'services',
-                    'text_en' => $data['name'],
-                    'text_el' => $data['name'],
-                    'context' => 'Service name'
-                ));
-                CB_Translations::save_translation(array(
-                    'string_key' => 'service_desc_' . $service_id,
-                    'category' => 'services',
-                    'text_en' => $data['description'],
-                    'text_el' => $data['description'],
-                    'context' => 'Service description'
-                ));
-            }
         } else {
             // Insert new
             $result = $wpdb->insert($table, $data);
             $message = $result ? __('Service created successfully!', 'cleaning-booking') : __('Error creating service', 'cleaning-booking');
             if ($result) {
                 $service_id = intval($wpdb->insert_id);
-                // Initialize translations so admin can edit them later
-                CB_Translations::save_translation(array(
-                    'string_key' => 'service_name_' . $service_id,
-                    'category' => 'services',
-                    'text_en' => $data['name'],
-                    'text_el' => $data['name'],
-                    'context' => 'Service name'
-                ));
-                CB_Translations::save_translation(array(
-                    'string_key' => 'service_desc_' . $service_id,
-                    'category' => 'services',
-                    'text_en' => $data['description'],
-                    'text_el' => $data['description'],
-                    'context' => 'Service description'
-                ));
             }
         }
+        
+        // Data is already saved with both English and Greek in the database columns
+        // No need to save to translations table anymore
         
         wp_send_json_success(array('message' => $message));
     }
@@ -402,57 +384,45 @@ class CB_Admin {
         
         $service_id = intval($_POST['service_id']); // This should be passed from frontend
         
+        // Get bilingual fields
+        $name_en = sanitize_text_field($_POST['name_en']);
+        $name_el = sanitize_text_field($_POST['name_el']);
+        $description_en = sanitize_textarea_field($_POST['description_en']);
+        $description_el = sanitize_textarea_field($_POST['description_el']);
+        
+        // Save both English and Greek in database
         $extra_data = array(
-            'name' => sanitize_text_field($_POST['name']),
-            'description' => sanitize_textarea_field($_POST['description']),
+            'name' => $name_en,
+            'description' => $description_en,
+            'name_el' => $name_el,
+            'description_el' => $description_el,
             'price' => floatval($_POST['price']),
             'duration' => intval($_POST['duration']),
             'is_active' => isset($_POST['is_active']) ? 1 : 0,
-            'sort_order' => intval($_POST['sort_order'])
+            'sort_order' => intval($_POST['sort_order']),
+            'pricing_type' => isset($_POST['pricing_type']) ? sanitize_text_field($_POST['pricing_type']) : 'fixed',
+            'price_per_sqm' => isset($_POST['price_per_sqm']) && !empty($_POST['price_per_sqm']) ? floatval($_POST['price_per_sqm']) : null,
+            'duration_per_sqm' => isset($_POST['duration_per_sqm']) && !empty($_POST['duration_per_sqm']) ? intval($_POST['duration_per_sqm']) : null
         );
         
-        if (isset($_POST['id']) && !empty($_POST['id'])) {
-            $result = CB_Database::update_service_extra($service_id, intval($_POST['id']), $extra_data);
+        $extra_id = isset($_POST['id']) && !empty($_POST['id']) ? intval($_POST['id']) : null;
+        
+        if ($extra_id) {
+            // Update existing
+            $result = CB_Database::update_service_extra($service_id, $extra_id, $extra_data);
             $message = $result ? __('Extra updated successfully!', 'cleaning-booking') : __('Error updating extra', 'cleaning-booking');
-            $extra_id = intval($_POST['id']);
-            if ($extra_id) {
-                // Persist translations for extra name/description (defaults to provided value in both langs)
-                CB_Translations::save_translation(array(
-                    'string_key' => 'extra_name_' . $extra_id,
-                    'category' => 'extras',
-                    'text_en' => $extra_data['name'],
-                    'text_el' => $extra_data['name'],
-                    'context' => 'Extra name (service ' . $service_id . ')'
-                ));
-                CB_Translations::save_translation(array(
-                    'string_key' => 'extra_desc_' . $extra_id,
-                    'category' => 'extras',
-                    'text_en' => $extra_data['description'],
-                    'text_el' => $extra_data['description'],
-                    'context' => 'Extra description (service ' . $service_id . ')'
-                ));
-            }
         } else {
+            // Insert new
             $result = CB_Database::add_service_extra($service_id, $extra_data);
             $message = $result ? __('Extra created successfully!', 'cleaning-booking') : __('Error creating extra', 'cleaning-booking');
             if ($result) {
+                global $wpdb;
                 $extra_id = intval($wpdb->insert_id);
-                CB_Translations::save_translation(array(
-                    'string_key' => 'extra_name_' . $extra_id,
-                    'category' => 'extras',
-                    'text_en' => $extra_data['name'],
-                    'text_el' => $extra_data['name'],
-                    'context' => 'Extra name (service ' . $service_id . ')'
-                ));
-                CB_Translations::save_translation(array(
-                    'string_key' => 'extra_desc_' . $extra_id,
-                    'category' => 'extras',
-                    'text_en' => $extra_data['description'],
-                    'text_el' => $extra_data['description'],
-                    'context' => 'Extra description (service ' . $service_id . ')'
-                ));
             }
         }
+        
+        // Data is already saved with both English and Greek in the database columns
+        // No need to save to translations table anymore
         
         wp_send_json_success(array('message' => $message));
     }
@@ -1174,6 +1144,45 @@ class CB_Admin {
         } catch (Exception $e) {
             wp_send_json_error(array('message' => $e->getMessage()));
         }
+    }
+    
+    /**
+     * AJAX handler for getting translations for a service
+     */
+    public function ajax_get_translations() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Insufficient permissions', 'cleaning-booking')));
+        }
+        
+        $service_id = isset($_POST['service_id']) ? intval($_POST['service_id']) : 0;
+        
+        if (!$service_id) {
+            wp_send_json_error(array('message' => __('Service ID is required', 'cleaning-booking')));
+        }
+        
+        // Get translations for this service
+        $translations = array();
+        
+        $name_translation = CB_Translations::get_translation_by_key('service_name_' . $service_id);
+        $desc_translation = CB_Translations::get_translation_by_key('service_desc_' . $service_id);
+        
+        if ($name_translation) {
+            $translations['service_name_' . $service_id] = array(
+                'en' => $name_translation->text_en,
+                'el' => $name_translation->text_el
+            );
+        }
+        
+        if ($desc_translation) {
+            $translations['service_desc_' . $service_id] = array(
+                'en' => $desc_translation->text_en,
+                'el' => $desc_translation->text_el
+            );
+        }
+        
+        wp_send_json_success(array('data' => $translations));
     }
     
     /**

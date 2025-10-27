@@ -92,6 +92,7 @@ document.addEventListener('DOMContentLoaded', function() {
         service_id: null,
         square_meters: 0,
         extras: [],
+        extra_spaces: {}, // Store space for each per m² extra
         booking_date: '',
         booking_time: '',
         pricing: {
@@ -445,6 +446,13 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
+        // Extra space input changes (for per m² extras)
+        document.addEventListener('input', function(e) {
+            if (e.target.classList.contains('cb-extra-space-input')) {
+                handleExtraSpaceChange(e);
+            }
+        });
+        
         // Time slot selection
         document.addEventListener('click', function(e) {
             if (e.target.closest('.cb-time-slot')) {
@@ -524,6 +532,50 @@ document.addEventListener('DOMContentLoaded', function() {
         updateButtonStates();
     }
     
+    function handleExtraSpaceChange(e) {
+        const extraId = parseInt(e.target.dataset.extraId, 10);
+        const space = parseFloat(e.target.value) || 0;
+        
+        // Initialize extra_spaces if it doesn't exist
+        if (!bookingData.extra_spaces) {
+            bookingData.extra_spaces = {};
+        }
+        
+        // Store the space for this extra
+        if (space > 0) {
+            bookingData.extra_spaces[extraId] = space;
+        } else {
+            delete bookingData.extra_spaces[extraId];
+        }
+        
+        // Update only the price display for this extra without re-rendering everything
+        updateExtraPriceDisplay(extraId);
+        
+        // Recalculate price
+        checkAndCalculatePrice();
+    }
+    
+    function updateExtraPriceDisplay(extraId) {
+        // Find the extra item and update only its price display
+        const extraItem = document.querySelector(`[data-extra-id="${extraId}"]`);
+        if (!extraItem) return;
+        
+        const extra = extras.find(e => e.id === extraId);
+        if (!extra || !extra.pricing_type) return;
+        
+        // Only update if it's a per_sqm extra
+        if (extra.pricing_type === 'per_sqm') {
+            const space = bookingData.extra_spaces[extraId] || 0;
+            if (space > 0) {
+                const calculatedPrice = extra.price_per_sqm * space;
+                const priceDisplay = extraItem.querySelector('.cb-extra-price');
+                if (priceDisplay) {
+                    priceDisplay.textContent = `€${calculatedPrice.toFixed(2)}`;
+                }
+            }
+        }
+    }
+    
     function handleDateChange(e) {
         bookingData.booking_date = e.target.value;
         bookingData.booking_time = '';
@@ -558,7 +610,16 @@ document.addEventListener('DOMContentLoaded', function() {
         // Add selection to clicked card
         clickedCard.classList.add('selected');
         
-        bookingData.service_id = clickedCard.dataset.serviceId;
+        const newServiceId = clickedCard.dataset.serviceId;
+        
+        // If service changed, reset extras
+        if (bookingData.service_id != newServiceId) {
+            extras = []; // Clear cached extras
+            bookingData.extras = []; // Clear selected extras
+            bookingData.extra_spaces = {}; // Clear extra spaces
+        }
+        
+        bookingData.service_id = newServiceId;
         
         
         
@@ -584,6 +645,19 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function handleExtraSelect(e) {
+        // Don't handle if clicking on space input or its container (including label)
+        const spaceInputContainer = e.target.closest('.cb-extra-space-input-container');
+        const spaceInput = e.target.closest('.cb-extra-space-input');
+        
+        if (e.target.classList.contains('cb-extra-space-input') || 
+            spaceInputContainer ||
+            spaceInput ||
+            (e.target.tagName === 'INPUT' && e.target.type === 'number') ||
+            (e.target.tagName === 'LABEL')) {
+            // Don't process extra selection for these elements
+            return;
+        }
+        
         e.preventDefault();
         
         const clickedItem = e.target.closest('.cb-extra-item');
@@ -610,27 +684,24 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (clickedItem.classList.contains('selected')) {
             // Remove extra
-            
-            
             clickedItem.classList.remove('selected');
             
             bookingData.extras = bookingData.extras.filter(id => parseInt(id, 10) !== extraId);
+            
+            // Remove space data if this was a per m² extra
+            if (bookingData.extra_spaces && bookingData.extra_spaces[extraId]) {
+                delete bookingData.extra_spaces[extraId];
+            }
         } else {
             // Add extra
-            
-            
             clickedItem.classList.add('selected');
             
             bookingData.extras.push(extraId);
             
-            // Debug: Check if class was actually added
-            setTimeout(() => {
-                console.log('Element has selected class after adding:', clickedItem.classList.contains('selected'));
-                
-            }, 100);
         }
         
-        
+        // Re-render extras to show/hide space inputs
+        displayExtras();
         
         // Recalculate price with new extras
         checkAndCalculatePrice();
@@ -738,7 +809,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         const selectedService = getSelectedService();
                         if (selectedService) {
                             const serviceExtras = response.data.extras.filter(extra => extra.service_id === selectedService.id);
-                            displayExtras(serviceExtras);
+                            extras = serviceExtras; // Update global extras array
+                            displayExtras();
                         }
                     }
                     
@@ -1019,12 +1091,21 @@ document.addEventListener('DOMContentLoaded', function() {
         formData.append('action', 'cb_store_booking_session');
         formData.append('nonce', cb_frontend.nonce);
     
+        // Calculate actual additional area to send (not total space)
+        // If smart_area is available, use the calculated additional_area
+        // Otherwise, use the entered square_meters value
+        let actual_square_meters = bookingData.square_meters;
+        if (bookingData.pricing && bookingData.pricing.smart_area && bookingData.pricing.smart_area.use_smart_area) {
+            actual_square_meters = bookingData.pricing.smart_area.additional_area || 0;
+        }
+    
         // Add booking data to store in session
         const sessionData = {
             zip_code: bookingData.zip_code,
             service_id: bookingData.service_id,
-            square_meters: bookingData.square_meters,
+            square_meters: actual_square_meters, // Use calculated additional area, not total
             extras: bookingData.extras || [],
+            extra_spaces: bookingData.extra_spaces || {}, // Include extra spaces for per m² extras
             booking_date: bookingData.booking_date,
             booking_time: bookingData.booking_time,
             pricing: bookingData.pricing || {}
@@ -1122,6 +1203,30 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!bookingData.booking_time) {
             showNotification(cb_frontend.translations['Please select a time slot'] || 'Παρακαλούμε επιλέξτε χρονική περίοδο', 'error');
             return false;
+        }
+        
+        // Validate per-square-meter extras
+        if (bookingData.extras && bookingData.extras.length > 0) {
+            for (const extraId of bookingData.extras) {
+                const extra = extras.find(e => e.id === extraId);
+                if (extra && extra.pricing_type === 'per_sqm') {
+                    const space = bookingData.extra_spaces && bookingData.extra_spaces[extraId];
+                    if (!space || space <= 0) {
+                        showNotification(cb_frontend.translations['Please enter space for selected extra'] || 'Παρακαλούμε εισάγετε χώρο για το επιλεγμένο επιπλέον', 'error');
+                        // Scroll to the extra
+                        const extraElement = document.querySelector(`[data-extra-id="${extraId}"]`);
+                        if (extraElement) {
+                            extraElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            // Add a visual highlight
+                            extraElement.style.border = '2px solid red';
+                            setTimeout(() => {
+                                extraElement.style.border = '';
+                            }, 3000);
+                        }
+                        return false;
+                    }
+                }
+            }
         }
         
         return true;
@@ -1240,7 +1345,31 @@ document.addEventListener('DOMContentLoaded', function() {
             hideError('cb-sqm-error');
             bookingData.square_meters = squareMeters;
             
-            // Extras are optional - no validation needed
+            // Validate per-square-meter extras if selected
+            if (bookingData.extras && bookingData.extras.length > 0) {
+                for (const extraId of bookingData.extras) {
+                    const extra = extras.find(e => e.id === extraId);
+                    if (extra && extra.pricing_type === 'per_sqm') {
+                        const space = bookingData.extra_spaces && bookingData.extra_spaces[extraId];
+                        if (!space || space <= 0) {
+                            showNotification(cb_frontend.translations['Please enter space for selected extra'] || 'Παρακαλούμε εισάγετε χώρο για το επιλεγμένο επιπλέον', 'error');
+                            // Scroll to the extra
+                            const extraElement = document.querySelector(`[data-extra-id="${extraId}"]`);
+                            if (extraElement) {
+                                extraElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                // Add a visual highlight
+                                extraElement.style.border = '2px solid red';
+                                setTimeout(() => {
+                                    extraElement.style.border = '';
+                                }, 3000);
+                            }
+                            resolve(false);
+                            return;
+                        }
+                    }
+                }
+            }
+            
             resolve(true);
         });
     }
@@ -1301,26 +1430,16 @@ document.addEventListener('DOMContentLoaded', function() {
             clearTimeout(timeoutId); // Clear timeout
             window.loadingSlots = false; // Reset loading flag
             
-            console.log('Slots response:', response); // Temporary debug
-            console.log('response.success:', response.success); // Temporary debug
-            console.log('response.data:', response.data); // Temporary debug
-            console.log('response.data.slots:', response.data?.slots); // Temporary debug
-            
             if (response.success && response.data && response.data.slots) {
                 availableSlots = response.data.slots;
-                console.log('Available slots set:', availableSlots); // Temporary debug
-                console.log('About to call displayTimeSlots()'); // Temporary debug
-                console.log('displayTimeSlots function exists:', typeof displayTimeSlots); // Temporary debug
                 try {
                     displayTimeSlots(response.data);
-                    console.log('displayTimeSlots() completed successfully'); // Temporary debug
                 } catch (error) {
                     console.error('Error in displayTimeSlots:', error); // Temporary debug
                 }
             } else {
                 // Set empty array to prevent infinite loop
                 availableSlots = [];
-                console.log('No slots in response or error:', response); // Temporary debug
                 if (timeSlotsContainer) {
                     timeSlotsContainer.innerHTML = '<div class="cb-loading">' + (response.data?.message || cb_frontend.strings.no_slots_available) + '</div>';
                 }
@@ -1567,13 +1686,6 @@ document.addEventListener('DOMContentLoaded', function() {
             
                 if (response.success && response.data.services) {
                     services = response.data.services;
-                    // Debug: Check if icon_url is present
-                    console.log('Services loaded:', services);
-                    if (services.length > 0) {
-                        console.log('First service:', services[0]);
-                        console.log('Has icon_url:', 'icon_url' in services[0]);
-                        console.log('icon_url value:', services[0].icon_url);
-                    }
                     displayServices();
                 } else {
                 if (servicesContainer) {
@@ -1684,7 +1796,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Show hint about additional area
+        // Show hint about total space
         if (hintElement) {
             hintElement.style.display = 'block';
             const hintText = cb_frontend.translations['Enter total space beyond the default area, or leave as 0 to skip'] || 'Εισάγετε Σύνολο χώρο πέρα από την προεπιλεγμένη περιοχή, ή αφήστε 0 για παράλειψη';
@@ -1708,20 +1820,23 @@ document.addEventListener('DOMContentLoaded', function() {
             baseDurationDisplay.textContent = baseDurationText.replace('20 λεπτά', `${baseDuration} λεπτά`);
         }
         
-        // Clear the input field and set to 0 (no additional area)
+        // Clear the input field and set to 0 (base space only)
         const squareMetersInput = document.getElementById('cb-square-meters');
         if (squareMetersInput) {
             squareMetersInput.value = '0';
-            bookingData.square_meters = 0; // Start with 0 additional area
+            bookingData.square_meters = 0; // Start with 0 (base space only, no extra)
             
-            // Trigger change event to calculate price (base + 0 additional)
+            // Trigger change event to calculate price (base space only)
             squareMetersInput.dispatchEvent(new Event('input', { bubbles: true }));
         }
     }
     
     function loadExtras() {
         
-        if (!bookingData.service_id || extras.length > 0) {
+        // Only skip if service_id matches and we already have extras loaded
+        const alreadyLoadedForService = bookingData.service_id && extras.length > 0 && extras[0] && extras[0].service_id == bookingData.service_id;
+        
+        if (!bookingData.service_id || alreadyLoadedForService) {
             displayExtras();
             return;
         }
@@ -1788,19 +1903,49 @@ document.addEventListener('DOMContentLoaded', function() {
             // Check if this extra is already selected - use loose comparison for type safety
             const isSelected = bookingData.extras && bookingData.extras.some(id => id == extra.id);
             const selectedClass = isSelected ? ' selected' : '';
+            const isPerSqm = extra.pricing_type === 'per_sqm';
             
             const itemElement = document.createElement('div');
             itemElement.className = `cb-extra-item${selectedClass}`;
             itemElement.dataset.extraId = extra.id;
             itemElement.dataset.extraPrice = extra.price;
+            itemElement.dataset.pricingType = extra.pricing_type || 'fixed';
+            itemElement.dataset.pricePerSqm = extra.price_per_sqm || '0';
             itemElement.style.cursor = 'pointer';
+            
+            // Get current space for this extra if it's per sqm
+            const currentSpace = bookingData.extra_spaces && bookingData.extra_spaces[extra.id] ? bookingData.extra_spaces[extra.id] : '';
+            
+            let priceDisplay = '€0.00';
+            if (isPerSqm && isSelected && currentSpace) {
+                const calculatedPrice = parseFloat(extra.price_per_sqm) * parseFloat(currentSpace);
+                priceDisplay = '€' + calculatedPrice.toFixed(2);
+            } else if (isPerSqm) {
+                // Show per m² rate for unselected per sqm extras
+                priceDisplay = '€' + parseFloat(extra.price_per_sqm || 0).toFixed(2) + ' per m²';
+            } else {
+                priceDisplay = '€' + parseFloat(extra.price).toFixed(2);
+            }
+            
+            let spaceInput = '';
+            if (isPerSqm && isSelected) {
+                spaceInput = `
+                    <div class="cb-extra-space-input-container" style="margin-top: 10px;">
+                        <label style="font-size: 12px; color: #666; display: block; margin-bottom: 5px;">Enter space (m²):</label>
+                        <input type="number" class="cb-extra-space-input" data-extra-id="${extra.id}" 
+                               value="${currentSpace}" min="0" step="0.1" 
+                               style="width: 100px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;" />
+                    </div>
+                `;
+            }
             
             itemElement.innerHTML = `
                     <div class="cb-extra-checkbox"></div>
                     <div class="cb-extra-info">
                         <div class="cb-extra-name">${extra.name}</div>
                         <div class="cb-extra-description">${extra.description}</div>
-                        <div class="cb-extra-price">€${parseFloat(extra.price).toFixed(2)}</div>
+                        ${spaceInput}
+                        <div class="cb-extra-price">${priceDisplay}</div>
                     </div>
             `;
             
@@ -1870,23 +2015,16 @@ document.addEventListener('DOMContentLoaded', function() {
         // Handle extras properly - ensure it's always an array
         if (bookingData.extras && Array.isArray(bookingData.extras) && bookingData.extras.length > 0) {
             formData.append('extras', JSON.stringify(bookingData.extras));
-            
         } else {
             formData.append('extras', '[]'); // Send empty array as JSON string
+        }
             
+        // Send extra spaces for per m² extras
+        if (bookingData.extra_spaces && Object.keys(bookingData.extra_spaces).length > 0) {
+            formData.append('extra_spaces', JSON.stringify(bookingData.extra_spaces));
         }
         
         formData.append('zip_code', bookingData.zip_code);
-        
-        console.log('Sending smart price calculation request:', {
-                action: 'cb_calculate_price',
-                nonce: cb_frontend.nonce,
-                service_id: bookingData.service_id,
-                square_meters: additionalArea,
-                use_smart_area: '1',
-                extras: bookingData.extras,
-                zip_code: bookingData.zip_code
-        });
         
         fetch(cb_frontend.ajax_url, {
             method: 'POST',
