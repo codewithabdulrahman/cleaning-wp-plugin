@@ -312,9 +312,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Add service icon if available
                 if (service.icon_url) {
-                    iconHtml = `<img src="${service.icon_url}" alt="${service.name}" class="cb-sidebar-service-icon" style="width: 20px; height: 20px; margin-right: 8px; vertical-align: middle; object-fit: contain;">`;
+                    iconHtml = `<span class="cb-sidebar-service-icon"><img src="${service.icon_url}" alt="${service.name}"></span>`;
                 } else {
-                    iconHtml = `<span class="cb-sidebar-service-icon" style="margin-right: 8px;">🧹</span>`;
+                    iconHtml = `<span class="cb-sidebar-service-icon">🧹</span>`;
                 }
             }
         }

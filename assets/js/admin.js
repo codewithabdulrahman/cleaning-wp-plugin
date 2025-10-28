@@ -984,14 +984,14 @@ document.addEventListener('DOMContentLoaded', function() {
             if (durationPerSqmRow) durationPerSqmRow.style.display = '';
             if (priceRow) priceRow.style.display = 'none';
             if (durationRow) durationRow.style.display = 'none';
-            if (priceDesc) priceDesc.textContent = 'Price per square meter in USD (leave 0 if not used)';
+            if (priceDesc) priceDesc.textContent = 'Price per square meter in Euro (leave 0 if not used)';
         } else {
             // Show fixed price/duration, hide per sqm fields
             if (pricePerSqmRow) pricePerSqmRow.style.display = 'none';
             if (durationPerSqmRow) durationPerSqmRow.style.display = 'none';
             if (priceRow) priceRow.style.display = '';
             if (durationRow) durationRow.style.display = '';
-            if (priceDesc) priceDesc.textContent = 'Fixed price in USD';
+            if (priceDesc) priceDesc.textContent = 'Fixed price in Euro';
         }
     }
     
@@ -1010,18 +1010,45 @@ document.addEventListener('DOMContentLoaded', function() {
         tbody.innerHTML = '';
         
         if (extras.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center">No extras assigned to this service</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No extras assigned to this service</td></tr>';
             return;
         }
         
         extras.forEach(function(extra) {
+            const pricingType = extra.pricing_type || 'fixed';
+            const isPerSqm = pricingType === 'per_sqm';
+            
+            // Determine price display
+            let priceDisplay;
+            if (isPerSqm) {
+                const pricePerSqm = extra.price_per_sqm || 0;
+                priceDisplay = '€' + parseFloat(pricePerSqm).toFixed(2) + ' /m²';
+            } else {
+                priceDisplay = '€' + parseFloat(extra.price).toFixed(2);
+            }
+            
+            // Determine duration display
+            let durationDisplay;
+            if (isPerSqm) {
+                const durationPerSqm = extra.duration_per_sqm || 0;
+                durationDisplay = durationPerSqm + ' min/m²';
+            } else {
+                durationDisplay = extra.duration + ' min';
+            }
+            
+            // Determine pricing type badge
+            const pricingTypeBadge = isPerSqm ? 
+                '<span style="background: #2271b1; color: white; padding: 2px 8px; border-radius: 3px; font-size: 11px;">Per SQM</span>' :
+                '<span style="background: #00a32a; color: white; padding: 2px 8px; border-radius: 3px; font-size: 11px;">Fixed</span>';
+            
             const row = document.createElement('tr');
             row.dataset.extraId = extra.id;
             row.innerHTML = 
                 '<td><strong>' + extra.name + '</strong>' +
                 (extra.description ? '<br><small>' + extra.description + '</small>' : '') + '</td>' +
-                '<td>€' + parseFloat(extra.price).toFixed(2) + '</td>' +
-                '<td>' + extra.duration + ' min</td>' +
+                '<td>' + pricingTypeBadge + '</td>' +
+                '<td>' + priceDisplay + '</td>' +
+                '<td>' + durationDisplay + '</td>' +
                 '<td>' +
                     '<label style="display: inline-flex; align-items: center;">' +
                         '<input type="checkbox" class="cb-toggle-extra-status" data-extra-id="' + extra.id + '" ' + (parseInt(extra.is_active) === 1 ? 'checked' : '') + ' style="margin-right: 5px;">' +

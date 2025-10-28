@@ -276,7 +276,7 @@ if (!defined('ABSPATH')) {
                         </th>
                         <td>
                             <input type="number" id="create-extra-price" name="price" step="0.01" min="0" class="small-text" value="0">
-                            <span class="description" id="create-extra-price-desc"><?php _e('Fixed price in USD', 'cleaning-booking'); ?></span>
+                            <span class="description" id="create-extra-price-desc"><?php _e('Fixed price in Euro', 'cleaning-booking'); ?></span>
                         </td>
                     </tr>
                     <tr id="create-extra-price-per-sqm-row" style="display: none;">
@@ -285,7 +285,7 @@ if (!defined('ABSPATH')) {
                         </th>
                         <td>
                             <input type="number" id="create-extra-price-per-sqm" name="price_per_sqm" step="0.01" min="0" class="small-text">
-                            <span class="description"><?php _e('Price per square meter in USD', 'cleaning-booking'); ?></span>
+                            <span class="description"><?php _e('Price per square meter in Euro', 'cleaning-booking'); ?></span>
                         </td>
                     </tr>
                     <tr id="create-extra-duration-per-sqm-row" style="display: none;">
@@ -340,6 +340,7 @@ if (!defined('ABSPATH')) {
                 <thead>
                     <tr>
                         <th><?php _e('Extra Name', 'cleaning-booking'); ?></th>
+                        <th><?php _e('Pricing Type', 'cleaning-booking'); ?></th>
                         <th><?php _e('Price', 'cleaning-booking'); ?></th>
                         <th><?php _e('Duration', 'cleaning-booking'); ?></th>
                         <th><?php _e('Status', 'cleaning-booking'); ?></th>
