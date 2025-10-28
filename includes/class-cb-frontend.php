@@ -1101,6 +1101,9 @@ public function rest_get_services($request) {
             }
             
             $zip_code = sanitize_text_field($_POST['zip_code']);
+            
+            // Get express cleaning flag
+            $express_cleaning = isset($_POST['express_cleaning']) && $_POST['express_cleaning'] === '1';
 
             // Validate required fields
             if (empty($service_id)) {
@@ -1183,6 +1186,15 @@ public function rest_get_services($request) {
                 $pricing['total_price'] = $pricing['service_price'] + $pricing['extras_price'] + $pricing['zip_surcharge'];
                 $pricing['total_duration'] = max($pricing['service_duration'] + $pricing['extras_duration'], 30);
             }
+            
+            // Apply 20% surcharge for express cleaning
+            if ($express_cleaning) {
+                $pricing['total_price'] = $pricing['total_price'] * 1.20; // Add 20% surcharge
+            }
+            
+            // Add express cleaning info to pricing response
+            $pricing['express_cleaning'] = $express_cleaning;
+            $pricing['express_surcharge'] = $express_cleaning ? ($pricing['total_price'] / 1.20 * 0.20) : 0;
             
             wp_send_json_success(array(
                 'pricing' => $pricing,

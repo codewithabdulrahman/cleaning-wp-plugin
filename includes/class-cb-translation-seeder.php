@@ -339,6 +339,13 @@ class CB_Translation_Seeder {
                 'category' => 'form_fields',
                 'context' => 'Form field label'
             ),
+            array(
+                'string_key' => 'Express Cleaning',
+                'text_en' => 'Express Cleaning',
+                'text_el' => 'Γρήγορος Καθαρισμός',
+                'category' => 'form_fields',
+                'context' => 'Express cleaning option'
+            ),
             
             // Buttons
             array(

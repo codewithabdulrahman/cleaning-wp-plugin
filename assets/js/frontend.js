@@ -93,6 +93,7 @@ document.addEventListener('DOMContentLoaded', function() {
         square_meters: 0,
         extras: [],
         extra_spaces: {}, // Store space for each per m² extra
+        express_cleaning: false, // Express cleaning option
         booking_date: '',
         booking_time: '',
         pricing: {
@@ -459,6 +460,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 handleTimeSlotSelect(e);
             }
         });
+        
+        // Express cleaning checkbox
+        const expressCleaningCheckbox = document.getElementById('cb-express-cleaning');
+        if (expressCleaningCheckbox) {
+            expressCleaningCheckbox.addEventListener('change', handleExpressCleaningChange);
+        }
     }
     
     function handleNextStep(e) {
@@ -596,6 +603,13 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Promocode functionality removed - just show success message
         showNotification('Promocode functionality temporarily disabled', 'info');
+    }
+    
+    function handleExpressCleaningChange(e) {
+        bookingData.express_cleaning = e.target.checked;
+        
+        // Recalculate price with express cleaning surcharge
+        calculatePrice();
     }
     
     function handleServiceSelect(e) {
@@ -965,6 +979,14 @@ document.addEventListener('DOMContentLoaded', function() {
             if (timeLabel) timeLabel.textContent = translations['Available Time Slots'];
         }
         
+        // Update express cleaning label
+        if (translations['Express Cleaning']) {
+            const expressLabel = document.getElementById('cb-express-cleaning-label');
+            if (expressLabel) {
+                expressLabel.textContent = translations['Express Cleaning'] + ' (+20%)';
+            }
+        }
+        
         // Update info banner
         if (translations['Our contractors have all the necessary cleaning products and equipment']) {
             const infoBanner = document.querySelector('.cb-info-text');
@@ -1106,6 +1128,7 @@ document.addEventListener('DOMContentLoaded', function() {
             square_meters: actual_square_meters, // Use calculated additional area, not total
             extras: bookingData.extras || [],
             extra_spaces: bookingData.extra_spaces || {}, // Include extra spaces for per m² extras
+            express_cleaning: bookingData.express_cleaning || false, // Express cleaning option
             booking_date: bookingData.booking_date,
             booking_time: bookingData.booking_time,
             pricing: bookingData.pricing || {}
@@ -2026,6 +2049,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         formData.append('zip_code', bookingData.zip_code);
         
+        // Send express cleaning flag
+        formData.append('express_cleaning', bookingData.express_cleaning ? '1' : '0');
+        
         fetch(cb_frontend.ajax_url, {
             method: 'POST',
             body: formData
@@ -2127,6 +2153,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 step3ExtrasPrice.textContent = '€0.00';
             }
         }
+        
+        // Show express cleaning surcharge if applicable
+        if (pricing.express_cleaning && pricing.express_surcharge > 0) {
+            const step3ExpressPrice = document.getElementById('cb-step3-express-price');
+            if (step3ExpressPrice) {
+                step3ExpressPrice.textContent = formatPrice(pricing.express_surcharge);
+            }
+        }
+        
         if (step3TotalPrice) step3TotalPrice.textContent = formatPrice(pricing.total_price);
         
         // Update Step 3 duration display with smart area breakdown

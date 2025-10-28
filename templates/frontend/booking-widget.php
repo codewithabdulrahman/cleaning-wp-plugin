@@ -182,6 +182,13 @@ if (!defined('ABSPATH')) {
                         </div>
                         
                         <div class="cb-form-group">
+                            <label class="cb-checkbox-label">
+                                <input type="checkbox" id="cb-express-cleaning" name="express_cleaning" class="cb-checkbox">
+                                <span id="cb-express-cleaning-label"><?php _e('Εξπρές Καθαρισμός', 'cleaning-booking'); ?> (+20%)</span>
+                            </label>
+                        </div>
+                        
+                        <div class="cb-form-group">
                             <label><?php _e('Available Time Slots', 'cleaning-booking'); ?></label>
                             <div class="cb-time-slots" id="cb-time-slots">
                                 <div class="cb-loading"><?php _e('Select a date to see available times', 'cleaning-booking'); ?></div>

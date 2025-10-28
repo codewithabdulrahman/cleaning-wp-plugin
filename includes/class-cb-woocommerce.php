@@ -465,14 +465,21 @@ class CB_WooCommerce {
             wp_set_object_terms($product_id, 'simple', 'product_type');
             
             // Add booking metadata
-            update_post_meta($product_id, '_cb_booking_data', array(
+            $booking_meta = array(
                 'service_id' => $booking->service_id,
                 'square_meters' => $booking->square_meters,
                 'total_duration' => $booking->total_duration,
                 'booking_date' => $booking->booking_date,
                 'booking_time' => $booking->booking_time,
                 'extras' => json_decode($booking->extras_data, true)
-            ));
+            );
+            
+            // Add express cleaning flag if set
+            if (isset($booking->express_cleaning)) {
+                $booking_meta['express_cleaning'] = $booking->express_cleaning;
+            }
+            
+            update_post_meta($product_id, '_cb_booking_data', $booking_meta);
         }
         
          return $product_id;
@@ -573,6 +580,11 @@ class CB_WooCommerce {
             $booking->booking_time,
             $booking->total_duration
         );
+        
+        // Add express cleaning information if enabled
+        if (isset($booking->express_cleaning) && $booking->express_cleaning) {
+            $description .= "\nExpress Cleaning: Yes (+20%)";
+        }
                     
         if ($booking->extras_data) {
             $extras = json_decode($booking->extras_data, true);
@@ -1204,6 +1216,7 @@ $this->display_booking_details($order);
              $booking->booking_reference = 'CB' . date('Ymd') . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
              $booking->service_id = $booking_data['service_id'];
              $booking->square_meters = $booking_data['square_meters'];
+             $booking->express_cleaning = isset($booking_data['express_cleaning']) ? $booking_data['express_cleaning'] : false;
              $booking->booking_date = $booking_data['booking_date'];
              $booking->booking_time = $booking_data['booking_time'];
              $booking->total_price = $booking_data['pricing']['total_price'] ?? 0;
@@ -1276,6 +1289,7 @@ $this->display_booking_details($order);
                 'booking_reference' => $booking_reference,
                 'service_id' => $booking_data['service_id'],
                 'square_meters' => $booking_data['square_meters'],
+                'express_cleaning' => isset($booking_data['express_cleaning']) ? ($booking_data['express_cleaning'] ? 1 : 0) : 0,
                 'booking_date' => $booking_data['booking_date'],
                 'booking_time' => $booking_data['booking_time'],
                 'total_duration' => $total_duration,

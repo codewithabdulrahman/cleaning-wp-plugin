@@ -411,6 +411,7 @@ class CB_Database {
         self::check_bookings_table();
         self::check_greek_columns();
         self::check_extras_pricing_columns();
+        self::check_express_cleaning_column();
         
         error_log('Database migrations completed.');
     }
@@ -826,6 +827,25 @@ class CB_Database {
         if (empty($payment_method_column)) {
             error_log('Adding payment_method column to bookings table');
             $wpdb->query("ALTER TABLE $table_name ADD COLUMN payment_method varchar(50) DEFAULT NULL AFTER notes");
+        }
+    }
+    
+    private static function check_express_cleaning_column() {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'cb_bookings';
+        
+        // Check if table exists
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'");
+        if (!$table_exists) {
+            return;
+        }
+        
+        // Check if express_cleaning column exists
+        $express_cleaning_column = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'express_cleaning'");
+        if (empty($express_cleaning_column)) {
+            error_log('Adding express_cleaning column to bookings table');
+            $wpdb->query("ALTER TABLE $table_name ADD COLUMN express_cleaning tinyint(1) NOT NULL DEFAULT 0 AFTER square_meters");
         }
     }
     
