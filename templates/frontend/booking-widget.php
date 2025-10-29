@@ -133,8 +133,12 @@ if (!defined('ABSPATH')) {
                                     <span><?php _e('Service Price:', 'cleaning-booking'); ?></span>
                                     <span id="cb-step3-service-price">€0.00</span>
                                 </div>
+                                <div class="cb-price-item" id="cb-step3-extra-sqm-item" style="display: none;">
+                                    <span><?php _e('Extra m²:', 'cleaning-booking'); ?></span>
+                                    <span id="cb-step3-extra-sqm-price">€0.00</span>
+                                </div>
                                 <div class="cb-price-item">
-                                    <span><?php _e('Extras:', 'cleaning-booking'); ?></span>
+                                    <span><?php _e('Service Extras:', 'cleaning-booking'); ?></span>
                                     <span id="cb-step3-extras-price">€0.00</span>
                                 </div>
                                 <div class="cb-price-item cb-price-total">
@@ -147,8 +151,12 @@ if (!defined('ABSPATH')) {
                                     <span><?php _e('Service Duration:', 'cleaning-booking'); ?></span>
                                     <span id="cb-step3-service-duration">0h 0m</span>
                                 </div>
+                                <div class="cb-duration-item" id="cb-step3-extra-sqm-duration-item" style="display: none;">
+                                    <span><?php _e('Extra m² Duration:', 'cleaning-booking'); ?></span>
+                                    <span id="cb-step3-extra-sqm-duration">0h 0m</span>
+                                </div>
                                 <div class="cb-duration-item">
-                                    <span><?php _e('Extras Duration:', 'cleaning-booking'); ?></span>
+                                    <span><?php _e('Service Extras Duration:', 'cleaning-booking'); ?></span>
                                     <span id="cb-step3-extras-duration">0h 0m</span>
                                 </div>
                                 <div class="cb-duration-item cb-duration-total">

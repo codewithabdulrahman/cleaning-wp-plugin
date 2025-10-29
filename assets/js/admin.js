@@ -254,6 +254,111 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     }
     
+    // ZIP Codes CSV import button handling
+    const importCsvBtn = document.getElementById('cb-import-csv-btn');
+    const zipCodeCsvForm = document.getElementById('cb-zip-code-csv-form');
+    
+    if (importCsvBtn && zipCodeCsvForm) {
+        importCsvBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Check if cb_admin is available
+            if (typeof cb_admin === 'undefined') {
+                console.error('cb_admin is not defined');
+                showNotice('JavaScript error: Admin configuration not loaded. Please refresh the page.', 'error');
+                return false;
+            }
+            
+            const fileInput = document.getElementById('zip-csv-file');
+            if (!fileInput || !fileInput.files || !fileInput.files[0]) {
+                showNotice('Please select a CSV file to upload', 'error');
+                return false;
+            }
+            
+            const statusSpan = document.getElementById('cb-csv-import-status');
+            const originalText = importCsvBtn.textContent;
+            
+            // Update UI
+            importCsvBtn.textContent = 'Importing...';
+            importCsvBtn.disabled = true;
+            if (statusSpan) {
+                statusSpan.textContent = '';
+            }
+            
+            // Create FormData manually to ensure proper file handling
+            const formData = new FormData();
+            formData.append('action', 'cb_import_zip_codes_csv');
+            formData.append('nonce', cb_admin.nonce);
+            formData.append('csv_file', fileInput.files[0]);
+            
+            console.log('Starting CSV import...');
+            
+            fetch(cb_admin.ajax_url, {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin'
+            })
+            .then(response => {
+                console.log('Response received:', response.status);
+                if (!response.ok) {
+                    throw new Error('Network response was not ok: ' + response.status);
+                }
+                return response.json();
+            })
+            .then(response => {
+                console.log('Response data:', response);
+                if (response.success) {
+                    showNotice(response.data.message, 'success');
+                    zipCodeCsvForm.reset();
+                    // Reload page after a short delay to show the new zip codes
+                    setTimeout(function() {
+                        loadZipCodes();
+                    }, 1000);
+                    if (statusSpan) {
+                        statusSpan.innerHTML = '<span style="color: green;">✓ Import completed</span>';
+                        setTimeout(() => {
+                            statusSpan.textContent = '';
+                        }, 5000);
+                    }
+                } else {
+                    showNotice(response.data.message || cb_admin.strings.error, 'error');
+                    if (statusSpan) {
+                        statusSpan.innerHTML = '<span style="color: red;">✗ Import failed</span>';
+                        setTimeout(() => {
+                            statusSpan.textContent = '';
+                        }, 5000);
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('CSV import error:', error);
+                showNotice('An error occurred during import: ' + error.message, 'error');
+                if (statusSpan) {
+                    statusSpan.innerHTML = '<span style="color: red;">✗ Import failed</span>';
+                    setTimeout(() => {
+                        statusSpan.textContent = '';
+                    }, 5000);
+                }
+            })
+            .finally(() => {
+                importCsvBtn.textContent = originalText;
+                importCsvBtn.disabled = false;
+            });
+            
+            return false;
+        });
+    }
+    
+    // Also prevent form submission if someone presses Enter
+    if (zipCodeCsvForm) {
+        zipCodeCsvForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        });
+    }
+    
     // Edit ZIP code
     document.addEventListener('click', function(e) {
         if (e.target.closest('.cb-edit-zip-code')) {

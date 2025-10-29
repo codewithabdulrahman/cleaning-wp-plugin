@@ -117,6 +117,15 @@ document.addEventListener('DOMContentLoaded', function() {
     let availableSlots = [];
     let heldSessionId = null;
     
+    // Debounce utility for price calculation
+    let priceCalculationTimeout = null;
+    function debouncePriceCalculation(callback, delay = 300) {
+        if (priceCalculationTimeout) {
+            clearTimeout(priceCalculationTimeout);
+        }
+        priceCalculationTimeout = setTimeout(callback, delay);
+    }
+    
     // Initialize
     init();
     
@@ -518,22 +527,32 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 100);
     }
     
-    function checkAndCalculatePrice() {
-        if (bookingData.service_id) {
-            calculatePrice();
+    function checkAndCalculatePrice(immediate = false) {
+        if (bookingData.service_id && bookingData.square_meters >= 0) {
+            if (immediate) {
+                calculatePrice();
+            } else {
+                // Debounce price calculation for input events
+                debouncePriceCalculation(function() {
+                    calculatePrice();
+                }, 300);
+            }
         }
+        updateSidebarDisplay();
     }
     
     function handleZipCodeChange(e) {
         bookingData.zip_code = e.target.value.trim();
+        // Recalculate price when ZIP code changes (immediate for ZIP changes)
+        checkAndCalculatePrice(true);
     }
     
     function handleSquareMetersChange(e) {
         const squareMeters = parseInt(e.target.value, 10) || 0; // Use base 10 explicitly
         bookingData.square_meters = squareMeters;
         
-        // Calculate price if service is selected
-        checkAndCalculatePrice();
+        // Calculate price if service is selected (debounced for typing)
+        checkAndCalculatePrice(false);
         
         // Update button states
         updateButtonStates();
@@ -558,8 +577,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update only the price display for this extra without re-rendering everything
         updateExtraPriceDisplay(extraId);
         
-        // Recalculate price
-        checkAndCalculatePrice();
+        // Recalculate price (debounced for input events)
+        checkAndCalculatePrice(false);
     }
     
     function updateExtraPriceDisplay(extraId) {
@@ -608,8 +627,11 @@ document.addEventListener('DOMContentLoaded', function() {
     function handleExpressCleaningChange(e) {
         bookingData.express_cleaning = e.target.checked;
         
-        // Recalculate price with express cleaning surcharge
-        calculatePrice();
+        // Recalculate price with express cleaning surcharge (immediate for checkbox)
+        if (bookingData.service_id && bookingData.square_meters >= 0) {
+            calculatePrice();
+        }
+        updateSidebarDisplay();
     }
     
     function handleServiceSelect(e) {
@@ -650,8 +672,8 @@ document.addEventListener('DOMContentLoaded', function() {
             nextStepBtn.disabled = false;
         }
         
-        // Calculate price and load extras
-        checkAndCalculatePrice();
+        // Calculate price and load extras (immediate for service selection)
+        checkAndCalculatePrice(true);
         loadExtras();
         
         // Update sidebar display
@@ -717,8 +739,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Re-render extras to show/hide space inputs
         displayExtras();
         
-        // Recalculate price with new extras
-        checkAndCalculatePrice();
+        // Recalculate price with new extras (immediate for click events)
+        checkAndCalculatePrice(true);
         
         // Remove processing class after a short delay
         setTimeout(() => {
@@ -2124,28 +2146,57 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Update Step 3 pricing display with smart area breakdown
         const step3ServicePrice = document.getElementById('cb-step3-service-price');
+        const step3ExtraSqmPrice = document.getElementById('cb-step3-extra-sqm-price');
+        const step3ExtraSqmItem = document.getElementById('cb-step3-extra-sqm-item');
         const step3ExtrasPrice = document.getElementById('cb-step3-extras-price');
         const step3TotalPrice = document.getElementById('cb-step3-total-price');
         
         if (step3ServicePrice) {
             if (pricing.smart_area && pricing.smart_area.use_smart_area) {
-                // Show base + additional breakdown using backend data
+                // Show base service price with inline breakdown
                 const basePrice = parseFloat(pricing.smart_area.base_price) || 0;
                 const additionalPrice = parseFloat(pricing.smart_area.additional_price) || 0;
+                const zipSurcharge = parseFloat(pricing.zip_surcharge) || 0;
                 
+                // Show base service price with inline breakdown including extra m²
                 step3ServicePrice.innerHTML = `
                     <div class="cb-price-breakdown">
                         <div>Base: ${formatPrice(basePrice)}</div>
-                        ${additionalPrice > 0 ? `<div>Extra: ${formatPrice(additionalPrice)}</div>` : ''}
-                        ${pricing.zip_surcharge > 0 ? `<div>Zip Fee: ${formatPrice(pricing.zip_surcharge)}</div>` : ''}
+                        ${additionalPrice > 0 ? `<div>Extra m²: ${formatPrice(additionalPrice)}</div>` : ''}
+                        ${zipSurcharge > 0 ? `<div>Zip Fee: ${formatPrice(zipSurcharge)}</div>` : ''}
                     </div>
                 `;
+                
+                // Hide separate extra m² row since it's shown inline
+                if (step3ExtraSqmItem) {
+                    step3ExtraSqmItem.style.display = 'none';
+                }
             } else {
-                step3ServicePrice.textContent = formatPrice(pricing.service_price);
+                // Non-smart area: split service price into base and extra m² if applicable
+                const basePrice = parseFloat(pricing.smart_area?.base_price) || parseFloat(pricing.service_price) || 0;
+                const additionalPrice = parseFloat(pricing.smart_area?.additional_price) || 0;
+                
+                if (additionalPrice > 0 && pricing.smart_area) {
+                    // Show with inline breakdown
+                    step3ServicePrice.innerHTML = `
+                        <div class="cb-price-breakdown">
+                            <div>Base: ${formatPrice(basePrice)}</div>
+                            <div>Extra m²: ${formatPrice(additionalPrice)}</div>
+                        </div>
+                    `;
+                    if (step3ExtraSqmItem) {
+                        step3ExtraSqmItem.style.display = 'none';
+                    }
+                } else {
+                    step3ServicePrice.textContent = formatPrice(pricing.service_price);
+                    if (step3ExtraSqmItem) {
+                        step3ExtraSqmItem.style.display = 'none';
+                    }
+                }
             }
         }
         
-        // Update extras price separately
+        // Update service extras price separately (this is for additional services, not extra m²)
         if (step3ExtrasPrice) {
             if (pricing.extras_price > 0) {
                 step3ExtrasPrice.textContent = formatPrice(pricing.extras_price);
@@ -2166,26 +2217,57 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Update Step 3 duration display with smart area breakdown
         const step3ServiceDuration = document.getElementById('cb-step3-service-duration');
+        const step3ExtraSqmDuration = document.getElementById('cb-step3-extra-sqm-duration');
+        const step3ExtraSqmDurationItem = document.getElementById('cb-step3-extra-sqm-duration-item');
         const step3ExtrasDuration = document.getElementById('cb-step3-extras-duration');
         const step3TotalDuration = document.getElementById('cb-step3-total-duration');
         
         if (step3ServiceDuration) {
             if (pricing.smart_area && pricing.smart_area.use_smart_area) {
-                // Show base + additional breakdown using backend data
+                // Show base service duration with inline breakdown
                 const baseDuration = parseInt(pricing.smart_area.base_duration, 10) || 0;
                 const additionalDuration = parseInt(pricing.smart_area.additional_duration, 10) || 0;
                 
-                step3ServiceDuration.innerHTML = `
-                    <div class="cb-duration-breakdown">
-                        <div>Base: ${formatDuration(baseDuration)}</div>
-                        ${additionalDuration > 0 ? `<div>Extra: ${formatDuration(additionalDuration)}</div>` : ''}
-                    </div>
-                `;
+                if (additionalDuration > 0) {
+                    step3ServiceDuration.innerHTML = `
+                        <div class="cb-duration-breakdown">
+                            <div>Base: ${formatDuration(baseDuration)}</div>
+                            <div>Extra m²: ${formatDuration(additionalDuration)}</div>
+                        </div>
+                    `;
+                } else {
+                    step3ServiceDuration.textContent = formatDuration(baseDuration);
+                }
+                
+                // Hide separate extra m² duration row since it's shown inline
+                if (step3ExtraSqmDurationItem) {
+                    step3ExtraSqmDurationItem.style.display = 'none';
+                }
             } else {
-                step3ServiceDuration.textContent = formatDuration(pricing.service_duration);
+                // Non-smart area: split duration into base and extra m² if applicable
+                const baseDuration = parseInt(pricing.smart_area?.base_duration, 10) || parseInt(pricing.service_duration, 10) || 0;
+                const additionalDuration = parseInt(pricing.smart_area?.additional_duration, 10) || 0;
+                
+                if (additionalDuration > 0 && pricing.smart_area) {
+                    step3ServiceDuration.innerHTML = `
+                        <div class="cb-duration-breakdown">
+                            <div>Base: ${formatDuration(baseDuration)}</div>
+                            <div>Extra m²: ${formatDuration(additionalDuration)}</div>
+                        </div>
+                    `;
+                    if (step3ExtraSqmDurationItem) {
+                        step3ExtraSqmDurationItem.style.display = 'none';
+                    }
+                } else {
+                    step3ServiceDuration.textContent = formatDuration(pricing.service_duration);
+                    if (step3ExtraSqmDurationItem) {
+                        step3ExtraSqmDurationItem.style.display = 'none';
+                    }
+                }
             }
         }
         
+        // Update service extras duration (for additional services, not extra m²)
         if (step3ExtrasDuration) step3ExtrasDuration.textContent = formatDuration(pricing.extras_duration);
         if (step3TotalDuration) step3TotalDuration.textContent = formatDuration(pricing.total_duration);
         
@@ -2212,12 +2294,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    function checkAndCalculatePrice() {
-        if (bookingData.service_id && bookingData.square_meters >= 0) {
-            calculatePrice();
-        }
-        updateSidebarDisplay();
-    }
     
     // Utility functions
     function showError(errorId, message) {

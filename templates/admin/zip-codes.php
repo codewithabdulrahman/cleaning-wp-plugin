@@ -12,6 +12,30 @@ if (!defined('ABSPATH')) {
     <h1><?php _e('ZIP Codes', 'cleaning-booking'); ?></h1>
     
     <div class="cb-admin-section">
+        <h2><?php _e('Import ZIP Codes from CSV', 'cleaning-booking'); ?></h2>
+        <p class="description"><?php _e('Upload a CSV file with columns: postal_code,area', 'cleaning-booking'); ?></p>
+        <form id="cb-zip-code-csv-form" class="cb-form" enctype="multipart/form-data" method="post">
+            <input type="hidden" name="action" value="cb_import_zip_codes_csv">
+            <input type="hidden" name="nonce" value="<?php echo wp_create_nonce('cb_admin_nonce'); ?>">
+            <table class="form-table">
+                <tr>
+                    <th scope="row">
+                        <label for="zip-csv-file"><?php _e('CSV File', 'cleaning-booking'); ?></label>
+                    </th>
+                    <td>
+                        <input type="file" id="zip-csv-file" name="csv_file" accept=".csv" required>
+                        <p class="description"><?php _e('CSV format: postal_code,area (surcharge will be 0, status will be active by default)', 'cleaning-booking'); ?></p>
+                    </td>
+                </tr>
+            </table>
+            <p class="submit">
+                <button type="button" id="cb-import-csv-btn" class="button-primary"><?php _e('Import CSV', 'cleaning-booking'); ?></button>
+                <span id="cb-csv-import-status" style="margin-left: 10px;"></span>
+            </p>
+        </form>
+    </div>
+    
+    <div class="cb-admin-section">
         <h2><?php _e('Add New ZIP Code', 'cleaning-booking'); ?></h2>
         <form id="cb-zip-code-form" class="cb-form">
             <input type="hidden" name="id" id="zip-code-id">

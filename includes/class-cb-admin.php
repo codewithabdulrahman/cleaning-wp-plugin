@@ -21,6 +21,7 @@ class CB_Admin {
         add_action('wp_ajax_cb_update_extra_status', array($this, 'ajax_update_extra_status'));
         add_action('wp_ajax_cb_save_zip_code', array($this, 'ajax_save_zip_code'));
         add_action('wp_ajax_cb_delete_zip_code', array($this, 'ajax_delete_zip_code'));
+        add_action('wp_ajax_cb_import_zip_codes_csv', array($this, 'ajax_import_zip_codes_csv'));
         add_action('wp_ajax_cb_update_booking_status', array($this, 'ajax_update_booking_status'));
         add_action('wp_ajax_cb_get_booking_details', array($this, 'ajax_get_booking_details'));
         add_action('wp_ajax_cb_update_booking', array($this, 'ajax_update_booking'));
@@ -491,6 +492,143 @@ class CB_Admin {
         } else {
             wp_send_json_error(array('message' => __('Error deleting ZIP code', 'cleaning-booking')));
         }
+    }
+    
+    public function ajax_import_zip_codes_csv() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Insufficient permissions', 'cleaning-booking')));
+        }
+        
+        // Check if file was uploaded
+        if (!isset($_FILES['csv_file']) || $_FILES['csv_file']['error'] !== UPLOAD_ERR_OK) {
+            wp_send_json_error(array('message' => __('No file uploaded or upload error occurred', 'cleaning-booking')));
+        }
+        
+        // Validate file type
+        $file_info = wp_check_filetype($_FILES['csv_file']['name']);
+        if ($file_info['ext'] !== 'csv') {
+            wp_send_json_error(array('message' => __('Invalid file type. Please upload a CSV file.', 'cleaning-booking')));
+        }
+        
+        $file_path = $_FILES['csv_file']['tmp_name'];
+        
+        if (!file_exists($file_path) || !is_readable($file_path)) {
+            wp_send_json_error(array('message' => __('Cannot read uploaded file', 'cleaning-booking')));
+        }
+        
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_zip_codes';
+        
+        $imported = 0;
+        $skipped = 0;
+        $errors = array();
+        
+        // Open and read CSV file
+        if (($handle = fopen($file_path, 'r')) !== false) {
+            // Read header row
+            $header = fgetcsv($handle);
+            
+            // Validate header
+            if (!$header || count($header) < 2) {
+                fclose($handle);
+                wp_send_json_error(array('message' => __('Invalid CSV format. Expected columns: postal_code,area', 'cleaning-booking')));
+            }
+            
+            // Find column indices (case-insensitive)
+            $postal_code_idx = -1;
+            $area_idx = -1;
+            
+            foreach ($header as $idx => $col) {
+                $col_lower = strtolower(trim($col));
+                if ($col_lower === 'postal_code' && $postal_code_idx === -1) {
+                    $postal_code_idx = $idx;
+                } elseif ($col_lower === 'area' && $area_idx === -1) {
+                    $area_idx = $idx;
+                }
+            }
+            
+            if ($postal_code_idx === -1 || $area_idx === -1) {
+                fclose($handle);
+                wp_send_json_error(array('message' => __('CSV must contain columns: postal_code,area', 'cleaning-booking')));
+            }
+            
+            // Process data rows
+            $line_number = 1;
+            while (($data = fgetcsv($handle)) !== false) {
+                $line_number++;
+                
+                // Skip empty rows
+                if (empty($data) || (count($data) === 1 && trim($data[0]) === '')) {
+                    continue;
+                }
+                
+                // Get values
+                $postal_code = isset($data[$postal_code_idx]) ? trim($data[$postal_code_idx]) : '';
+                $area = isset($data[$area_idx]) ? trim($data[$area_idx]) : '';
+                
+                // Skip if postal_code is empty
+                if (empty($postal_code)) {
+                    $skipped++;
+                    continue;
+                }
+                
+                // Check if ZIP code already exists
+                $exists = $wpdb->get_var($wpdb->prepare(
+                    "SELECT COUNT(*) FROM $table WHERE zip_code = %s",
+                    $postal_code
+                ));
+                
+                if ($exists > 0) {
+                    $skipped++;
+                    continue;
+                }
+                
+                // Insert new ZIP code with defaults
+                $result = $wpdb->insert(
+                    $table,
+                    array(
+                        'zip_code' => sanitize_text_field($postal_code),
+                        'city' => sanitize_text_field($area),
+                        'surcharge' => 0.00,
+                        'is_active' => 1
+                    ),
+                    array('%s', '%s', '%f', '%d')
+                );
+                
+                if ($result) {
+                    $imported++;
+                } else {
+                    $errors[] = sprintf(__('Line %d: Failed to import ZIP code %s', 'cleaning-booking'), $line_number, $postal_code);
+                }
+            }
+            
+            fclose($handle);
+        } else {
+            wp_send_json_error(array('message' => __('Cannot open CSV file for reading', 'cleaning-booking')));
+        }
+        
+        // Build response message
+        $message = sprintf(
+            __('Import completed: %d imported, %d skipped', 'cleaning-booking'),
+            $imported,
+            $skipped
+        );
+        
+        if (!empty($errors)) {
+            $message .= '. ' . __('Errors:', 'cleaning-booking') . ' ' . implode(', ', array_slice($errors, 0, 5));
+            if (count($errors) > 5) {
+                $message .= sprintf(__(' and %d more', 'cleaning-booking'), count($errors) - 5);
+            }
+        }
+        
+        wp_send_json_success(array(
+            'message' => $message,
+            'imported' => $imported,
+            'skipped' => $skipped,
+            'errors' => count($errors)
+        ));
     }
     
     public function ajax_update_booking_status() {
