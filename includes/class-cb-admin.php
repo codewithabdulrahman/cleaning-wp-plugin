@@ -19,6 +19,9 @@ class CB_Admin {
         add_action('wp_ajax_cb_get_service_extras', array($this, 'ajax_get_service_extras'));
         add_action('wp_ajax_cb_remove_service_extra', array($this, 'ajax_remove_service_extra'));
         add_action('wp_ajax_cb_update_extra_status', array($this, 'ajax_update_extra_status'));
+        add_action('wp_ajax_cb_save_global_extra', array($this, 'ajax_save_global_extra'));
+        add_action('wp_ajax_cb_assign_existing_extra', array($this, 'ajax_assign_existing_extra'));
+        add_action('wp_ajax_cb_get_extras_with_services', array($this, 'ajax_get_extras_with_services'));
         add_action('wp_ajax_cb_save_zip_code', array($this, 'ajax_save_zip_code'));
         add_action('wp_ajax_cb_delete_zip_code', array($this, 'ajax_delete_zip_code'));
         add_action('wp_ajax_cb_import_zip_codes_csv', array($this, 'ajax_import_zip_codes_csv'));
@@ -85,6 +88,15 @@ class CB_Admin {
             'manage_options',
             'cb-services',
             array($this, 'services_page')
+        );
+        
+        add_submenu_page(
+            'cleaning-booking',
+            __('Extras', 'cleaning-booking'),
+            __('Extras', 'cleaning-booking'),
+            'manage_options',
+            'cb-extras',
+            array($this, 'extras_page')
         );
         
         add_submenu_page(
@@ -200,6 +212,12 @@ class CB_Admin {
     public function services_page() {
         $services = CB_Database::get_services(false);
         include CB_PLUGIN_DIR . 'templates/admin/services.php';
+    }
+    
+    public function extras_page() {
+        $services = CB_Database::get_services(false);
+        $extras = CB_Database::get_all_extras(false);
+        include CB_PLUGIN_DIR . 'templates/admin/extras.php';
     }
     
     
@@ -676,7 +694,7 @@ class CB_Admin {
         }
         
         global $wpdb;
-        $table = $wpdb->prefix . 'cb_service_extras';
+        $table = $wpdb->prefix . 'cb_extras';
         
         $extra_id = intval($_POST['extra_id']);
         $is_active = intval($_POST['is_active']);
@@ -694,6 +712,75 @@ class CB_Admin {
         } else {
             wp_send_json_error(array('message' => __('Error updating extra status', 'cleaning-booking')));
         }
+    }
+
+    public function ajax_save_global_extra() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Insufficient permissions', 'cleaning-booking'));
+        }
+        $extra_data = array(
+            'name' => sanitize_text_field($_POST['name_en']),
+            'description' => sanitize_textarea_field($_POST['description_en']),
+            'name_el' => sanitize_text_field($_POST['name_el']),
+            'description_el' => sanitize_textarea_field($_POST['description_el']),
+            'price' => floatval($_POST['price']),
+            'duration' => intval($_POST['duration']),
+            'is_active' => isset($_POST['is_active']) ? 1 : 0,
+            'sort_order' => isset($_POST['sort_order']) ? intval($_POST['sort_order']) : 0,
+            'pricing_type' => isset($_POST['pricing_type']) ? sanitize_text_field($_POST['pricing_type']) : 'fixed',
+            'price_per_sqm' => isset($_POST['price_per_sqm']) && $_POST['price_per_sqm'] !== '' ? floatval($_POST['price_per_sqm']) : null,
+            'duration_per_sqm' => isset($_POST['duration_per_sqm']) && $_POST['duration_per_sqm'] !== '' ? intval($_POST['duration_per_sqm']) : null
+        );
+        $service_ids = isset($_POST['service_ids']) ? (array)$_POST['service_ids'] : array();
+        $extra_id = isset($_POST['id']) ? intval($_POST['id']) : 0;
+        if ($extra_id > 0) {
+            // update
+            $updated = CB_Database::update_service_extra(0, $extra_id, $extra_data);
+            if ($updated !== false) {
+                CB_Database::set_extra_services($extra_id, $service_ids);
+                wp_send_json_success(array('message' => __('Extra updated successfully!', 'cleaning-booking'), 'extra_id' => $extra_id));
+            } else {
+                wp_send_json_error(array('message' => __('Error updating extra', 'cleaning-booking')));
+            }
+        } else {
+            // create
+            $extra_id = CB_Database::create_extra($extra_data);
+            if ($extra_id) {
+                CB_Database::map_extra_to_services($extra_id, $service_ids);
+                wp_send_json_success(array('message' => __('Extra created and assigned successfully!', 'cleaning-booking'), 'extra_id' => $extra_id));
+            } else {
+                wp_send_json_error(array('message' => __('Error creating extra', 'cleaning-booking')));
+            }
+        }
+    }
+
+    public function ajax_assign_existing_extra() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Insufficient permissions', 'cleaning-booking'));
+        }
+        $extra_id = intval($_POST['extra_id']);
+        $service_ids = isset($_POST['service_ids']) ? (array)$_POST['service_ids'] : array();
+        CB_Database::map_extra_to_services($extra_id, $service_ids);
+        wp_send_json_success(array('message' => __('Extra assigned to services successfully!', 'cleaning-booking')));
+    }
+
+    public function ajax_get_extras_with_services() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Insufficient permissions', 'cleaning-booking'));
+        }
+        $extras = CB_Database::get_all_extras(false);
+        $response = array();
+        foreach ($extras as $extra) {
+            $services = CB_Database::get_extra_services($extra->id);
+            $response[] = array(
+                'extra' => $extra,
+                'services' => array_map(function($s){ return array('id' => $s->id, 'name' => $s->name); }, $services)
+            );
+        }
+        wp_send_json_success($response);
     }
     
     public function ajax_remove_service_extra() {

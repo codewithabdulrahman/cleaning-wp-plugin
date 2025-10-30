@@ -174,7 +174,7 @@ class CB_Pricing {
         if (!empty($extras_data)) {
             foreach ($extras_data as $extra_id) {
                 $extra = $wpdb->get_row($wpdb->prepare(
-                    "SELECT price, duration, pricing_type, price_per_sqm, duration_per_sqm FROM {$wpdb->prefix}cb_service_extras WHERE id = %d AND is_active = 1",
+                    "SELECT price, duration, pricing_type, price_per_sqm, duration_per_sqm FROM {$wpdb->prefix}cb_extras WHERE id = %d AND is_active = 1",
                     $extra_id
                 ));
                 

@@ -77,6 +77,8 @@ class CleaningBooking {
      */
     private function __construct() {
         add_action('init', array($this, 'init'));
+        // Declare WooCommerce HPOS (custom order tables) compatibility early
+        add_action('before_woocommerce_init', array($this, 'declare_hpos_compat'));
         register_activation_hook(__FILE__, array($this, 'activate'));
         register_deactivation_hook(__FILE__, array($this, 'deactivate'));
         add_action('admin_notices', array($this, 'admin_notices'));
@@ -344,6 +346,16 @@ class CleaningBooking {
             if (get_option($key) === false) {
                 add_option($key, $value);
             }
+        }
+    }
+
+    /**
+     * Declare compatibility with WooCommerce High-Performance Order Storage (HPOS).
+     * This tells WooCommerce we use the CRUD/official APIs and not direct posts/postmeta queries.
+     */
+    public function declare_hpos_compat() {
+        if (class_exists('Automattic\\WooCommerce\\Utilities\\FeaturesUtil')) {
+            Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility('custom_order_tables', __FILE__, true);
         }
     }
     

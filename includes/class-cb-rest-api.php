@@ -326,15 +326,14 @@ class CB_REST_API {
         $extras_details = array();
         
         if (!empty($extras)) {
-            $service_extras_table = $wpdb->prefix . 'cb_service_extras';
+            $extras_table = $wpdb->prefix . 'cb_extras';
+            $map_table = $wpdb->prefix . 'cb_service_extra_map';
             $extra_ids = array_map('intval', $extras);
             $placeholders = implode(',', array_fill(0, count($extra_ids), '%d'));
             
-            // Get extras with service validation to ensure security
-            $extras_data = $wpdb->get_results($wpdb->prepare(
-                "SELECT * FROM $service_extras_table WHERE id IN ($placeholders) AND service_id = %d AND is_active = 1",
-                array_merge($extra_ids, array($service_id))
-            ));
+            // Only extras that are active and mapped to the given service
+            $query = "SELECT e.* FROM $extras_table e INNER JOIN $map_table m ON m.extra_id = e.id WHERE e.id IN ($placeholders) AND m.service_id = %d AND e.is_active = 1";
+            $extras_data = $wpdb->get_results($wpdb->prepare($query, array_merge($extra_ids, array($service_id))));
             
             foreach ($extras_data as $extra) {
                 $extras_price += floatval($extra->price);

@@ -48,6 +48,8 @@ function cb_uninstall_cleanup() {
     $tables_to_remove = array(
         $wpdb->prefix . 'cb_services',
         $wpdb->prefix . 'cb_service_extras',
+        $wpdb->prefix . 'cb_extras',
+        $wpdb->prefix . 'cb_service_extra_map',
         $wpdb->prefix . 'cb_bookings',
         $wpdb->prefix . 'cb_booking_services',
         $wpdb->prefix . 'cb_booking_extras',

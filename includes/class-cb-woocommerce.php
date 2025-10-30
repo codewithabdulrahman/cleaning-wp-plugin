@@ -48,6 +48,10 @@ class CB_WooCommerce {
         
         // Add admin notice for payment gateway issues
         add_action('admin_notices', array($this, 'admin_payment_gateway_notice'));
+
+        // Persist booking_session across template changes/redirects and attach to cart items
+        add_action('init', array($this, 'persist_booking_session'));
+        add_filter('woocommerce_add_cart_item_data', array($this, 'attach_booking_session_to_cart_item'), 10, 3);
     }
     
     public function create_booking_order($booking) {
@@ -86,6 +90,32 @@ class CB_WooCommerce {
         error_log('CB Debug - Generated checkout URL: ' . $checkout_url);
         
         return $checkout_url;
+    }
+
+    /**
+     * Persist booking_session from querystring into WooCommerce session so templates that drop
+     * the parameter still have access to it.
+     */
+    public function persist_booking_session() {
+        if (!function_exists('WC') || !WC()) return;
+        if (!WC()->session) return;
+        if (isset($_GET['booking_session']) && $_GET['booking_session'] !== '') {
+            WC()->session->set('cb_booking_session', sanitize_text_field($_GET['booking_session']));
+        }
+    }
+
+    /**
+     * Ensure the booking_session value is carried on the cart item even if the URL param is gone.
+     */
+    public function attach_booking_session_to_cart_item($cart_item_data, $product_id, $variation_id) {
+        if (!function_exists('WC') || !WC()) return $cart_item_data;
+        $session_val = isset($_GET['booking_session']) && $_GET['booking_session'] !== ''
+            ? sanitize_text_field($_GET['booking_session'])
+            : (WC()->session ? WC()->session->get('cb_booking_session') : '');
+        if ($session_val) {
+            $cart_item_data['cb_booking_session'] = $session_val;
+        }
+        return $cart_item_data;
     }
     
     /**
@@ -407,21 +437,24 @@ class CB_WooCommerce {
     }
     
     private function create_booking_product($booking) {
-        // Check if product already exists for this booking
-        $existing_product = get_posts(array(
-            'post_type' => 'product',
-            'meta_query' => array(
-                array(
-                    'key' => '_cb_booking_id',
-                    'value' => $booking->id,
-                    'compare' => '='
-                )
-            ),
-            'posts_per_page' => 1
-        ));
-        
-        if (!empty($existing_product)) {
-            return $existing_product[0]->ID;
+        // Only attempt to reuse a product for persisted bookings (non-zero ID).
+        // Session-based (ID=0) bookings must always create a fresh product,
+        // otherwise multiple checkouts would reuse the first product and keep the old title.
+        if (!empty($booking->id)) {
+            $existing_product = get_posts(array(
+                'post_type' => 'product',
+                'meta_query' => array(
+                    array(
+                        'key' => '_cb_booking_id',
+                        'value' => $booking->id,
+                        'compare' => '='
+                    )
+                ),
+                'posts_per_page' => 1
+            ));
+            if (!empty($existing_product)) {
+                return $existing_product[0]->ID;
+            }
         }
         
          // Create new product with proper service name
@@ -724,7 +757,46 @@ class CB_WooCommerce {
             WC()->session->set('cb_generated_booking_reference', null);
             WC()->session->set('cb_service_name', null);
         } else {
-            error_log("CB Debug - No booking session data found for order $order_id");
+            // Fallback: recover booking data from the product attached to this order
+            $order = wc_get_order($order_id);
+            if ($order) {
+                foreach ($order->get_items() as $item) {
+                    $product = $item->get_product();
+                    if (!$product) { continue; }
+                    $product_id = $product->get_id();
+                    $booking_meta = get_post_meta($product_id, '_cb_booking_data', true);
+                    if (is_array($booking_meta) && !empty($booking_meta)) {
+                        // Build booking_data structure expected by create_booking_from_session
+                        $recovered = array(
+                            'service_id' => intval($booking_meta['service_id']),
+                            'square_meters' => intval($booking_meta['square_meters']),
+                            'booking_date' => $booking_meta['booking_date'],
+                            'booking_time' => $booking_meta['booking_time'],
+                            'extras' => isset($booking_meta['extras']) ? $booking_meta['extras'] : array(),
+                            'pricing' => array(
+                                'total_duration' => intval(isset($booking_meta['total_duration']) ? $booking_meta['total_duration'] : 0),
+                                'total_price' => floatval(get_post_meta($product_id, '_price', true))
+                            )
+                        );
+                        // Generate reference if needed
+                        $generated_ref = get_post_meta($product_id, '_cb_booking_reference', true);
+                        if (!empty($generated_ref)) {
+                            WC()->session->set('cb_generated_booking_reference', $generated_ref);
+                        }
+                        $booking_id = $this->create_booking_from_session($recovered, $order_id, $order);
+                        if ($booking_id) {
+                            error_log("CB Debug - Booking recovered from product meta for order $order_id -> booking $booking_id");
+                            // Map status
+                            $status = $order->get_payment_method() === 'cod' ? 'confirmed' : 'pending';
+                            CB_Database::update_booking_status($booking_id, $status, $order_id, $order->get_payment_method());
+                            $this->update_product_title_with_booking_reference($order_id, $booking_id);
+                            $this->release_slot_hold($booking_id);
+                            return;
+                        }
+                    }
+                }
+            }
+            error_log("CB Debug - No booking session data or product meta found for order $order_id");
         }
     }
     
@@ -782,7 +854,9 @@ class CB_WooCommerce {
                 error_log("CB Debug - Failed to update booking {$booking->id} status");
             }
         } else {
-            error_log("CB Debug - No booking found for order $order_id");
+            error_log("CB Debug - No booking found for order $order_id; attempting recovery via link_booking_to_order");
+            // Try to recover by creating the booking from session/product meta
+            $this->link_booking_to_order($order_id);
         }
     }
     
@@ -1219,8 +1293,22 @@ $this->display_booking_details($order);
              $booking->express_cleaning = isset($booking_data['express_cleaning']) ? $booking_data['express_cleaning'] : false;
              $booking->booking_date = $booking_data['booking_date'];
              $booking->booking_time = $booking_data['booking_time'];
-             $booking->total_price = $booking_data['pricing']['total_price'] ?? 0;
-             $booking->total_duration = $booking_data['pricing']['total_duration'] ?? 120;
+            // Ensure price/duration exist; if not, compute server-side
+            $total_price = isset($booking_data['pricing']['total_price']) ? floatval($booking_data['pricing']['total_price']) : null;
+            $total_duration = isset($booking_data['pricing']['total_duration']) ? intval($booking_data['pricing']['total_duration']) : null;
+            if (($total_price === null || $total_duration === null) && class_exists('CB_Pricing')) {
+                $extras_struct = isset($booking_data['extras']) ? $booking_data['extras'] : array();
+                $pricing = CB_Pricing::get_pricing_breakdown(
+                    intval($booking_data['service_id']),
+                    intval($booking_data['square_meters']),
+                    $extras_struct,
+                    isset($booking_data['zip_code']) ? $booking_data['zip_code'] : ''
+                );
+                $total_price = $pricing['total_price'];
+                $total_duration = $pricing['total_duration'];
+            }
+            $booking->total_price = $total_price !== null ? $total_price : 0;
+            $booking->total_duration = $total_duration !== null ? $total_duration : 120;
              $booking->extras_data = json_encode($booking_data['extras']);
              
              // Store the generated reference in session for later use
@@ -1277,11 +1365,23 @@ $this->display_booking_details($order);
             }
 
             // Assign available truck automatically
-            $total_duration = $booking_data['pricing']['total_duration'] ?? 120;
+            // Ensure duration/price on server too
+            $total_duration = isset($booking_data['pricing']['total_duration']) ? intval($booking_data['pricing']['total_duration']) : null;
+            $total_price = isset($booking_data['pricing']['total_price']) ? floatval($booking_data['pricing']['total_price']) : null;
+            if (($total_duration === null || $total_price === null) && class_exists('CB_Pricing')) {
+                $pricing = CB_Pricing::get_pricing_breakdown(
+                    intval($booking_data['service_id']),
+                    intval($booking_data['square_meters']),
+                    isset($booking_data['extras']) ? $booking_data['extras'] : array(),
+                    isset($booking_data['zip_code']) ? $booking_data['zip_code'] : ''
+                );
+                $total_duration = $total_duration === null ? $pricing['total_duration'] : $total_duration;
+                $total_price = $total_price === null ? $pricing['total_price'] : $total_price;
+            }
             $available_truck = CB_Database::get_available_truck($booking_data['booking_date'], $booking_data['booking_time'], $total_duration);
             if (!$available_truck) {
-                error_log("CB Debug - No available truck found for WooCommerce booking on {$booking_data['booking_date']} at {$booking_data['booking_time']}");
-                return false;
+                // Do NOT block booking creation if trucks are not configured; proceed without assigning a truck
+                error_log("CB Debug - No available truck found; proceeding without truck assignment for order {$order_id}");
             }
 
             // Prepare booking data for database
@@ -1292,8 +1392,8 @@ $this->display_booking_details($order);
                 'express_cleaning' => isset($booking_data['express_cleaning']) ? ($booking_data['express_cleaning'] ? 1 : 0) : 0,
                 'booking_date' => $booking_data['booking_date'],
                 'booking_time' => $booking_data['booking_time'],
-                'total_duration' => $total_duration,
-                'total_price' => $booking_data['pricing']['total_price'] ?? 0,
+                'total_duration' => $total_duration ?? 120,
+                'total_price' => $total_price ?? 0,
                 'customer_name' => $customer_name,
                 'customer_email' => $customer_email,
                 'customer_phone' => $customer_phone,
@@ -1301,7 +1401,7 @@ $this->display_booking_details($order);
                 'zip_code' => $zip_code,
                 'extras_data' => json_encode($booking_data['extras']),
                 'status' => 'pending',
-                'truck_id' => $available_truck->id,
+                'truck_id' => $available_truck ? $available_truck->id : null,
                 'woocommerce_order_id' => $order_id,
                 'created_at' => current_time('mysql'),
                 'updated_at' => current_time('mysql')
