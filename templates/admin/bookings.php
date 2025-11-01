@@ -165,8 +165,13 @@ if (!defined('ABSPATH')) {
                                     </div>
                                 </td>
                                 <td>
-                                    <?php echo esc_html($booking->service_names); ?><br>
-                                    <small><?php echo esc_html($booking->square_meters); ?> m²</small>
+                                    <?php 
+                                    $service_name = !empty($booking->service_name) ? esc_html($booking->service_name) : __('No Service', 'cleaning-booking');
+                                    echo '<strong>' . $service_name . '</strong>';
+                                    if (!empty($booking->square_meters) && $booking->square_meters > 0) {
+                                        echo '<br><small>' . esc_html($booking->square_meters) . ' m²</small>';
+                                    }
+                                    ?>
                                 </td>
                                 <td>
                                     <?php if ($booking->truck_id): ?>
@@ -190,6 +195,11 @@ if (!defined('ABSPATH')) {
                                     </span>
                                 </td>
                                 <td>
+                                    <?php if (!empty($booking->extras_data) && is_array($booking->extras_data) && count($booking->extras_data) > 0): ?>
+                                        <button type="button" class="button button-small cb-view-extras" data-booking-id="<?php echo esc_attr($booking->id); ?>" data-extras='<?php echo esc_attr(json_encode($booking->extras_data)); ?>' style="margin-bottom: 5px; background: #2271b1; color: white; border-color: #2271b1;">
+                                            <?php _e('View Extras', 'cleaning-booking'); ?> (<?php echo count($booking->extras_data); ?>)
+                                        </button><br>
+                                    <?php endif; ?>
                                     <button type="button" class="button button-small cb-edit-booking-inline" data-booking='<?php echo esc_attr(json_encode($booking)); ?>'>Edit</button>
                                     <button type="button" class="button button-small button-secondary cb-delete-booking" data-booking-id="<?php echo esc_attr($booking->id); ?>">Delete</button>
                                 </td>
@@ -201,4 +211,84 @@ if (!defined('ABSPATH')) {
         </div>
     </div>
 </div>
+
+<!-- Extras Modal -->
+<div id="cb-extras-modal" style="display: none; position: fixed; z-index: 100000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5);">
+    <div style="background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 90%; max-width: 600px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #2271b1; padding-bottom: 10px;">
+            <h2 style="margin: 0; color: #2271b1;"><?php _e('Booking Extras', 'cleaning-booking'); ?></h2>
+            <span class="cb-modal-close" style="color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; line-height: 20px;">&times;</span>
+        </div>
+        <div id="cb-extras-modal-content">
+            <p><?php _e('Loading extras...', 'cleaning-booking'); ?></p>
+        </div>
+        <div style="margin-top: 20px; text-align: right;">
+            <button type="button" class="button cb-modal-close"><?php _e('Close', 'cleaning-booking'); ?></button>
+        </div>
+    </div>
+</div>
+
+<style>
+.cb-extras-grid-view {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 16px;
+    margin-top: 15px;
+}
+
+.cb-extra-item-view {
+    background: #ffffff;
+    border: 2px solid #e8e8e8;
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.cb-extra-item-view.selected {
+    border-color: #2271b1;
+    background: linear-gradient(135deg, rgba(34, 113, 177, 0.05) 0%, rgba(34, 113, 177, 0.02) 100%);
+}
+
+.cb-extra-item-view .cb-extra-name {
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: #1a1a1a;
+    font-size: 15px;
+}
+
+.cb-extra-item-view .cb-extra-description {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 10px;
+    line-height: 1.4;
+    flex: 1;
+}
+
+.cb-extra-item-view .cb-extra-price {
+    font-size: 16px;
+    font-weight: 700;
+    color: #2271b1;
+    margin-top: auto;
+}
+
+.cb-extra-item-view .cb-extra-pricing-type {
+    display: inline-block;
+    background: #2271b1;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.cb-extras-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: #666;
+    font-style: italic;
+}
+</style>
 

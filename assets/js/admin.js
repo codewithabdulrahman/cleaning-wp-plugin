@@ -1328,6 +1328,94 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // View Extras Modal
+    const extrasModal = document.getElementById('cb-extras-modal');
+    const extrasModalContent = document.getElementById('cb-extras-modal-content');
+    
+    function displayExtrasModal(extras) {
+        if (!extras || extras.length === 0) {
+            extrasModalContent.innerHTML = '<div class="cb-extras-empty">No extras found for this booking.</div>';
+            extrasModal.style.display = 'block';
+            return;
+        }
+        
+        let html = '<div class="cb-extras-grid-view">';
+        
+        extras.forEach(function(extra) {
+            const isPerSqm = extra.pricing_type === 'per_sqm';
+            const pricingTypeBadge = isPerSqm ? 
+                '<span class="cb-extra-pricing-type">Per SQM</span>' : 
+                '<span class="cb-extra-pricing-type">Fixed</span>';
+            
+            let priceDisplay = '€0.00';
+            let areaDisplay = '';
+            
+            if (isPerSqm) {
+                if (extra.area && extra.area > 0) {
+                    // Show calculated price and area
+                    priceDisplay = '€' + parseFloat(extra.price || 0).toFixed(2);
+                    areaDisplay = '<div class="cb-extra-area" style="margin-top: 8px; font-size: 12px; color: #666;">Area: <strong>' + parseFloat(extra.area).toFixed(2) + ' m²</strong></div>';
+                } else if (extra.price_per_sqm) {
+                    // Show per m² rate if area not available
+                    priceDisplay = '€' + parseFloat(extra.price_per_sqm).toFixed(2) + ' /m²';
+                }
+            } else if (extra.price) {
+                priceDisplay = '€' + parseFloat(extra.price).toFixed(2);
+            }
+            
+            html += '<div class="cb-extra-item-view selected">';
+            html += pricingTypeBadge;
+            html += '<div class="cb-extra-name">' + (extra.name || 'Unknown Extra') + '</div>';
+            if (extra.description) {
+                html += '<div class="cb-extra-description">' + extra.description + '</div>';
+            }
+            html += '<div class="cb-extra-price">' + priceDisplay + '</div>';
+            if (areaDisplay) {
+                html += areaDisplay;
+            }
+            html += '</div>';
+        });
+        
+        html += '</div>';
+        extrasModalContent.innerHTML = html;
+        extrasModal.style.display = 'block';
+    }
+    
+    // Close modal handlers
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('cb-modal-close') || e.target.closest('.cb-modal-close')) {
+            if (extrasModal) {
+                extrasModal.style.display = 'none';
+            }
+        }
+    });
+    
+    // Close modal on outside click
+    if (extrasModal) {
+        extrasModal.addEventListener('click', function(e) {
+            if (e.target === extrasModal) {
+                extrasModal.style.display = 'none';
+            }
+        });
+    }
+    
+    // View extras button handler
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.cb-view-extras')) {
+            const viewExtrasBtn = e.target.closest('.cb-view-extras');
+            const extrasJson = viewExtrasBtn.dataset.extras;
+            
+            try {
+                const extras = JSON.parse(extrasJson);
+                displayExtrasModal(extras);
+            } catch (error) {
+                console.error('Error parsing extras:', error);
+                extrasModalContent.innerHTML = '<div class="cb-extras-empty">Error loading extras.</div>';
+                extrasModal.style.display = 'block';
+            }
+        }
+    });
+    
     // Delete booking
     document.addEventListener('click', function(e) {
         if (e.target.closest('.cb-delete-booking')) {

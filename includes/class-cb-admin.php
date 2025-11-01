@@ -193,18 +193,62 @@ class CB_Admin {
             echo '<div class="notice notice-success"><p>' . __('Booking status updated!', 'cleaning-booking') . '</p></div>';
         }
         
-        // Get bookings with their services
+        // Get bookings with service name from service_id
         $bookings = $wpdb->get_results("
-            SELECT b.*, 
-                   GROUP_CONCAT(s.name SEPARATOR ', ') as service_names,
-                   GROUP_CONCAT(bs.quantity SEPARATOR ', ') as service_quantities
+            SELECT b.*, s.name as service_name
             FROM $bookings_table b 
-            LEFT JOIN $booking_services_table bs ON b.id = bs.booking_id 
-            LEFT JOIN $services_table s ON bs.service_id = s.id 
-            GROUP BY b.id
+            LEFT JOIN $services_table s ON b.service_id = s.id 
             ORDER BY b.created_at DESC 
             LIMIT 50
         ");
+        
+        // Get extras for each booking separately to avoid query complexity
+        $booking_extras_table = $wpdb->prefix . 'cb_booking_extras';
+        $extras_table = $wpdb->prefix . 'cb_extras';
+        
+        foreach ($bookings as $booking) {
+            $booking->extras_data = array();
+            
+            // Fetch service name if not already loaded
+            if (empty($booking->service_name) && !empty($booking->service_id)) {
+                $service = $wpdb->get_row($wpdb->prepare(
+                    "SELECT name FROM $services_table WHERE id = %d",
+                    $booking->service_id
+                ));
+                $booking->service_name = $service ? $service->name : __('Unknown Service', 'cleaning-booking');
+            }
+            
+            $booking_extras = $wpdb->get_results($wpdb->prepare(
+                "SELECT be.*, e.name, e.description, e.pricing_type, e.price_per_sqm
+                 FROM $booking_extras_table be
+                 INNER JOIN $extras_table e ON be.extra_id = e.id
+                 WHERE be.booking_id = %d",
+                $booking->id
+            ));
+            
+            if ($booking_extras) {
+                foreach ($booking_extras as $be) {
+                    $is_per_sqm = ($be->pricing_type === 'per_sqm');
+                    $area = null;
+                    
+                    // Calculate area for per_sqm extras from price
+                    if ($is_per_sqm && !empty($be->price_per_sqm) && $be->price_per_sqm > 0) {
+                        $area = $be->price / $be->price_per_sqm;
+                        $area = round($area, 2);
+                    }
+                    
+                    $booking->extras_data[] = array(
+                        'id' => $be->extra_id,
+                        'name' => $be->name,
+                        'description' => $be->description,
+                        'price' => $be->price,
+                        'pricing_type' => $be->pricing_type,
+                        'price_per_sqm' => $be->price_per_sqm,
+                        'area' => $area
+                    );
+                }
+            }
+        }
         
         include CB_PLUGIN_DIR . 'templates/admin/bookings.php';
     }
