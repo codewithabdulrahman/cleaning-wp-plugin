@@ -61,7 +61,7 @@ if (!defined('ABSPATH')) {
                         
                         <div class="cb-form-group">
                             <label for="cb-zip-code"><?php _e('ZIP Code', 'cleaning-booking'); ?></label>
-                            <input type="text" id="cb-zip-code" name="zip_code" class="cb-input" placeholder="12345" maxlength="10" required>
+                            <input type="text" id="cb-zip-code" name="zip_code" class="cb-input" placeholder="π.χ. 10672" maxlength="10" required>
                             <div class="cb-error-message" id="cb-zip-error"></div>
                         </div>
                         
@@ -102,9 +102,15 @@ if (!defined('ABSPATH')) {
                         
                         <div class="cb-form-group">
                             <label for="cb-square-meters"><?php _e('Space (m²)', 'cleaning-booking'); ?></label>
+                            <input type="range" id="cb-square-meters-slider" name="square_meters_slider" class="cb-input-range" min="0" max="1000" value="0" step="1" style="width: 100%; margin-bottom: 10px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 12px; color: #666;">
+                                <span>0</span>
+                                <span id="cb-slider-value">0</span>
+                                <span>1000</span>
+                            </div>
                             <input type="number" id="cb-square-meters" name="square_meters" class="cb-input" min="0" max="1000" placeholder="0" value="0">
                             <div class="cb-field-hint" id="cb-sqm-hint" style="display: none;">
-                                <small><?php _e('Enter total space beyond the default area, or leave as 0 to skip', 'cleaning-booking'); ?></small>
+                                <small><?php _e('Enter total area in square meters', 'cleaning-booking'); ?></small>
                             </div>
                             <div class="cb-base-area-info" id="cb-base-area-info" style="display: none;">
                                 <div class="cb-base-info-card">

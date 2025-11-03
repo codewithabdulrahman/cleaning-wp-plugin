@@ -301,7 +301,18 @@ class CB_Frontend {
         wp_deregister_script('elementor-frontend-min-js');
         
         wp_dequeue_script('elementor-frontend-js');
-        wp_deregister_script('elementor-frontend-js');  
+        wp_deregister_script('elementor-frontend-js');
+        
+        // Suppress WooCommerce mini-cart preload warnings
+        add_filter('script_loader_tag', function($tag, $handle) {
+            if (strpos($handle, 'wc-mini-cart') !== false || strpos($handle, 'mini-cart') !== false) {
+                // Remove preload link warnings by adding proper attributes
+                if (strpos($tag, 'rel="preload"') !== false && strpos($tag, 'as=') === false) {
+                    $tag = str_replace('rel="preload"', 'rel="preload" as="script"', $tag);
+                }
+            }
+            return $tag;
+        }, 10, 2);
     }
     
     public function enqueue_scripts() {

@@ -619,9 +619,9 @@ class CB_Translation_Seeder {
             
             // Service Details
             array(
-                'string_key' => 'Enter total space beyond the default area, or leave as 0 to skip',
-                'text_en' => 'Enter total space beyond the default area, or leave as 0 to skip',
-                'text_el' => 'Εισάγετε Σύνολο χώρο πέρα από την προεπιλεγμένη περιοχή, ή αφήστε 0 για παράλειψη',
+                'string_key' => 'Enter total area in square meters',
+                'text_en' => 'Enter total area in square meters',
+                'text_el' => 'Εισάγετε Σύνολικό χώρο σε τετραγωνικά μέτρα',
                 'category' => 'service_details',
                 'context' => 'Space input hint'
             ),

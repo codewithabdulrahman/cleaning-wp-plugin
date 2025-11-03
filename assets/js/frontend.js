@@ -140,6 +140,16 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update UI translations on initialization
         setTimeout(() => {
             updateUITranslations();
+            // Initialize ZIP code placeholder
+            const zipCodeInput = document.getElementById('cb-zip-code');
+            if (zipCodeInput) {
+                const currentLang = cb_frontend.current_language || 'en';
+                if (currentLang === 'el') {
+                    zipCodeInput.placeholder = 'π.χ. 10672';
+                } else {
+                    zipCodeInput.placeholder = 'e.g. 10672';
+                }
+            }
         }, 100);
         
         // Debug: Check if custom colors are loaded
@@ -405,6 +415,7 @@ document.addEventListener('DOMContentLoaded', function() {
             zipCodeInput.addEventListener('input', handleZipCodeChange);
         }
         
+        // Declare squareMetersInput in function scope for reuse with slider
         const squareMetersInput = document.getElementById('cb-square-meters');
         if (squareMetersInput) {
             squareMetersInput.addEventListener('input', handleSquareMetersChange);
@@ -474,6 +485,86 @@ document.addEventListener('DOMContentLoaded', function() {
         const expressCleaningCheckbox = document.getElementById('cb-express-cleaning');
         if (expressCleaningCheckbox) {
             expressCleaningCheckbox.addEventListener('change', handleExpressCleaningChange);
+        }
+        
+        // Slider initialization will happen when step 3 becomes visible
+        // This prevents trying to initialize elements that don't exist yet
+    }
+    
+    /**
+     * Initialize slider sync with input field
+     * Called when step 3 becomes visible
+     */
+    function initializeSlider() {
+        try {
+            const squareMetersSlider = document.getElementById('cb-square-meters-slider');
+            const squareMetersInput = document.getElementById('cb-square-meters');
+            const sliderValueDisplay = document.getElementById('cb-slider-value');
+            
+            // Check if elements exist
+            if (!squareMetersSlider || !squareMetersInput) {
+                console.warn('Slider or input element not found, retrying...');
+                // Retry after a short delay if elements don't exist yet
+                setTimeout(initializeSlider, 100);
+                return;
+            }
+            
+            // Check if already initialized to prevent duplicate event listeners
+            if (squareMetersSlider.dataset.initialized === 'true') {
+                return;
+            }
+            
+            // Mark as initialized
+            squareMetersSlider.dataset.initialized = 'true';
+            
+            // Sync slider to input
+            squareMetersSlider.addEventListener('input', function(e) {
+                try {
+                    const value = e.target.value;
+                    squareMetersInput.value = value;
+                    if (sliderValueDisplay) {
+                        sliderValueDisplay.textContent = value;
+                    }
+                    // Trigger input event to calculate price
+                    squareMetersInput.dispatchEvent(new Event('input', { bubbles: true }));
+                } catch (error) {
+                    console.error('Error syncing slider to input:', error);
+                }
+            });
+            
+            // Sync input to slider - but don't override existing handler
+            // We need to wrap the existing handler to also update slider
+            const existingInputHandler = squareMetersInput.oninput;
+            squareMetersInput.addEventListener('input', function(e) {
+                try {
+                    let value = parseInt(e.target.value) || 0;
+                    if (value < 0) value = 0;
+                    if (value > 1000) value = 1000;
+                    if (squareMetersSlider) {
+                        squareMetersSlider.value = value;
+                    }
+                    if (sliderValueDisplay) {
+                        sliderValueDisplay.textContent = value;
+                    }
+                } catch (error) {
+                    console.error('Error syncing input to slider:', error);
+                }
+            });
+            
+            // Initialize slider value display
+            if (sliderValueDisplay && squareMetersSlider) {
+                sliderValueDisplay.textContent = squareMetersSlider.value || '0';
+            }
+            
+            console.log('Slider initialized successfully');
+        } catch (error) {
+            console.error('Error initializing slider:', error);
+            // Retry initialization
+            setTimeout(function() {
+                if (document.getElementById('cb-square-meters-slider')) {
+                    initializeSlider();
+                }
+            }, 200);
         }
     }
     
@@ -673,11 +764,33 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Calculate price and load extras (immediate for service selection)
-        checkAndCalculatePrice(true);
-        loadExtras();
+        try {
+            checkAndCalculatePrice(true);
+            loadExtras();
+        } catch (error) {
+            console.error('Error in service selection:', error);
+        }
         
         // Update sidebar display
         updateSidebarDisplay();
+        
+        // Auto-advance to next step when service is selected
+        // Use longer delay to ensure async operations complete
+        setTimeout(function() {
+            try {
+                currentStep = 3;
+                updateStepDisplay();
+                // Scroll to top for better UX
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } catch (error) {
+                console.error('Error advancing to step 3:', error);
+                // Fallback: try manual navigation
+                const nextBtn = document.querySelector('.cb-step-2 .cb-next-step');
+                if (nextBtn && !nextBtn.disabled) {
+                    nextBtn.click();
+                }
+            }
+        }, 500); // Increased delay to ensure everything loads
     }
     
     function handleExtraSelect(e) {
@@ -876,6 +989,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Update language selector value
                     if (languageSelector) {
                         languageSelector.value = targetLanguage;
+                    }
+                    
+                    // Update ZIP code placeholder based on language
+                    const zipCodeInput = document.getElementById('cb-zip-code');
+                    if (zipCodeInput) {
+                        if (targetLanguage === 'el') {
+                            zipCodeInput.placeholder = 'π.χ. 10672';
+                        } else {
+                            zipCodeInput.placeholder = 'e.g. 10672';
+                        }
                     }
                     
                     // Save language preference
@@ -1080,9 +1203,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Update placeholders
-        if (translations['Enter total space beyond the default area, or leave as 0 to skip']) {
-            const spacePlaceholder = document.querySelector('#cb-square-meters + small');
-            if (spacePlaceholder) spacePlaceholder.textContent = translations['Enter total space beyond the default area, or leave as 0 to skip'];
+        const spaceHintText = translations['Enter total area in square meters'] || translations['Enter total space beyond the default area, or leave as 0 to skip'];
+        if (spaceHintText) {
+            const spacePlaceholder = document.querySelector('#cb-sqm-hint small');
+            if (spacePlaceholder) spacePlaceholder.textContent = spaceHintText;
+        }
+        
+        // Update ZIP code placeholder based on language
+        const zipCodeInput = document.getElementById('cb-zip-code');
+        if (zipCodeInput) {
+            const currentLang = cb_frontend.current_language || 'en';
+            if (currentLang === 'el') {
+                zipCodeInput.placeholder = 'π.χ. 10672';
+            } else {
+                zipCodeInput.placeholder = 'e.g. 10672';
+            }
         }
         
         // Update Step 3 pricing labels
@@ -1591,6 +1726,11 @@ document.addEventListener('DOMContentLoaded', function() {
             case 3:
                 // Service details step
                 
+                // Initialize slider when step 3 becomes visible
+                // Use setTimeout to ensure DOM is fully rendered
+                setTimeout(function() {
+                    initializeSlider();
+                }, 100);
                 
                 // Auto-trigger calculation when entering step 3
                 if (bookingData.service_id) {
@@ -1844,7 +1984,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Show hint about total space
         if (hintElement) {
             hintElement.style.display = 'block';
-            const hintText = cb_frontend.translations['Enter total space beyond the default area, or leave as 0 to skip'] || 'Εισάγετε Σύνολο χώρο πέρα από την προεπιλεγμένη περιοχή, ή αφήστε 0 για παράλειψη';
+            const hintText = cb_frontend.translations['Enter total area in square meters'] || cb_frontend.translations['Enter total space beyond the default area, or leave as 0 to skip'] || 'Εισάγετε Σύνολικό χώρο σε τετραγωνικά μέτρα';
             hintElement.innerHTML = `<small>${hintText.replace('default area', `default ${service.default_area} m²`)}</small>`;
         }
         
