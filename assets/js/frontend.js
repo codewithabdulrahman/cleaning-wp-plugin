@@ -374,108 +374,138 @@ document.addEventListener('DOMContentLoaded', function() {
             sidebarCheckout.disabled = !isValid;
         }
     }
-    
-    function setupEventListeners() {
-        // Language switching
-        const languageSelector = document.querySelector('.cb-language-selector');
-        if (languageSelector) {
-            languageSelector.addEventListener('change', handleLanguageSwitch);
-        }
 
-        // Checkout button
-        const proceedCheckoutBtn = document.getElementById('cb-proceed-checkout');
-        if (proceedCheckoutBtn) {
-            proceedCheckoutBtn.addEventListener('click', proceedToCheckout);
-        }
-        
-        // Step navigation
-        const nextStepButtons = document.querySelectorAll('.cb-next-step');
-        nextStepButtons.forEach(button => {
-            button.addEventListener('click', handleNextStep);
-        });
-        
-        const prevStepButtons = document.querySelectorAll('.cb-prev-step');
-        prevStepButtons.forEach(button => {
-            button.addEventListener('click', handlePrevStep);
-        });
-        
-        // Form inputs
-        const zipCodeInput = document.getElementById('cb-zip-code');
-        if (zipCodeInput) {
-            zipCodeInput.addEventListener('input', handleZipCodeChange);
-        }
-        
-        const squareMetersInput = document.getElementById('cb-square-meters');
-        if (squareMetersInput) {
-            squareMetersInput.addEventListener('input', handleSquareMetersChange);
-        }
-        
-        const bookingDateInput = document.getElementById('cb-booking-date');
-        if (bookingDateInput) {
-            bookingDateInput.addEventListener('change', handleDateChange);
-        }
-        
-        // Promocode
-        const applyPromocodeBtn = document.getElementById('cb-apply-promocode');
-        if (applyPromocodeBtn) {
-            applyPromocodeBtn.addEventListener('click', handlePromocodeApply);
-        }
-        
-        const promocodeInput = document.getElementById('cb-promocode');
-        if (promocodeInput) {
-            promocodeInput.addEventListener('keypress', function(e) {
-            if (e.which === 13) {
-                handlePromocodeApply();
-            }
-        });
-        }
-        
-        // Sidebar checkout button
-        const sidebarCheckout = document.getElementById('cb-sidebar-checkout');
-        if (sidebarCheckout) {
-            sidebarCheckout.addEventListener('click', proceedToCheckout);
-        }
-        
-        // Form submission
-        const bookingForm = document.getElementById('cb-booking-form');
-        if (bookingForm) {
-            bookingForm.addEventListener('submit', handleFormSubmit);
-        }
-        
-        // Service selection
-        document.addEventListener('click', function(e) {
-            if (e.target.closest('.cb-service-card')) {
-                handleServiceSelect(e);
-            }
-        });
-        
-        // Extra selection
-        document.addEventListener('click', function(e) {
-            if (e.target.closest('.cb-extra-item')) {
-                handleExtraSelect(e);
-            }
-        });
-        
-        // Extra space input changes (for per m² extras)
-        document.addEventListener('input', function(e) {
-            if (e.target.classList.contains('cb-extra-space-input')) {
-                handleExtraSpaceChange(e);
-            }
-        });
-        
-        // Time slot selection
-        document.addEventListener('click', function(e) {
-            if (e.target.closest('.cb-time-slot')) {
-                handleTimeSlotSelect(e);
-            }
-        });
-        
-        // Express cleaning checkbox
-        const expressCleaningCheckbox = document.getElementById('cb-express-cleaning');
-        if (expressCleaningCheckbox) {
-            expressCleaningCheckbox.addEventListener('change', handleExpressCleaningChange);
-        }
+    function setupEventListeners() {
+    // Language switching
+    const languageSelector = document.querySelector('.cb-language-selector');
+    if (languageSelector) {
+        languageSelector.addEventListener('change', handleLanguageSwitch);
     }
+
+    // Checkout button
+    const proceedCheckoutBtn = document.getElementById('cb-proceed-checkout');
+    if (proceedCheckoutBtn) {
+        proceedCheckoutBtn.addEventListener('click', proceedToCheckout);
+    }
+    
+    // Step navigation
+    const nextStepButtons = document.querySelectorAll('.cb-next-step');
+    nextStepButtons.forEach(button => {
+        button.addEventListener('click', handleNextStep);
+    });
+    
+    const prevStepButtons = document.querySelectorAll('.cb-prev-step');
+    prevStepButtons.forEach(button => {
+        button.addEventListener('click', handlePrevStep);
+    });
+    
+    // Form inputs
+    const zipCodeInput = document.getElementById('cb-zip-code');
+    if (zipCodeInput) {
+        zipCodeInput.addEventListener('input', handleZipCodeChange);
+    }
+    
+    const squareMetersInput = document.getElementById('cb-square-meters');
+    if (squareMetersInput) {
+        squareMetersInput.addEventListener('input', handleSquareMetersChange);
+    }
+    
+    const bookingDateInput = document.getElementById('cb-booking-date');
+    if (bookingDateInput) {
+        bookingDateInput.addEventListener('change', handleDateChange);
+    }
+    
+    // Square meters slider
+    const squareMetersSlider = document.getElementById('cb-square-meters-slider');
+    const sliderValueDisplay = document.getElementById('cb-slider-value-display');
+    
+    if (squareMetersSlider && squareMetersInput && sliderValueDisplay) {
+        // Update slider when input changes
+        squareMetersInput.addEventListener('input', function(e) {
+            const value = parseInt(e.target.value) || 0;
+            const clampedValue = Math.min(1000, Math.max(0, value));
+            
+            squareMetersSlider.value = clampedValue;
+            sliderValueDisplay.textContent = clampedValue + ' m²';
+            squareMetersInput.value = clampedValue;
+        });
+        
+        // Update input when slider changes
+        squareMetersSlider.addEventListener('input', function(e) {
+            const value = parseInt(e.target.value);
+            squareMetersInput.value = value;
+            sliderValueDisplay.textContent = value + ' m²';
+            
+            // Create and trigger input event on the number input
+            const inputEvent = new Event('input', { bubbles: true });
+            squareMetersInput.dispatchEvent(inputEvent);
+        });
+        
+        // Initialize slider display
+        sliderValueDisplay.textContent = squareMetersInput.value + ' m²';
+    }
+    
+    // Promocode
+    const applyPromocodeBtn = document.getElementById('cb-apply-promocode');
+    if (applyPromocodeBtn) {
+        applyPromocodeBtn.addEventListener('click', handlePromocodeApply);
+    }
+    
+    const promocodeInput = document.getElementById('cb-promocode');
+    if (promocodeInput) {
+        promocodeInput.addEventListener('keypress', function(e) {
+        if (e.which === 13) {
+            handlePromocodeApply();
+        }
+    });
+    }
+    
+    // Sidebar checkout button
+    const sidebarCheckout = document.getElementById('cb-sidebar-checkout');
+    if (sidebarCheckout) {
+        sidebarCheckout.addEventListener('click', proceedToCheckout);
+    }
+    
+    // Form submission
+    const bookingForm = document.getElementById('cb-booking-form');
+    if (bookingForm) {
+        bookingForm.addEventListener('submit', handleFormSubmit);
+    }
+    
+    // Service selection
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.cb-service-card')) {
+            handleServiceSelect(e);
+        }
+    });
+    
+    // Extra selection
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.cb-extra-item')) {
+            handleExtraSelect(e);
+        }
+    });
+    
+    // Extra space input changes (for per m² extras)
+    document.addEventListener('input', function(e) {
+        if (e.target.classList.contains('cb-extra-space-input')) {
+            handleExtraSpaceChange(e);
+        }
+    });
+    
+    // Time slot selection
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.cb-time-slot')) {
+            handleTimeSlotSelect(e);
+        }
+    });
+    
+    // Express cleaning checkbox
+    const expressCleaningCheckbox = document.getElementById('cb-express-cleaning');
+    if (expressCleaningCheckbox) {
+        expressCleaningCheckbox.addEventListener('change', handleExpressCleaningChange);
+    }
+}
     
     function handleNextStep(e) {
         const button = e.target;
@@ -547,16 +577,16 @@ document.addEventListener('DOMContentLoaded', function() {
         checkAndCalculatePrice(true);
     }
     
-    function handleSquareMetersChange(e) {
-        const squareMeters = parseInt(e.target.value, 10) || 0; // Use base 10 explicitly
-        bookingData.square_meters = squareMeters;
-        
-        // Calculate price if service is selected (debounced for typing)
-        checkAndCalculatePrice(false);
-        
-        // Update button states
-        updateButtonStates();
-    }
+   function handleSquareMetersChange(e) {
+    const squareMeters = parseInt(e.target.value, 10) || 0; // Use base 10 explicitly
+    bookingData.square_meters = squareMeters;
+    
+    // Calculate price if service is selected (debounced for typing)
+    checkAndCalculatePrice(false);
+    
+    // Update button states
+    updateButtonStates();
+}
     
     function handleExtraSpaceChange(e) {
         const extraId = parseInt(e.target.dataset.extraId, 10);
@@ -634,51 +664,61 @@ document.addEventListener('DOMContentLoaded', function() {
         updateSidebarDisplay();
     }
     
-    function handleServiceSelect(e) {
-        e.preventDefault();
-        
-        const clickedCard = e.target.closest('.cb-service-card');
-        
-        // Remove previous selection
-        const serviceCards = document.querySelectorAll('.cb-service-card');
-        serviceCards.forEach(card => card.classList.remove('selected'));
-        
-        // Add selection to clicked card
-        clickedCard.classList.add('selected');
-        
-        const newServiceId = clickedCard.dataset.serviceId;
-        
-        // If service changed, reset extras
-        if (bookingData.service_id != newServiceId) {
-            extras = []; // Clear cached extras
-            bookingData.extras = []; // Clear selected extras
-            bookingData.extra_spaces = {}; // Clear extra spaces
-        }
-        
-        bookingData.service_id = newServiceId;
-        
-        
-        
-        // Set square meters to 0 and update the input field
-        bookingData.square_meters = 0;
-        const squareMetersInput = document.getElementById('cb-square-meters');
-        if (squareMetersInput) {
-            squareMetersInput.value = '0';
-        }
-        
-        // Enable next button
-        const nextStepBtn = document.querySelector('.cb-step-2 .cb-next-step');
-        if (nextStepBtn) {
-            nextStepBtn.disabled = false;
-        }
-        
-        // Calculate price and load extras (immediate for service selection)
-        checkAndCalculatePrice(true);
-        loadExtras();
-        
-        // Update sidebar display
-        updateSidebarDisplay();
+  function handleServiceSelect(e) {
+    e.preventDefault();
+    
+    const clickedCard = e.target.closest('.cb-service-card');
+    
+    // Remove previous selection
+    const serviceCards = document.querySelectorAll('.cb-service-card');
+    serviceCards.forEach(card => card.classList.remove('selected'));
+    
+    // Add selection to clicked card
+    clickedCard.classList.add('selected');
+    
+    const newServiceId = clickedCard.dataset.serviceId;
+    
+    // If service changed, reset extras
+    if (bookingData.service_id != newServiceId) {
+        extras = []; // Clear cached extras
+        bookingData.extras = []; // Clear selected extras
+        bookingData.extra_spaces = {}; // Clear extra spaces
     }
+    
+    bookingData.service_id = newServiceId;
+    
+    // Set square meters to 0 and update the input field
+    bookingData.square_meters = 0;
+    const squareMetersInput = document.getElementById('cb-square-meters');
+    if (squareMetersInput) {
+        squareMetersInput.value = '0';
+    }
+    
+    // Enable next button
+    const nextStepBtn = document.querySelector('.cb-step-2 .cb-next-step');
+    if (nextStepBtn) {
+        nextStepBtn.disabled = false;
+    }
+    
+    // Calculate price and load extras (immediate for service selection)
+    checkAndCalculatePrice(true);
+    loadExtras();
+    
+    // Update sidebar display
+    updateSidebarDisplay();
+    
+    // AUTO-ADVANCE TO NEXT STEP AFTER A BRIEF DELAY
+    setTimeout(() => {
+        // Validate service selection first
+        if (validateServiceSelection()) {
+            currentStep++;
+            updateStepDisplay();
+            
+            // Show success notification
+            showNotification(cb_frontend.translations['Service selected successfully'] || 'Η υπηρεσία επιλέχθηκε με επιτυχία', 'success');
+        }
+    }, 800); // 800ms delay to give user visual feedback
+}
     
     function handleExtraSelect(e) {
         // Don't handle if clicking on space input or its container (including label)
@@ -1080,9 +1120,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Update placeholders
-        if (translations['Enter total space beyond the default area, or leave as 0 to skip']) {
+        if (translations['Enter total area in square meters']) {
             const spacePlaceholder = document.querySelector('#cb-square-meters + small');
-            if (spacePlaceholder) spacePlaceholder.textContent = translations['Enter total space beyond the default area, or leave as 0 to skip'];
+            if (spacePlaceholder) spacePlaceholder.textContent = translations['Enter total area in square meters'];
         }
         
         // Update Step 3 pricing labels
@@ -1844,7 +1884,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Show hint about total space
         if (hintElement) {
             hintElement.style.display = 'block';
-            const hintText = cb_frontend.translations['Enter total space beyond the default area, or leave as 0 to skip'] || 'Εισάγετε Σύνολο χώρο πέρα από την προεπιλεγμένη περιοχή, ή αφήστε 0 για παράλειψη';
+            const hintText = cb_frontend.translations['Enter total area in square meters'] || 'Εισάγετε Σύνολικό χώρο σε τετραγωνικά μέτρα';
             hintElement.innerHTML = `<small>${hintText.replace('default area', `default ${service.default_area} m²`)}</small>`;
         }
         

@@ -1067,7 +1067,7 @@ class CB_Database {
                 'field_type' => 'text',
                 'label_en' => 'ZIP Code',
                 'label_el' => '', // Empty - translations handled separately
-                'placeholder_en' => '12345',
+                'placeholder_en' => '10672',
                 'placeholder_el' => '', // Empty - translations handled separately
                 'is_required' => 1,
                 'is_visible' => 1,
