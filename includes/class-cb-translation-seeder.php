@@ -339,6 +339,13 @@ class CB_Translation_Seeder {
                 'category' => 'form_fields',
                 'context' => 'Form field label'
             ),
+            array(
+                'string_key' => 'Express Cleaning',
+                'text_en' => 'Express Cleaning',
+                'text_el' => 'Γρήγορος Καθαρισμός',
+                'category' => 'form_fields',
+                'context' => 'Express cleaning option'
+            ),
             
             // Buttons
             array(
@@ -612,9 +619,9 @@ class CB_Translation_Seeder {
             
             // Service Details
             array(
-                'string_key' => 'Enter additional space beyond the default area, or leave as 0 to skip',
-                'text_en' => 'Enter additional space beyond the default area, or leave as 0 to skip',
-                'text_el' => 'Εισάγετε επιπλέον χώρο πέρα από την προεπιλεγμένη περιοχή, ή αφήστε 0 για παράλειψη',
+                'string_key' => 'Enter total space beyond the default area, or leave as 0 to skip',
+                'text_en' => 'Enter total space beyond the default area, or leave as 0 to skip',
+                'text_el' => 'Εισάγετε Σύνολο χώρο πέρα από την προεπιλεγμένη περιοχή, ή αφήστε 0 για παράλειψη',
                 'category' => 'service_details',
                 'context' => 'Space input hint'
             ),

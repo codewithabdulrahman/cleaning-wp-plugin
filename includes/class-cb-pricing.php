@@ -168,16 +168,34 @@ class CB_Pricing {
         $breakdown['service_duration'] = $base_duration + ($square_meters * $sqm_duration_multiplier);
         
         // Calculate extras
-        if (!empty($extras)) {
-            foreach ($extras as $extra_id) {
+        $extras_data = isset($extras['extras']) && is_array($extras['extras']) ? $extras['extras'] : array();
+        $extra_spaces = isset($extras['extra_spaces']) && is_array($extras['extra_spaces']) ? $extras['extra_spaces'] : array();
+        
+        if (!empty($extras_data)) {
+            foreach ($extras_data as $extra_id) {
                 $extra = $wpdb->get_row($wpdb->prepare(
-                    "SELECT price, duration FROM {$wpdb->prefix}cb_service_extras WHERE id = %d AND is_active = 1",
+                    "SELECT price, duration, pricing_type, price_per_sqm, duration_per_sqm FROM {$wpdb->prefix}cb_extras WHERE id = %d AND is_active = 1",
                     $extra_id
                 ));
                 
                 if ($extra) {
-                    $breakdown['extras_price'] += floatval($extra->price);
-                    $breakdown['extras_duration'] += intval($extra->duration);
+                    // Check if this extra is charged per m²
+                    if ($extra->pricing_type === 'per_sqm' && !empty($extra->price_per_sqm)) {
+                        // Get the space for this extra (if provided)
+                        $extra_space = isset($extra_spaces[$extra_id]) ? floatval($extra_spaces[$extra_id]) : 0;
+                        $extra_price = floatval($extra->price_per_sqm) * $extra_space;
+                        $breakdown['extras_price'] += $extra_price;
+                        
+                        // Calculate duration based on space if duration_per_sqm is set
+                        if (!empty($extra->duration_per_sqm)) {
+                            $extra_duration = intval($extra->duration_per_sqm) * $extra_space;
+                            $breakdown['extras_duration'] += $extra_duration;
+                        }
+                    } else {
+                        // Fixed price and duration
+                        $breakdown['extras_price'] += floatval($extra->price);
+                        $breakdown['extras_duration'] += intval($extra->duration);
+                    }
                 }
             }
         }

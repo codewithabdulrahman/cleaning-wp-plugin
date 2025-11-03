@@ -55,8 +55,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const service = JSON.parse(editBtn.dataset.service);
             
             const serviceIdInput = document.getElementById('service-id');
-            const serviceNameInput = document.getElementById('service-name');
-            const serviceDescriptionInput = document.getElementById('service-description');
+            const serviceNameEnInput = document.getElementById('service-name-en');
+            const serviceNameElInput = document.getElementById('service-name-el');
+            const serviceDescriptionEnInput = document.getElementById('service-description-en');
+            const serviceDescriptionElInput = document.getElementById('service-description-el');
             const serviceBasePriceInput = document.getElementById('service-base-price');
             const serviceBaseDurationInput = document.getElementById('service-base-duration');
             const serviceSqmMultiplierInput = document.getElementById('service-sqm-multiplier');
@@ -70,8 +72,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const serviceIconUploadBtn = document.getElementById('service-icon-upload');
             
             if (serviceIdInput) serviceIdInput.value = service.id;
-            if (serviceNameInput) serviceNameInput.value = service.name;
-            if (serviceDescriptionInput) serviceDescriptionInput.value = service.description;
+            
+            // Populate English fields from service object
+            if (serviceNameEnInput) serviceNameEnInput.value = service.name || '';
+            if (serviceDescriptionEnInput) serviceDescriptionEnInput.value = service.description || '';
+            
+            // Populate Greek fields from service object (if available)
+            if (serviceNameElInput) serviceNameElInput.value = service.name_el || '';
+            if (serviceDescriptionElInput) serviceDescriptionElInput.value = service.description_el || '';
             if (serviceBasePriceInput) serviceBasePriceInput.value = service.base_price;
             if (serviceBaseDurationInput) serviceBaseDurationInput.value = service.base_duration;
             if (serviceSqmMultiplierInput) serviceSqmMultiplierInput.value = service.sqm_multiplier;
@@ -244,6 +252,111 @@ document.addEventListener('DOMContentLoaded', function() {
                 submitBtn.disabled = false;
         });
     });
+    }
+    
+    // ZIP Codes CSV import button handling
+    const importCsvBtn = document.getElementById('cb-import-csv-btn');
+    const zipCodeCsvForm = document.getElementById('cb-zip-code-csv-form');
+    
+    if (importCsvBtn && zipCodeCsvForm) {
+        importCsvBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Check if cb_admin is available
+            if (typeof cb_admin === 'undefined') {
+                console.error('cb_admin is not defined');
+                showNotice('JavaScript error: Admin configuration not loaded. Please refresh the page.', 'error');
+                return false;
+            }
+            
+            const fileInput = document.getElementById('zip-csv-file');
+            if (!fileInput || !fileInput.files || !fileInput.files[0]) {
+                showNotice('Please select a CSV file to upload', 'error');
+                return false;
+            }
+            
+            const statusSpan = document.getElementById('cb-csv-import-status');
+            const originalText = importCsvBtn.textContent;
+            
+            // Update UI
+            importCsvBtn.textContent = 'Importing...';
+            importCsvBtn.disabled = true;
+            if (statusSpan) {
+                statusSpan.textContent = '';
+            }
+            
+            // Create FormData manually to ensure proper file handling
+            const formData = new FormData();
+            formData.append('action', 'cb_import_zip_codes_csv');
+            formData.append('nonce', cb_admin.nonce);
+            formData.append('csv_file', fileInput.files[0]);
+            
+            console.log('Starting CSV import...');
+            
+            fetch(cb_admin.ajax_url, {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin'
+            })
+            .then(response => {
+                console.log('Response received:', response.status);
+                if (!response.ok) {
+                    throw new Error('Network response was not ok: ' + response.status);
+                }
+                return response.json();
+            })
+            .then(response => {
+                console.log('Response data:', response);
+                if (response.success) {
+                    showNotice(response.data.message, 'success');
+                    zipCodeCsvForm.reset();
+                    // Reload page after a short delay to show the new zip codes
+                    setTimeout(function() {
+                        loadZipCodes();
+                    }, 1000);
+                    if (statusSpan) {
+                        statusSpan.innerHTML = '<span style="color: green;">✓ Import completed</span>';
+                        setTimeout(() => {
+                            statusSpan.textContent = '';
+                        }, 5000);
+                    }
+                } else {
+                    showNotice(response.data.message || cb_admin.strings.error, 'error');
+                    if (statusSpan) {
+                        statusSpan.innerHTML = '<span style="color: red;">✗ Import failed</span>';
+                        setTimeout(() => {
+                            statusSpan.textContent = '';
+                        }, 5000);
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('CSV import error:', error);
+                showNotice('An error occurred during import: ' + error.message, 'error');
+                if (statusSpan) {
+                    statusSpan.innerHTML = '<span style="color: red;">✗ Import failed</span>';
+                    setTimeout(() => {
+                        statusSpan.textContent = '';
+                    }, 5000);
+                }
+            })
+            .finally(() => {
+                importCsvBtn.textContent = originalText;
+                importCsvBtn.disabled = false;
+            });
+            
+            return false;
+        });
+    }
+    
+    // Also prevent form submission if someone presses Enter
+    if (zipCodeCsvForm) {
+        zipCodeCsvForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        });
     }
     
     // Edit ZIP code
@@ -747,6 +860,54 @@ document.addEventListener('DOMContentLoaded', function() {
             const submitBtn = form.querySelector('input[type="submit"]');
             const originalText = submitBtn.value;
             
+            // Validate based on pricing type
+            const pricingType = document.getElementById('create-extra-pricing-type').value;
+            const nameEn = document.getElementById('create-extra-name-en').value.trim();
+            const nameEl = document.getElementById('create-extra-name-el').value.trim();
+            let isValid = true;
+            let errorMessage = '';
+            
+            // Validate names
+            if (!nameEn) {
+                errorMessage = 'Please enter the extra name in English';
+                isValid = false;
+            } else if (!nameEl) {
+                errorMessage = 'Please enter the extra name in Greek';
+                isValid = false;
+            }
+            
+            if (isValid) {
+                if (pricingType === 'fixed') {
+                    // Fixed pricing - validate fixed price and duration
+                    const price = parseFloat(document.getElementById('create-extra-price').value);
+                    const duration = parseInt(document.getElementById('create-extra-duration').value);
+                    if (isNaN(price) || price <= 0) {
+                        errorMessage = 'Please enter a valid fixed price greater than 0';
+                        isValid = false;
+                    } else if (isNaN(duration) || duration < 0) {
+                        errorMessage = 'Please enter a valid duration (minimum 0)';
+                        isValid = false;
+                    }
+                } else if (pricingType === 'per_sqm') {
+                    // Per sqm pricing - validate price per sqm and duration per sqm
+                    const pricePerSqm = parseFloat(document.getElementById('create-extra-price-per-sqm').value);
+                    const durationPerSqm = parseInt(document.getElementById('create-extra-duration-per-sqm').value);
+                    if (isNaN(pricePerSqm) || pricePerSqm <= 0) {
+                        errorMessage = 'Please enter a valid price per m² greater than 0';
+                        isValid = false;
+                    } else if (isNaN(durationPerSqm) || durationPerSqm < 0) {
+                        errorMessage = 'Please enter a valid duration per m² (minimum 0)';
+                        isValid = false;
+                    }
+                }
+            }
+            
+            if (!isValid) {
+                showNotice(errorMessage, 'error');
+                if (submitBtn) submitBtn.disabled = false;
+                return;
+            }
+            
             submitBtn.value = cb_admin.strings.saving;
             submitBtn.disabled = true;
             
@@ -794,19 +955,45 @@ document.addEventListener('DOMContentLoaded', function() {
             const editBtn = e.target.closest('.cb-edit-extra-inline');
             const extra = JSON.parse(editBtn.dataset.extra);
             
+            // Debug: Log the extra object
+            console.log('Editing extra:', extra);
+            console.log('Has name_el:', 'name_el' in extra, 'Value:', extra.name_el);
+            console.log('Has description_el:', 'description_el' in extra, 'Value:', extra.description_el);
+            
             const createExtraIdInput = document.getElementById('create-extra-id');
-            const createExtraNameInput = document.getElementById('create-extra-name');
-            const createExtraDescriptionInput = document.getElementById('create-extra-description');
+            const createExtraNameEnInput = document.getElementById('create-extra-name-en');
+            const createExtraNameElInput = document.getElementById('create-extra-name-el');
+            const createExtraDescriptionEnInput = document.getElementById('create-extra-description-en');
+            const createExtraDescriptionElInput = document.getElementById('create-extra-description-el');
             const createExtraPriceInput = document.getElementById('create-extra-price');
             const createExtraDurationInput = document.getElementById('create-extra-duration');
             const createExtraIsActiveInput = document.getElementById('create-extra-is-active');
+            const createExtraPricingTypeInput = document.getElementById('create-extra-pricing-type');
+            const createExtraPricePerSqmInput = document.getElementById('create-extra-price-per-sqm');
+            const createExtraDurationPerSqmInput = document.getElementById('create-extra-duration-per-sqm');
+            const createExtraPricePerSqmRow = document.getElementById('create-extra-price-per-sqm-row');
+            const createExtraPriceDesc = document.getElementById('create-extra-price-desc');
             
             if (createExtraIdInput) createExtraIdInput.value = extra.id;
-            if (createExtraNameInput) createExtraNameInput.value = extra.name;
-            if (createExtraDescriptionInput) createExtraDescriptionInput.value = extra.description;
+            if (createExtraNameEnInput) createExtraNameEnInput.value = extra.name || '';
+            if (createExtraNameElInput) createExtraNameElInput.value = extra.name_el || '';
+            if (createExtraDescriptionEnInput) createExtraDescriptionEnInput.value = extra.description || '';
+            if (createExtraDescriptionElInput) createExtraDescriptionElInput.value = extra.description_el || '';
             if (createExtraPriceInput) createExtraPriceInput.value = extra.price;
             if (createExtraDurationInput) createExtraDurationInput.value = extra.duration;
             if (createExtraIsActiveInput) createExtraIsActiveInput.checked = parseInt(extra.is_active) === 1;
+            
+            // Handle pricing type
+            if (createExtraPricingTypeInput) {
+                createExtraPricingTypeInput.value = extra.pricing_type || 'fixed';
+                togglePricingTypeFields(createExtraPricingTypeInput.value);
+            }
+            if (createExtraPricePerSqmInput) {
+                createExtraPricePerSqmInput.value = extra.price_per_sqm || '';
+            }
+            if (createExtraDurationPerSqmInput) {
+                createExtraDurationPerSqmInput.value = extra.duration_per_sqm || '';
+            }
             
             const showCreateFormBtn = document.getElementById('cb-show-create-form');
             if (showCreateFormBtn) showCreateFormBtn.style.display = 'none';
@@ -889,6 +1076,38 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    function togglePricingTypeFields(pricingType) {
+        const pricePerSqmRow = document.getElementById('create-extra-price-per-sqm-row');
+        const durationPerSqmRow = document.getElementById('create-extra-duration-per-sqm-row');
+        const priceRow = document.getElementById('create-extra-price-row');
+        const durationRow = document.getElementById('create-extra-duration-row');
+        const priceDesc = document.getElementById('create-extra-price-desc');
+        
+        if (pricingType === 'per_sqm') {
+            // Show price and duration per sqm fields, hide fixed price/duration
+            if (pricePerSqmRow) pricePerSqmRow.style.display = '';
+            if (durationPerSqmRow) durationPerSqmRow.style.display = '';
+            if (priceRow) priceRow.style.display = 'none';
+            if (durationRow) durationRow.style.display = 'none';
+            if (priceDesc) priceDesc.textContent = 'Price per square meter in Euro (leave 0 if not used)';
+        } else {
+            // Show fixed price/duration, hide per sqm fields
+            if (pricePerSqmRow) pricePerSqmRow.style.display = 'none';
+            if (durationPerSqmRow) durationPerSqmRow.style.display = 'none';
+            if (priceRow) priceRow.style.display = '';
+            if (durationRow) durationRow.style.display = '';
+            if (priceDesc) priceDesc.textContent = 'Fixed price in Euro';
+        }
+    }
+    
+    // Handle pricing type dropdown change
+    const pricingTypeSelect = document.getElementById('create-extra-pricing-type');
+    if (pricingTypeSelect) {
+        pricingTypeSelect.addEventListener('change', function(e) {
+            togglePricingTypeFields(e.target.value);
+        });
+    }
+    
     function displayServiceExtras(extras) {
         const tbody = document.getElementById('service-extras-tbody');
         if (!tbody) return;
@@ -896,18 +1115,45 @@ document.addEventListener('DOMContentLoaded', function() {
         tbody.innerHTML = '';
         
         if (extras.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center">No extras assigned to this service</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No extras assigned to this service</td></tr>';
             return;
         }
         
         extras.forEach(function(extra) {
+            const pricingType = extra.pricing_type || 'fixed';
+            const isPerSqm = pricingType === 'per_sqm';
+            
+            // Determine price display
+            let priceDisplay;
+            if (isPerSqm) {
+                const pricePerSqm = extra.price_per_sqm || 0;
+                priceDisplay = '€' + parseFloat(pricePerSqm).toFixed(2) + ' /m²';
+            } else {
+                priceDisplay = '€' + parseFloat(extra.price).toFixed(2);
+            }
+            
+            // Determine duration display
+            let durationDisplay;
+            if (isPerSqm) {
+                const durationPerSqm = extra.duration_per_sqm || 0;
+                durationDisplay = durationPerSqm + ' min/m²';
+            } else {
+                durationDisplay = extra.duration + ' min';
+            }
+            
+            // Determine pricing type badge
+            const pricingTypeBadge = isPerSqm ? 
+                '<span style="background: #2271b1; color: white; padding: 2px 8px; border-radius: 3px; font-size: 11px;">Per SQM</span>' :
+                '<span style="background: #00a32a; color: white; padding: 2px 8px; border-radius: 3px; font-size: 11px;">Fixed</span>';
+            
             const row = document.createElement('tr');
             row.dataset.extraId = extra.id;
             row.innerHTML = 
                 '<td><strong>' + extra.name + '</strong>' +
                 (extra.description ? '<br><small>' + extra.description + '</small>' : '') + '</td>' +
-                '<td>p€' + parseFloat(extra.price).toFixed(2) + '</td>' +
-                '<td>' + extra.duration + ' min</td>' +
+                '<td>' + pricingTypeBadge + '</td>' +
+                '<td>' + priceDisplay + '</td>' +
+                '<td>' + durationDisplay + '</td>' +
                 '<td>' +
                     '<label style="display: inline-flex; align-items: center;">' +
                         '<input type="checkbox" class="cb-toggle-extra-status" data-extra-id="' + extra.id + '" ' + (parseInt(extra.is_active) === 1 ? 'checked' : '') + ' style="margin-right: 5px;">' +
@@ -1082,6 +1328,94 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // View Extras Modal
+    const extrasModal = document.getElementById('cb-extras-modal');
+    const extrasModalContent = document.getElementById('cb-extras-modal-content');
+    
+    function displayExtrasModal(extras) {
+        if (!extras || extras.length === 0) {
+            extrasModalContent.innerHTML = '<div class="cb-extras-empty">No extras found for this booking.</div>';
+            extrasModal.style.display = 'block';
+            return;
+        }
+        
+        let html = '<div class="cb-extras-grid-view">';
+        
+        extras.forEach(function(extra) {
+            const isPerSqm = extra.pricing_type === 'per_sqm';
+            const pricingTypeBadge = isPerSqm ? 
+                '<span class="cb-extra-pricing-type">Per SQM</span>' : 
+                '<span class="cb-extra-pricing-type">Fixed</span>';
+            
+            let priceDisplay = '€0.00';
+            let areaDisplay = '';
+            
+            if (isPerSqm) {
+                if (extra.area && extra.area > 0) {
+                    // Show calculated price and area
+                    priceDisplay = '€' + parseFloat(extra.price || 0).toFixed(2);
+                    areaDisplay = '<div class="cb-extra-area" style="margin-top: 8px; font-size: 12px; color: #666;">Area: <strong>' + parseFloat(extra.area).toFixed(2) + ' m²</strong></div>';
+                } else if (extra.price_per_sqm) {
+                    // Show per m² rate if area not available
+                    priceDisplay = '€' + parseFloat(extra.price_per_sqm).toFixed(2) + ' /m²';
+                }
+            } else if (extra.price) {
+                priceDisplay = '€' + parseFloat(extra.price).toFixed(2);
+            }
+            
+            html += '<div class="cb-extra-item-view selected">';
+            html += pricingTypeBadge;
+            html += '<div class="cb-extra-name">' + (extra.name || 'Unknown Extra') + '</div>';
+            if (extra.description) {
+                html += '<div class="cb-extra-description">' + extra.description + '</div>';
+            }
+            html += '<div class="cb-extra-price">' + priceDisplay + '</div>';
+            if (areaDisplay) {
+                html += areaDisplay;
+            }
+            html += '</div>';
+        });
+        
+        html += '</div>';
+        extrasModalContent.innerHTML = html;
+        extrasModal.style.display = 'block';
+    }
+    
+    // Close modal handlers
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('cb-modal-close') || e.target.closest('.cb-modal-close')) {
+            if (extrasModal) {
+                extrasModal.style.display = 'none';
+            }
+        }
+    });
+    
+    // Close modal on outside click
+    if (extrasModal) {
+        extrasModal.addEventListener('click', function(e) {
+            if (e.target === extrasModal) {
+                extrasModal.style.display = 'none';
+            }
+        });
+    }
+    
+    // View extras button handler
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.cb-view-extras')) {
+            const viewExtrasBtn = e.target.closest('.cb-view-extras');
+            const extrasJson = viewExtrasBtn.dataset.extras;
+            
+            try {
+                const extras = JSON.parse(extrasJson);
+                displayExtrasModal(extras);
+            } catch (error) {
+                console.error('Error parsing extras:', error);
+                extrasModalContent.innerHTML = '<div class="cb-extras-empty">Error loading extras.</div>';
+                extrasModal.style.display = 'block';
+            }
+        }
+    });
+    
     // Delete booking
     document.addEventListener('click', function(e) {
         if (e.target.closest('.cb-delete-booking')) {
@@ -1197,6 +1531,38 @@ function initializeSearchFunctionality() {
         servicesSearch.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 searchServices(this.value);
+            }
+        });
+    }
+    
+    // Extras search
+    const extrasSearch = document.getElementById('cb-extras-search');
+    const searchExtrasBtn = document.getElementById('cb-search-extras');
+    const clearExtrasSearch = document.getElementById('cb-clear-extras-search');
+    
+    if (extrasSearch && clearExtrasSearch) {
+        // Real-time search as you type
+        extrasSearch.addEventListener('input', function() {
+            searchExtras(this.value);
+        });
+        
+        // Search button
+        if (searchExtrasBtn) {
+            searchExtrasBtn.addEventListener('click', function() {
+                searchExtras(extrasSearch.value);
+            });
+        }
+        
+        // Clear button
+        clearExtrasSearch.addEventListener('click', function() {
+            extrasSearch.value = '';
+            searchExtras('');
+        });
+        
+        // Enter key to search
+        extrasSearch.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchExtras(this.value);
             }
         });
     }
@@ -1323,6 +1689,27 @@ function updateColorPreview() {
 
 function searchServices(searchTerm) {
     const table = document.querySelector('#cb-services-list table');
+    if (!table) return;
+    
+    const rows = table.querySelectorAll('tbody tr');
+    const searchLower = searchTerm.toLowerCase();
+    
+    rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        let found = false;
+        
+        cells.forEach(cell => {
+            if (cell.textContent.toLowerCase().includes(searchLower)) {
+                found = true;
+            }
+        });
+        
+        row.style.display = found ? '' : 'none';
+    });
+}
+
+function searchExtras(searchTerm) {
+    const table = document.querySelector('#cb-service-extras-list table');
     if (!table) return;
     
     const rows = table.querySelectorAll('tbody tr');

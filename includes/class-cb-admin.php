@@ -19,8 +19,12 @@ class CB_Admin {
         add_action('wp_ajax_cb_get_service_extras', array($this, 'ajax_get_service_extras'));
         add_action('wp_ajax_cb_remove_service_extra', array($this, 'ajax_remove_service_extra'));
         add_action('wp_ajax_cb_update_extra_status', array($this, 'ajax_update_extra_status'));
+        add_action('wp_ajax_cb_save_global_extra', array($this, 'ajax_save_global_extra'));
+        add_action('wp_ajax_cb_assign_existing_extra', array($this, 'ajax_assign_existing_extra'));
+        add_action('wp_ajax_cb_get_extras_with_services', array($this, 'ajax_get_extras_with_services'));
         add_action('wp_ajax_cb_save_zip_code', array($this, 'ajax_save_zip_code'));
         add_action('wp_ajax_cb_delete_zip_code', array($this, 'ajax_delete_zip_code'));
+        add_action('wp_ajax_cb_import_zip_codes_csv', array($this, 'ajax_import_zip_codes_csv'));
         add_action('wp_ajax_cb_update_booking_status', array($this, 'ajax_update_booking_status'));
         add_action('wp_ajax_cb_get_booking_details', array($this, 'ajax_get_booking_details'));
         add_action('wp_ajax_cb_update_booking', array($this, 'ajax_update_booking'));
@@ -39,6 +43,7 @@ class CB_Admin {
         add_action('wp_ajax_cb_bulk_delete_translations', array($this, 'ajax_bulk_delete_translations'));
         add_action('wp_ajax_cb_seed_translations', array($this, 'ajax_seed_translations'));
         add_action('wp_ajax_cb_clear_translation_cache', array($this, 'ajax_clear_translation_cache'));
+        add_action('wp_ajax_cb_get_translations', array($this, 'ajax_get_translations'));
         // Import/Export removed per product decision
         
         // Style Settings AJAX handlers
@@ -83,6 +88,15 @@ class CB_Admin {
             'manage_options',
             'cb-services',
             array($this, 'services_page')
+        );
+        
+        add_submenu_page(
+            'cleaning-booking',
+            __('Extras', 'cleaning-booking'),
+            __('Extras', 'cleaning-booking'),
+            'manage_options',
+            'cb-extras',
+            array($this, 'extras_page')
         );
         
         add_submenu_page(
@@ -179,18 +193,62 @@ class CB_Admin {
             echo '<div class="notice notice-success"><p>' . __('Booking status updated!', 'cleaning-booking') . '</p></div>';
         }
         
-        // Get bookings with their services
+        // Get bookings with service name from service_id
         $bookings = $wpdb->get_results("
-            SELECT b.*, 
-                   GROUP_CONCAT(s.name SEPARATOR ', ') as service_names,
-                   GROUP_CONCAT(bs.quantity SEPARATOR ', ') as service_quantities
+            SELECT b.*, s.name as service_name
             FROM $bookings_table b 
-            LEFT JOIN $booking_services_table bs ON b.id = bs.booking_id 
-            LEFT JOIN $services_table s ON bs.service_id = s.id 
-            GROUP BY b.id
+            LEFT JOIN $services_table s ON b.service_id = s.id 
             ORDER BY b.created_at DESC 
             LIMIT 50
         ");
+        
+        // Get extras for each booking separately to avoid query complexity
+        $booking_extras_table = $wpdb->prefix . 'cb_booking_extras';
+        $extras_table = $wpdb->prefix . 'cb_extras';
+        
+        foreach ($bookings as $booking) {
+            $booking->extras_data = array();
+            
+            // Fetch service name if not already loaded
+            if (empty($booking->service_name) && !empty($booking->service_id)) {
+                $service = $wpdb->get_row($wpdb->prepare(
+                    "SELECT name FROM $services_table WHERE id = %d",
+                    $booking->service_id
+                ));
+                $booking->service_name = $service ? $service->name : __('Unknown Service', 'cleaning-booking');
+            }
+            
+            $booking_extras = $wpdb->get_results($wpdb->prepare(
+                "SELECT be.*, e.name, e.description, e.pricing_type, e.price_per_sqm
+                 FROM $booking_extras_table be
+                 INNER JOIN $extras_table e ON be.extra_id = e.id
+                 WHERE be.booking_id = %d",
+                $booking->id
+            ));
+            
+            if ($booking_extras) {
+                foreach ($booking_extras as $be) {
+                    $is_per_sqm = ($be->pricing_type === 'per_sqm');
+                    $area = null;
+                    
+                    // Calculate area for per_sqm extras from price
+                    if ($is_per_sqm && !empty($be->price_per_sqm) && $be->price_per_sqm > 0) {
+                        $area = $be->price / $be->price_per_sqm;
+                        $area = round($area, 2);
+                    }
+                    
+                    $booking->extras_data[] = array(
+                        'id' => $be->extra_id,
+                        'name' => $be->name,
+                        'description' => $be->description,
+                        'price' => $be->price,
+                        'pricing_type' => $be->pricing_type,
+                        'price_per_sqm' => $be->price_per_sqm,
+                        'area' => $area
+                    );
+                }
+            }
+        }
         
         include CB_PLUGIN_DIR . 'templates/admin/bookings.php';
     }
@@ -198,6 +256,12 @@ class CB_Admin {
     public function services_page() {
         $services = CB_Database::get_services(false);
         include CB_PLUGIN_DIR . 'templates/admin/services.php';
+    }
+    
+    public function extras_page() {
+        $services = CB_Database::get_services(false);
+        $extras = CB_Database::get_all_extras(false);
+        include CB_PLUGIN_DIR . 'templates/admin/extras.php';
     }
     
     
@@ -306,9 +370,18 @@ class CB_Admin {
         // Debug: Log all POST data
         error_log('Admin save service POST data: ' . print_r($_POST, true));
         
+        // Get bilingual fields
+        $name_en = sanitize_text_field($_POST['name_en']);
+        $name_el = sanitize_text_field($_POST['name_el']);
+        $description_en = sanitize_textarea_field($_POST['description_en']);
+        $description_el = sanitize_textarea_field($_POST['description_el']);
+        
+        // Save both English and Greek in database
         $data = array(
-            'name' => sanitize_text_field($_POST['name']),
-            'description' => sanitize_textarea_field($_POST['description']),
+            'name' => $name_en,
+            'description' => $description_en,
+            'name_el' => $name_el,
+            'description_el' => $description_el,
             'base_price' => floatval($_POST['base_price']),
             'base_duration' => intval($_POST['base_duration']),
             'sqm_multiplier' => floatval($_POST['sqm_multiplier']),
@@ -322,55 +395,27 @@ class CB_Admin {
         // Debug: Log the data being saved
         error_log('Admin save service data array: ' . print_r($data, true));
         
-        if (isset($_POST['id']) && !empty($_POST['id'])) {
+        $service_id = isset($_POST['id']) && !empty($_POST['id']) ? intval($_POST['id']) : null;
+        
+        if ($service_id) {
             // Update existing
-            $result = $wpdb->update($table, $data, array('id' => intval($_POST['id'])));
+            $result = $wpdb->update($table, $data, array('id' => $service_id));
             error_log('Database update result: ' . ($result ? 'SUCCESS' : 'FAILED'));
             if ($wpdb->last_error) {
                 error_log('Database error: ' . $wpdb->last_error);
             }
             $message = $result ? __('Service updated successfully!', 'cleaning-booking') : __('Error updating service', 'cleaning-booking');
-            // Persist translations for service name/description (default both languages to provided values)
-            $service_id = intval($_POST['id']);
-            if ($service_id) {
-                CB_Translations::save_translation(array(
-                    'string_key' => 'service_name_' . $service_id,
-                    'category' => 'services',
-                    'text_en' => $data['name'],
-                    'text_el' => $data['name'],
-                    'context' => 'Service name'
-                ));
-                CB_Translations::save_translation(array(
-                    'string_key' => 'service_desc_' . $service_id,
-                    'category' => 'services',
-                    'text_en' => $data['description'],
-                    'text_el' => $data['description'],
-                    'context' => 'Service description'
-                ));
-            }
         } else {
             // Insert new
             $result = $wpdb->insert($table, $data);
             $message = $result ? __('Service created successfully!', 'cleaning-booking') : __('Error creating service', 'cleaning-booking');
             if ($result) {
                 $service_id = intval($wpdb->insert_id);
-                // Initialize translations so admin can edit them later
-                CB_Translations::save_translation(array(
-                    'string_key' => 'service_name_' . $service_id,
-                    'category' => 'services',
-                    'text_en' => $data['name'],
-                    'text_el' => $data['name'],
-                    'context' => 'Service name'
-                ));
-                CB_Translations::save_translation(array(
-                    'string_key' => 'service_desc_' . $service_id,
-                    'category' => 'services',
-                    'text_en' => $data['description'],
-                    'text_el' => $data['description'],
-                    'context' => 'Service description'
-                ));
             }
         }
+        
+        // Data is already saved with both English and Greek in the database columns
+        // No need to save to translations table anymore
         
         wp_send_json_success(array('message' => $message));
     }
@@ -402,57 +447,45 @@ class CB_Admin {
         
         $service_id = intval($_POST['service_id']); // This should be passed from frontend
         
+        // Get bilingual fields
+        $name_en = sanitize_text_field($_POST['name_en']);
+        $name_el = sanitize_text_field($_POST['name_el']);
+        $description_en = sanitize_textarea_field($_POST['description_en']);
+        $description_el = sanitize_textarea_field($_POST['description_el']);
+        
+        // Save both English and Greek in database
         $extra_data = array(
-            'name' => sanitize_text_field($_POST['name']),
-            'description' => sanitize_textarea_field($_POST['description']),
+            'name' => $name_en,
+            'description' => $description_en,
+            'name_el' => $name_el,
+            'description_el' => $description_el,
             'price' => floatval($_POST['price']),
             'duration' => intval($_POST['duration']),
             'is_active' => isset($_POST['is_active']) ? 1 : 0,
-            'sort_order' => intval($_POST['sort_order'])
+            'sort_order' => intval($_POST['sort_order']),
+            'pricing_type' => isset($_POST['pricing_type']) ? sanitize_text_field($_POST['pricing_type']) : 'fixed',
+            'price_per_sqm' => isset($_POST['price_per_sqm']) && !empty($_POST['price_per_sqm']) ? floatval($_POST['price_per_sqm']) : null,
+            'duration_per_sqm' => isset($_POST['duration_per_sqm']) && !empty($_POST['duration_per_sqm']) ? intval($_POST['duration_per_sqm']) : null
         );
         
-        if (isset($_POST['id']) && !empty($_POST['id'])) {
-            $result = CB_Database::update_service_extra($service_id, intval($_POST['id']), $extra_data);
+        $extra_id = isset($_POST['id']) && !empty($_POST['id']) ? intval($_POST['id']) : null;
+        
+        if ($extra_id) {
+            // Update existing
+            $result = CB_Database::update_service_extra($service_id, $extra_id, $extra_data);
             $message = $result ? __('Extra updated successfully!', 'cleaning-booking') : __('Error updating extra', 'cleaning-booking');
-            $extra_id = intval($_POST['id']);
-            if ($extra_id) {
-                // Persist translations for extra name/description (defaults to provided value in both langs)
-                CB_Translations::save_translation(array(
-                    'string_key' => 'extra_name_' . $extra_id,
-                    'category' => 'extras',
-                    'text_en' => $extra_data['name'],
-                    'text_el' => $extra_data['name'],
-                    'context' => 'Extra name (service ' . $service_id . ')'
-                ));
-                CB_Translations::save_translation(array(
-                    'string_key' => 'extra_desc_' . $extra_id,
-                    'category' => 'extras',
-                    'text_en' => $extra_data['description'],
-                    'text_el' => $extra_data['description'],
-                    'context' => 'Extra description (service ' . $service_id . ')'
-                ));
-            }
         } else {
+            // Insert new
             $result = CB_Database::add_service_extra($service_id, $extra_data);
             $message = $result ? __('Extra created successfully!', 'cleaning-booking') : __('Error creating extra', 'cleaning-booking');
             if ($result) {
+                global $wpdb;
                 $extra_id = intval($wpdb->insert_id);
-                CB_Translations::save_translation(array(
-                    'string_key' => 'extra_name_' . $extra_id,
-                    'category' => 'extras',
-                    'text_en' => $extra_data['name'],
-                    'text_el' => $extra_data['name'],
-                    'context' => 'Extra name (service ' . $service_id . ')'
-                ));
-                CB_Translations::save_translation(array(
-                    'string_key' => 'extra_desc_' . $extra_id,
-                    'category' => 'extras',
-                    'text_en' => $extra_data['description'],
-                    'text_el' => $extra_data['description'],
-                    'context' => 'Extra description (service ' . $service_id . ')'
-                ));
             }
         }
+        
+        // Data is already saved with both English and Greek in the database columns
+        // No need to save to translations table anymore
         
         wp_send_json_success(array('message' => $message));
     }
@@ -523,6 +556,143 @@ class CB_Admin {
         }
     }
     
+    public function ajax_import_zip_codes_csv() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Insufficient permissions', 'cleaning-booking')));
+        }
+        
+        // Check if file was uploaded
+        if (!isset($_FILES['csv_file']) || $_FILES['csv_file']['error'] !== UPLOAD_ERR_OK) {
+            wp_send_json_error(array('message' => __('No file uploaded or upload error occurred', 'cleaning-booking')));
+        }
+        
+        // Validate file type
+        $file_info = wp_check_filetype($_FILES['csv_file']['name']);
+        if ($file_info['ext'] !== 'csv') {
+            wp_send_json_error(array('message' => __('Invalid file type. Please upload a CSV file.', 'cleaning-booking')));
+        }
+        
+        $file_path = $_FILES['csv_file']['tmp_name'];
+        
+        if (!file_exists($file_path) || !is_readable($file_path)) {
+            wp_send_json_error(array('message' => __('Cannot read uploaded file', 'cleaning-booking')));
+        }
+        
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_zip_codes';
+        
+        $imported = 0;
+        $skipped = 0;
+        $errors = array();
+        
+        // Open and read CSV file
+        if (($handle = fopen($file_path, 'r')) !== false) {
+            // Read header row
+            $header = fgetcsv($handle);
+            
+            // Validate header
+            if (!$header || count($header) < 2) {
+                fclose($handle);
+                wp_send_json_error(array('message' => __('Invalid CSV format. Expected columns: postal_code,area', 'cleaning-booking')));
+            }
+            
+            // Find column indices (case-insensitive)
+            $postal_code_idx = -1;
+            $area_idx = -1;
+            
+            foreach ($header as $idx => $col) {
+                $col_lower = strtolower(trim($col));
+                if ($col_lower === 'postal_code' && $postal_code_idx === -1) {
+                    $postal_code_idx = $idx;
+                } elseif ($col_lower === 'area' && $area_idx === -1) {
+                    $area_idx = $idx;
+                }
+            }
+            
+            if ($postal_code_idx === -1 || $area_idx === -1) {
+                fclose($handle);
+                wp_send_json_error(array('message' => __('CSV must contain columns: postal_code,area', 'cleaning-booking')));
+            }
+            
+            // Process data rows
+            $line_number = 1;
+            while (($data = fgetcsv($handle)) !== false) {
+                $line_number++;
+                
+                // Skip empty rows
+                if (empty($data) || (count($data) === 1 && trim($data[0]) === '')) {
+                    continue;
+                }
+                
+                // Get values
+                $postal_code = isset($data[$postal_code_idx]) ? trim($data[$postal_code_idx]) : '';
+                $area = isset($data[$area_idx]) ? trim($data[$area_idx]) : '';
+                
+                // Skip if postal_code is empty
+                if (empty($postal_code)) {
+                    $skipped++;
+                    continue;
+                }
+                
+                // Check if ZIP code already exists
+                $exists = $wpdb->get_var($wpdb->prepare(
+                    "SELECT COUNT(*) FROM $table WHERE zip_code = %s",
+                    $postal_code
+                ));
+                
+                if ($exists > 0) {
+                    $skipped++;
+                    continue;
+                }
+                
+                // Insert new ZIP code with defaults
+                $result = $wpdb->insert(
+                    $table,
+                    array(
+                        'zip_code' => sanitize_text_field($postal_code),
+                        'city' => sanitize_text_field($area),
+                        'surcharge' => 0.00,
+                        'is_active' => 1
+                    ),
+                    array('%s', '%s', '%f', '%d')
+                );
+                
+                if ($result) {
+                    $imported++;
+                } else {
+                    $errors[] = sprintf(__('Line %d: Failed to import ZIP code %s', 'cleaning-booking'), $line_number, $postal_code);
+                }
+            }
+            
+            fclose($handle);
+        } else {
+            wp_send_json_error(array('message' => __('Cannot open CSV file for reading', 'cleaning-booking')));
+        }
+        
+        // Build response message
+        $message = sprintf(
+            __('Import completed: %d imported, %d skipped', 'cleaning-booking'),
+            $imported,
+            $skipped
+        );
+        
+        if (!empty($errors)) {
+            $message .= '. ' . __('Errors:', 'cleaning-booking') . ' ' . implode(', ', array_slice($errors, 0, 5));
+            if (count($errors) > 5) {
+                $message .= sprintf(__(' and %d more', 'cleaning-booking'), count($errors) - 5);
+            }
+        }
+        
+        wp_send_json_success(array(
+            'message' => $message,
+            'imported' => $imported,
+            'skipped' => $skipped,
+            'errors' => count($errors)
+        ));
+    }
+    
     public function ajax_update_booking_status() {
         check_ajax_referer('cb_admin_nonce', 'nonce');
         
@@ -568,7 +738,7 @@ class CB_Admin {
         }
         
         global $wpdb;
-        $table = $wpdb->prefix . 'cb_service_extras';
+        $table = $wpdb->prefix . 'cb_extras';
         
         $extra_id = intval($_POST['extra_id']);
         $is_active = intval($_POST['is_active']);
@@ -586,6 +756,75 @@ class CB_Admin {
         } else {
             wp_send_json_error(array('message' => __('Error updating extra status', 'cleaning-booking')));
         }
+    }
+
+    public function ajax_save_global_extra() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Insufficient permissions', 'cleaning-booking'));
+        }
+        $extra_data = array(
+            'name' => sanitize_text_field($_POST['name_en']),
+            'description' => sanitize_textarea_field($_POST['description_en']),
+            'name_el' => sanitize_text_field($_POST['name_el']),
+            'description_el' => sanitize_textarea_field($_POST['description_el']),
+            'price' => floatval($_POST['price']),
+            'duration' => intval($_POST['duration']),
+            'is_active' => isset($_POST['is_active']) ? 1 : 0,
+            'sort_order' => isset($_POST['sort_order']) ? intval($_POST['sort_order']) : 0,
+            'pricing_type' => isset($_POST['pricing_type']) ? sanitize_text_field($_POST['pricing_type']) : 'fixed',
+            'price_per_sqm' => isset($_POST['price_per_sqm']) && $_POST['price_per_sqm'] !== '' ? floatval($_POST['price_per_sqm']) : null,
+            'duration_per_sqm' => isset($_POST['duration_per_sqm']) && $_POST['duration_per_sqm'] !== '' ? intval($_POST['duration_per_sqm']) : null
+        );
+        $service_ids = isset($_POST['service_ids']) ? (array)$_POST['service_ids'] : array();
+        $extra_id = isset($_POST['id']) ? intval($_POST['id']) : 0;
+        if ($extra_id > 0) {
+            // update
+            $updated = CB_Database::update_service_extra(0, $extra_id, $extra_data);
+            if ($updated !== false) {
+                CB_Database::set_extra_services($extra_id, $service_ids);
+                wp_send_json_success(array('message' => __('Extra updated successfully!', 'cleaning-booking'), 'extra_id' => $extra_id));
+            } else {
+                wp_send_json_error(array('message' => __('Error updating extra', 'cleaning-booking')));
+            }
+        } else {
+            // create
+            $extra_id = CB_Database::create_extra($extra_data);
+            if ($extra_id) {
+                CB_Database::map_extra_to_services($extra_id, $service_ids);
+                wp_send_json_success(array('message' => __('Extra created and assigned successfully!', 'cleaning-booking'), 'extra_id' => $extra_id));
+            } else {
+                wp_send_json_error(array('message' => __('Error creating extra', 'cleaning-booking')));
+            }
+        }
+    }
+
+    public function ajax_assign_existing_extra() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Insufficient permissions', 'cleaning-booking'));
+        }
+        $extra_id = intval($_POST['extra_id']);
+        $service_ids = isset($_POST['service_ids']) ? (array)$_POST['service_ids'] : array();
+        CB_Database::map_extra_to_services($extra_id, $service_ids);
+        wp_send_json_success(array('message' => __('Extra assigned to services successfully!', 'cleaning-booking')));
+    }
+
+    public function ajax_get_extras_with_services() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Insufficient permissions', 'cleaning-booking'));
+        }
+        $extras = CB_Database::get_all_extras(false);
+        $response = array();
+        foreach ($extras as $extra) {
+            $services = CB_Database::get_extra_services($extra->id);
+            $response[] = array(
+                'extra' => $extra,
+                'services' => array_map(function($s){ return array('id' => $s->id, 'name' => $s->name); }, $services)
+            );
+        }
+        wp_send_json_success($response);
     }
     
     public function ajax_remove_service_extra() {
@@ -1174,6 +1413,45 @@ class CB_Admin {
         } catch (Exception $e) {
             wp_send_json_error(array('message' => $e->getMessage()));
         }
+    }
+    
+    /**
+     * AJAX handler for getting translations for a service
+     */
+    public function ajax_get_translations() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Insufficient permissions', 'cleaning-booking')));
+        }
+        
+        $service_id = isset($_POST['service_id']) ? intval($_POST['service_id']) : 0;
+        
+        if (!$service_id) {
+            wp_send_json_error(array('message' => __('Service ID is required', 'cleaning-booking')));
+        }
+        
+        // Get translations for this service
+        $translations = array();
+        
+        $name_translation = CB_Translations::get_translation_by_key('service_name_' . $service_id);
+        $desc_translation = CB_Translations::get_translation_by_key('service_desc_' . $service_id);
+        
+        if ($name_translation) {
+            $translations['service_name_' . $service_id] = array(
+                'en' => $name_translation->text_en,
+                'el' => $name_translation->text_el
+            );
+        }
+        
+        if ($desc_translation) {
+            $translations['service_desc_' . $service_id] = array(
+                'en' => $desc_translation->text_en,
+                'el' => $desc_translation->text_el
+            );
+        }
+        
+        wp_send_json_success(array('data' => $translations));
     }
     
     /**

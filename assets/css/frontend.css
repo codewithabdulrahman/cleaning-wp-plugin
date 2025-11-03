@@ -52,6 +52,7 @@
 .cb-widget .cb-btn-secondary {
     background-color: transparent !important;
     border-color: var(--cb-primary-color) !important;
+    color: var(--cb-primary-color) !important;
 }
 
 .elementor-kit-88 .cb-widget .cb-btn-secondary:hover,
@@ -59,6 +60,7 @@
 .cb-widget .cb-btn-secondary:hover {
     background-color: var(--cb-primary-color) !important;
     border-color: var(--cb-primary-color) !important;
+    color: var(--cb-background-color) !important;
 }
 
 .cb-container {
@@ -102,6 +104,8 @@
     display: flex;
     align-items: center;
     gap: 15px;
+    justify-content: flex-end;
+    flex-shrink: 0;
 }
 
 .cb-language-widget {
@@ -114,19 +118,19 @@
     background: var(--cb-background-color);
     border: 2px solid var(--cb-border-color);
     border-radius: 8px;
-    padding: 10px 16px;
-    font-size: 14px;
+    padding: 8px 14px;
+    font-size: 12px;
     font-weight: 500;
     color: var(--cb-text-color);
     cursor: pointer;
-    min-width: 140px;
+    min-width: 120px;
     transition: all 0.3s ease;
     appearance: none;
     background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
     background-repeat: no-repeat;
-    background-position: right 12px center;
-    background-size: 16px;
-    padding-right: 40px;
+    background-position: right 10px center;
+    background-size: 14px;
+    padding-right: 36px;
 }
 
 .cb-language-selector:hover {
@@ -359,13 +363,14 @@
     font-weight: 400;
 }
 
-.cb-error-message {
-    color: var(--cb-error);
-    font-size: 13px;
-    margin-top: 6px;
-    display: none;
-    font-weight: 500;
-}
+    .cb-error-message {
+        color: var(--cb-error);
+        font-size: 11px;
+        margin-top: 4px;
+        display: none;
+        font-weight: 500;
+        line-height: 1.3;
+    }
 
 /* Field hints */
 .cb-field-hint {
@@ -594,6 +599,8 @@
     justify-content: center;
     font-size: 14px;
     color: white;
+    padding: 6px;
+    box-sizing: border-box;
 }
 
 .cb-service-icon-img {
@@ -602,9 +609,10 @@
     border-radius: 6px;
     margin-bottom: 8px;
     object-fit: contain;
-    background: #f8f9fa;
-    padding: 4px;
-    border: 1px solid var(--cb-border-light);
+    background: #f5f5f5;
+    padding: 6px;
+    border: 1px solid #e0e0e0 !important;
+    box-sizing: border-box;
 }
 
 .cb-service-card h4 {
@@ -804,6 +812,29 @@
     font-weight: 600;
     color: #1a1a1a;
     line-height: 1.3;
+}
+
+/* Sidebar Service Icon Styles */
+.cb-sidebar-service-icon {
+    display: inline-block;
+    width: 32px;
+    height: 32px;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    background: #f5f5f5;
+    padding: 4px;
+    box-sizing: border-box;
+    vertical-align: middle;
+    margin-right: 8px;
+    text-align: center;
+    line-height: 20px;
+}
+
+.cb-sidebar-service-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
 }
 
 .cb-info-banner {
@@ -1088,6 +1119,22 @@
     background: #ffffff;
     margin: 0;
     padding: 0;
+    overflow-x: hidden; /* Prevent horizontal scroll */
+}
+
+/* Responsive container adjustments */
+@media (max-width: 1024px) {
+    .cb-widget-container {
+        min-height: auto;
+    }
+}
+
+/* Ensure proper container width on all screens */
+@media (min-width: 1440px) {
+    .cb-widget-container {
+        max-width: 1400px;
+        margin: 0 auto;
+    }
 }
 
 /* Ensure no horizontal scroll */
@@ -1095,112 +1142,288 @@ body {
     overflow-x: hidden;
 }
 
-/* Responsive Design */
-@media (max-width: 968px) {
-    .cb-content {
-        grid-template-columns: 1fr;
-        grid-template-areas: 
-            "main"
-            "sidebar";
-        min-height: auto;
+/* Responsive Utilities */
+.cb-widget-container * {
+    box-sizing: border-box;
+}
+
+/* Touch-friendly targets for mobile */
+@media (max-width: 768px) {
+    .cb-btn,
+    .cb-time-slot,
+    .cb-service-card,
+    .cb-extra-item {
+        min-height: 44px; /* iOS recommended touch target */
+        -webkit-tap-highlight-color: rgba(0, 115, 170, 0.1);
     }
     
-    .cb-main-content {
-        border-right: none;
-        border-bottom: 1px solid var(--cb-border-color);
-        padding: 32px 24px;
-        grid-area: main;
-    }
-    
-    .cb-checkout-sidebar {
-        padding: 16px 8px;
-        grid-area: sidebar;
-        min-height: auto;
+    /* Prevent text selection on interactive elements */
+    .cb-step,
+    .cb-service-card,
+    .cb-extra-item,
+    .cb-time-slot {
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
     }
 }
 
-/* Elementor section responsive adjustments */
+/* Landscape orientation adjustments for mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+    .cb-header {
+        padding: 16px 20px;
+    }
+    
+    .cb-steps {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 4px;
+        margin-top: 12px;
+        padding: 4px;
+        overflow: visible;
+    }
+    
+    .cb-step {
+        flex-direction: row;
+        padding: 6px 4px;
+        gap: 4px;
+    }
+    
+    .cb-step-label {
+        font-size: 8px;
+    }
+    
+    .cb-content {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+    }
+    
+    .cb-main-content {
+        order: 1;
+    }
+    
+    .cb-checkout-sidebar {
+        order: 2;
+        height: auto;
+        max-height: 400px;
+        overflow-y: auto;
+        position: relative;
+    }
+}
+
+/* Responsive Design - Desktop First Approach */
+
+/* Large Tablets and Small Desktops (1024px - 1200px) */
 @media (max-width: 1200px) {
     .cb-header {
-        padding: 30px;
+        padding: 24px 20px;
     }
     
     .cb-main-content,
     .cb-checkout-sidebar {
-        padding: 30px;
+        padding: 24px 20px;
+    }
+    
+    .cb-content {
+        gap: 20px;
+    }
+    
+    .cb-services-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+    
+    .cb-extras-grid {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     }
 }
 
-@media (max-width: 800px) {
+/* Tablets (768px - 1024px) */
+@media (max-width: 1024px) {
     .cb-content {
+        display: flex;
+        flex-direction: column;
         grid-template-columns: 1fr;
         grid-template-areas: 
             "main"
             "sidebar";
         min-height: auto;
+        gap: 0;
     }
     
     .cb-main-content {
+        order: 1;
         border-right: none;
         border-bottom: 1px solid var(--cb-border-color);
-        padding: 24px;
-        grid-area: main;
+        padding: 32px 24px;
+        width: 100%;
+        min-height: auto;
     }
     
     .cb-checkout-sidebar {
-        padding: 16px 8px;
-        grid-area: sidebar;
+        order: 2;
+        padding: 20px 24px;
         min-height: auto;
+        height: auto;
+        max-height: none;
+        position: relative;
+        top: 0;
+        width: 100%;
+        overflow: visible;
+        box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+    }
+    
+    .cb-checkout-sidebar .cb-order-summary {
+        position: relative;
+    }
+    
+    .cb-services-grid {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+    }
+    
+    .cb-extras-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+    
+    .cb-time-slots {
+        grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
     }
 }
 
+/* Medium Tablets (768px - 968px) */
+@media (max-width: 968px) {
+    .cb-content {
+        display: flex;
+        flex-direction: column;
+        grid-template-columns: 1fr;
+        grid-template-areas: 
+            "main"
+            "sidebar";
+        min-height: auto;
+        gap: 0;
+    }
+    
+    .cb-main-content {
+        order: 1;
+        border-right: none;
+        border-bottom: 1px solid var(--cb-border-color);
+        padding: 28px 20px;
+        width: 100%;
+        min-height: auto;
+    }
+    
+    .cb-checkout-sidebar {
+        order: 2;
+        padding: 20px;
+        min-height: auto;
+        width: 100%;
+        position: relative;
+        top: 0;
+        height: auto;
+        max-height: none;
+        overflow: visible;
+        box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+    }
+    
+    .cb-header {
+        padding: 20px;
+    }
+    
+    .cb-title {
+        font-size: 28px;
+    }
+    
+    .cb-step-header h2 {
+        font-size: 26px;
+    }
+}
+
+/* Mobile Devices (480px - 768px) */
 @media (max-width: 768px) {
     .cb-widget {
         margin: 0;
     }
     
+    .cb-widget-container {
+        min-height: auto;
+    }
+    
+    .cb-container {
+        min-height: auto;
+        border-radius: 0;
+    }
+    
     .cb-header {
-        padding: 24px;
+        padding: 20px 16px;
+        border-radius: 0;
     }
     
     .cb-header-top {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 16px;
-    }
-    
-    .cb-language-widget {
-        align-self: flex-end;
+        flex-direction: row;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
     }
     
     .cb-title {
-        font-size: 24px;
+        font-size: 22px;
+        line-height: 1.2;
+        flex: 1;
+    }
+    
+    .cb-header-controls {
+        flex-shrink: 0;
+        justify-content: flex-end;
+    }
+    
+    .cb-language-widget {
+        width: auto;
+    }
+    
+    .cb-language-selector {
+        min-width: 100px;
+        padding: 6px 12px;
+        font-size: 11px;
+        padding-right: 32px;
+        background-size: 12px;
+        background-position: right 8px center;
     }
     
     .cb-steps {
-        flex-wrap: wrap;
-        background: transparent;
-        padding: 0;
-        gap: 8px;
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 4px;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 4px;
+        border-radius: 8px;
         margin-top: 16px;
-        overflow: visible;
+        overflow: hidden;
     }
     
     .cb-step {
-        flex: none;
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 20px;
-        padding: 8px 12px;
-        margin-bottom: 8px;
-        min-width: auto;
+        flex: 1;
+        background: transparent;
+        border-radius: 6px;
+        padding: 8px 4px;
+        margin: 0;
+        min-width: 0;
         z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        opacity: 0.6;
     }
     
     .cb-step-active {
-        background: white;
-        color: #2962ff;
+        background: var(--cb-background-color);
+        color: var(--cb-primary-color);
+        opacity: 1;
         margin: 0;
-        border-radius: 20px;
+        border-radius: 6px;
     }
     
     .cb-step::after {
@@ -1208,36 +1431,110 @@ body {
     }
     
     .cb-step-number {
-        width: 20px;
-        height: 20px;
+        width: 22px;
+        height: 22px;
         font-size: 11px;
-        margin-right: 8px;
+        margin-right: 0;
+        flex-shrink: 0;
     }
     
     .cb-step-label {
-        font-size: 12px;
+        font-size: 9px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-align: center;
+        width: 100%;
+        line-height: 1.2;
+    }
+    
+    .cb-content {
+        display: flex;
+        flex-direction: column;
+        grid-template-columns: 1fr;
+        grid-template-areas: 
+            "main"
+            "sidebar";
+        min-height: auto;
+        margin-top: 0;
+        gap: 0;
     }
     
     .cb-main-content {
-        padding: 24px;
+        order: 1;
+        padding: 20px 16px;
+        border-right: none;
+        border-bottom: 1px solid var(--cb-border-color);
+        width: 100%;
+        min-height: auto;
+    }
+    
+    .cb-checkout-sidebar {
+        order: 2;
+        padding: 20px 16px;
+        position: relative;
+        top: 0;
+        height: auto;
+        max-height: none;
+        width: 100%;
+        overflow: visible;
+        box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+    }
+    
+    .cb-checkout-sidebar .cb-order-summary {
+        position: relative;
+        max-height: none;
+        overflow: visible;
+    }
+    
+    .cb-step-header {
+        margin-bottom: 12px;
     }
     
     .cb-step-header h2 {
-        font-size: 24px;
+        font-size: 18px;
+        margin-bottom: 4px;
+        line-height: 1.3;
+    }
+    
+    .cb-step-header p {
+        font-size: 12px;
+        line-height: 1.4;
+    }
+    
+    .cb-form-group {
+        margin-bottom: 12px;
+    }
+    
+    .cb-form-group label {
+        font-size: 11px;
+        margin-bottom: 6px;
+        letter-spacing: 0.3px;
     }
     
     .cb-form-row {
         grid-template-columns: 1fr;
-        gap: 16px;
+        gap: 12px;
     }
     
     .cb-form-actions {
         flex-direction: column;
+        gap: 10px;
+        margin-top: 20px;
     }
     
     .cb-btn {
         width: 100%;
         min-width: auto;
+        padding: 12px 20px;
+        font-size: 13px;
+        letter-spacing: 0.3px;
+    }
+    
+    .cb-input {
+        padding: 12px 14px;
+        font-size: 14px; /* Prevent zoom on iOS but still readable */
+        border-width: 1.5px;
     }
     
     .cb-services-grid {
@@ -1246,91 +1543,730 @@ body {
     }
     
     .cb-service-card {
-        padding: 15px;
+        padding: 12px;
+        text-align: center;
+    }
+    
+    .cb-service-icon,
+    .cb-service-icon-img {
+        width: 36px;
+        height: 36px;
+        margin: 0 auto 8px auto;
     }
     
     .cb-service-icon {
-        width: 32px;
-        height: 32px;
-        font-size: 14px;
-        margin-bottom: 8px;
+        font-size: 16px;
     }
     
     .cb-service-card h4 {
-        font-size: 15px;
+        font-size: 14px;
         margin-bottom: 4px;
+        line-height: 1.3;
     }
     
     .cb-service-card p {
-        font-size: 12px;
+        font-size: 11px;
         margin-bottom: 8px;
+        line-height: 1.3;
     }
     
     .cb-price-current {
-        font-size: 15px;
+        font-size: 14px;
     }
     
     .cb-service-duration,
     .cb-service-area {
-        font-size: 11px;
-    }
-    
-    .cb-btn-checkout {
         font-size: 10px;
-        padding: 12px 16px;
-        min-height: 48px;
-    }
-    
-    #cb-checkout-price {
-        margin-right: 3px;
     }
     
     .cb-extras-grid {
         grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .cb-extra-item {
+        padding: 12px;
+    }
+    
+    .cb-extra-checkbox {
+        width: 18px;
+        height: 18px;
+        margin-right: 8px;
+    }
+    
+    .cb-extra-name {
+        font-size: 13px;
+        margin-bottom: 3px;
+    }
+    
+    .cb-extra-description {
+        font-size: 11px;
+        margin-bottom: 6px;
+        line-height: 1.3;
+    }
+    
+    .cb-extra-price {
+        font-size: 14px;
     }
     
     .cb-time-slots {
-        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(85px, 1fr));
         gap: 8px;
     }
     
     .cb-time-slot {
-        padding: 12px 8px;
+        padding: 10px 6px;
+        font-size: 12px;
+    }
+    
+    .cb-order-summary {
+        padding: 12px;
+    }
+    
+    .cb-order-summary h3 {
+        font-size: 14px;
+        margin-bottom: 10px;
+        line-height: 1.3;
+    }
+    
+    .cb-info-banner {
+        padding: 10px;
+        margin: 10px 0;
+    }
+    
+    .cb-info-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+    }
+    
+    .cb-info-text {
+        font-size: 11px;
+        line-height: 1.3;
+    }
+    
+    .cb-duration-section,
+    .cb-selected-extras-section,
+    .cb-price-section {
+        margin: 10px 0;
+        padding: 6px 0;
+    }
+    
+    .cb-duration-label,
+    .cb-selected-extras-label,
+    .cb-price-label {
+        font-size: 11px;
+        margin-bottom: 6px;
+    }
+    
+    .cb-duration-value {
+        font-size: 12px;
+    }
+    
+    .cb-btn-checkout {
+        font-size: 12px;
+        padding: 12px 14px;
+        min-height: 46px;
+        flex-wrap: wrap;
+        text-align: center;
+        line-height: 1.3;
+        letter-spacing: 0.3px;
+    }
+    
+    #cb-checkout-price {
+        margin-right: 3px;
+        display: inline-block;
+        font-size: 14px;
+    }
+    
+    .cb-price-summary {
+        padding: 12px;
+    }
+    
+    .cb-price-item,
+    .cb-duration-item {
+        font-size: 11px;
+        padding: 4px 0;
+        line-height: 1.4;
+    }
+    
+    .cb-price-item.cb-price-total,
+    .cb-duration-item.cb-duration-total {
+        font-size: 14px;
+        padding-top: 8px;
+    }
+    
+    .cb-price-current {
+        font-size: 14px;
+    }
+    
+    .cb-payment-methods {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .cb-payment-option {
+        padding: 12px;
+    }
+    
+    .cb-payment-icon {
+        width: 36px;
+        height: 36px;
+        margin-right: 10px;
+        font-size: 18px;
+    }
+    
+    .cb-payment-info h4 {
         font-size: 13px;
+    }
+    
+    .cb-payment-info p {
+        font-size: 11px;
+    }
+    
+    .cb-base-area-info {
+        margin-top: 10px;
+    }
+    
+    .cb-base-info-card {
+        padding: 10px;
+        margin-top: 8px;
+    }
+    
+    .cb-base-info-card h4 {
+        font-size: 13px;
+        margin-bottom: 6px;
+    }
+    
+    .cb-base-info-card p {
+        font-size: 11px;
+        margin-bottom: 8px;
+        line-height: 1.3;
+    }
+    
+    .cb-base-pricing {
+        gap: 8px;
+        margin-top: 8px;
+        flex-direction: column;
+    }
+    
+    .cb-base-pricing span {
+        font-size: 11px;
+        padding: 5px 10px;
+    }
+    
+    .cb-field-hint {
+        font-size: 10px;
+        margin-top: 4px;
+    }
+    
+    .cb-field-hint small {
+        font-size: 10px;
+    }
+    
+    .cb-selected-extras-list {
+        gap: 3px;
+    }
+    
+    .cb-selected-extra-item {
+        font-size: 11px;
+        padding: 3px 6px;
     }
 }
 
+/* Small Mobile Devices (320px - 480px) */
 @media (max-width: 480px) {
     .cb-header {
-        padding: 20px 16px;
+        padding: 14px 12px;
     }
     
-    .cb-main-content,
-    .cb-checkout-sidebar {
-        padding: 20px 16px;
+    .cb-header-top {
+        gap: 8px;
+        margin-bottom: 10px;
+        flex-wrap: wrap;
     }
     
     .cb-title {
-        font-size: 22px;
-        margin-bottom: 16px;
+        font-size: 16px !important;
+        margin-bottom: 0;
+        line-height: 1.2;
+        flex: 1 1 100%;
+        min-width: 0;
+    }
+    
+    .cb-header-controls {
+        width: 100%;
+        justify-content: flex-end;
+        margin-top: 6px;
+    }
+    
+    .cb-language-selector {
+        padding: 5px 8px;
+        font-size: 10px;
+        min-width: 80px;
+        padding-right: 28px;
+        background-size: 10px;
+        background-position: right 6px center;
+    }
+    
+    .cb-steps {
+        grid-template-columns: repeat(5, 1fr);
+        gap: 2px;
+        margin-top: 10px;
+        padding: 2px;
+    }
+    
+    .cb-step {
+        padding: 5px 2px;
+        flex-direction: column;
+        gap: 2px;
+    }
+    
+    .cb-step-number {
+        width: 18px;
+        height: 18px;
+        font-size: 9px;
+        margin-right: 0;
+    }
+    
+    .cb-step-label {
+        font-size: 7px !important;
+        line-height: 1.1;
+    }
+    
+    .cb-main-content {
+        order: 1;
+        padding: 14px 12px;
+        width: 100%;
+    }
+    
+    .cb-checkout-sidebar {
+        order: 2;
+        padding: 14px 12px;
+        width: 100%;
+        position: relative;
+        top: 0;
+    }
+    
+    .cb-step-header {
+        margin-bottom: 10px;
     }
     
     .cb-step-header h2 {
-        font-size: 20px;
+        font-size: 16px;
+        margin-bottom: 3px;
+        line-height: 1.2;
     }
     
     .cb-step-header p {
-        font-size: 14px;
+        font-size: 11px;
+        line-height: 1.3;
+    }
+    
+    .cb-form-group {
+        margin-bottom: 10px;
+    }
+    
+    .cb-form-group label {
+        font-size: 10px;
+        margin-bottom: 5px;
+        letter-spacing: 0.2px;
     }
     
     .cb-input {
-        font-size: 16px; /* Prevent zoom on iOS */
-        padding: 14px 16px;
+        font-size: 14px; /* Prevent zoom on iOS */
+        padding: 10px 12px;
+        border-width: 1.5px;
+    }
+    
+    .cb-form-actions {
+        margin-top: 16px;
+        gap: 8px;
     }
     
     .cb-btn {
-        padding: 14px 20px;
+        padding: 10px 16px;
+        font-size: 12px !important;
+        letter-spacing: 0.2px;
+    }
+    
+    .cb-service-card {
+        padding: 10px;
+    }
+    
+    .cb-service-icon,
+    .cb-service-icon-img {
+        width: 32px;
+        height: 32px;
+    }
+    
+    .cb-service-icon {
         font-size: 14px;
+    }
+    
+    .cb-service-card h4 {
+        font-size: 13px;
+        margin-bottom: 3px;
+    }
+    
+    .cb-service-card p {
+        font-size: 10px;
+        margin-bottom: 6px;
+    }
+    
+    .cb-price-current {
+        font-size: 13px;
+    }
+    
+    .cb-service-duration,
+    .cb-service-area {
+        font-size: 9px;
+    }
+    
+    .cb-extra-item {
+        padding: 10px;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .cb-extra-checkbox {
+        width: 16px;
+        height: 16px;
+        margin-right: 0;
+        margin-bottom: 8px;
+    }
+    
+    .cb-extra-info {
+        width: 100%;
+    }
+    
+    .cb-extra-name {
+        font-size: 12px;
+        margin-bottom: 2px;
+    }
+    
+    .cb-extra-description {
+        font-size: 10px;
+        margin-bottom: 4px;
+    }
+    
+    .cb-extra-price {
+        font-size: 13px;
+        margin-top: 4px;
+    }
+    
+    .cb-time-slots {
+        grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+        gap: 6px;
+    }
+    
+    .cb-time-slot {
+        padding: 8px 4px;
+        font-size: 11px;
+    }
+    
+    .cb-order-summary {
+        padding: 10px;
+    }
+    
+    .cb-order-summary h3 {
+        font-size: 13px;
+        margin-bottom: 8px;
+    }
+    
+    .cb-info-banner {
+        padding: 8px;
+        flex-direction: column;
+        text-align: center;
+        gap: 6px;
+        margin: 8px 0;
+    }
+    
+    .cb-info-icon {
+        width: 28px;
+        height: 28px;
+        font-size: 12px;
+        align-self: center;
+    }
+    
+    .cb-info-text {
+        font-size: 10px;
+        text-align: center;
+    }
+    
+    .cb-duration-section,
+    .cb-selected-extras-section,
+    .cb-price-section {
+        margin: 8px 0;
+        padding: 5px 0;
+    }
+    
+    .cb-duration-label,
+    .cb-selected-extras-label,
+    .cb-price-label {
+        font-size: 10px;
+        margin-bottom: 4px;
+    }
+    
+    .cb-duration-value {
+        font-size: 11px;
+    }
+    
+    .cb-price-display {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 3px;
+    }
+    
+    .cb-price-current {
+        font-size: 14px;
+    }
+    
+    .cb-btn-checkout {
+        font-size: 11px;
+        padding: 10px 12px;
+        min-height: 44px;
+        line-height: 1.2;
+        letter-spacing: 0.2px;
+    }
+    
+    #cb-checkout-price {
+        display: block;
+        margin-bottom: 3px;
+        font-size: 13px;
+    }
+    
+    .cb-price-summary {
+        padding: 10px;
+    }
+    
+    .cb-price-breakdown,
+    .cb-duration-breakdown {
+        gap: 4px;
+    }
+    
+    .cb-price-item,
+    .cb-duration-item {
+        font-size: 10px;
+        padding: 3px 0;
+    }
+    
+    .cb-price-item.cb-price-total,
+    .cb-duration-item.cb-duration-total {
+        font-size: 13px;
+        padding-top: 6px;
+    }
+    
+    .cb-base-info-card {
+        padding: 8px;
+        margin-top: 6px;
+    }
+    
+    .cb-base-info-card h4 {
+        font-size: 12px;
+        margin-bottom: 4px;
+    }
+    
+    .cb-base-info-card p {
+        font-size: 10px;
+        margin-bottom: 6px;
+    }
+    
+    .cb-base-pricing {
+        flex-direction: column;
+        gap: 6px;
+        margin-top: 6px;
+    }
+    
+    .cb-base-pricing span {
+        font-size: 10px;
+        padding: 4px 8px;
+    }
+    
+    .cb-field-hint {
+        font-size: 9px;
+        margin-top: 3px;
+    }
+    
+    .cb-field-hint small {
+        font-size: 9px;
+    }
+    
+    .cb-selected-extras-list {
+        gap: 2px;
+    }
+    
+    .cb-selected-extra-item {
+        font-size: 10px;
+        padding: 2px 5px;
+    }
+    
+    .cb-payment-methods {
+        gap: 8px;
+    }
+    
+    .cb-payment-option {
+        padding: 10px;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .cb-payment-icon {
+        width: 32px;
+        height: 32px;
+        margin-right: 0;
+        margin-bottom: 8px;
+        font-size: 16px;
+    }
+    
+    .cb-payment-info h4 {
+        font-size: 13px;
+    }
+    
+    .cb-payment-info p {
+        font-size: 11px;
+    }
+    
+    .cb-error-message {
+        font-size: 10px;
+        margin-top: 3px;
+    }
+}
+
+/* Extra Small Mobile Devices (320px and below) */
+@media (max-width: 320px) {
+    .cb-header {
+        padding: 12px 10px;
+    }
+    
+    .cb-title {
+        font-size: 15px;
+    }
+    
+    .cb-language-selector {
+        font-size: 9px;
+        min-width: 75px;
+        padding: 4px 7px;
+        padding-right: 26px;
+        background-size: 9px;
+        background-position: right 5px center;
+    }
+    
+    .cb-main-content {
+        order: 1;
+        padding: 12px 10px;
+        width: 100%;
+    }
+    
+    .cb-checkout-sidebar {
+        order: 2;
+        padding: 12px 10px;
+        width: 100%;
+        position: relative;
+        top: 0;
+    }
+    
+    .cb-step-header {
+        margin-bottom: 8px;
+    }
+    
+    .cb-step-header h2 {
+        font-size: 15px;
+        margin-bottom: 2px;
+    }
+    
+    .cb-step-header p {
+        font-size: 10px;
+    }
+    
+    .cb-form-group {
+        margin-bottom: 8px;
+    }
+    
+    .cb-form-group label {
+        font-size: 9px;
+        margin-bottom: 4px;
+    }
+    
+    .cb-input {
+        padding: 9px 10px;
+        font-size: 14px;
+    }
+    
+    .cb-btn {
+        padding: 9px 14px;
+        font-size: 11px;
+    }
+    
+    .cb-form-actions {
+        margin-top: 14px;
+        gap: 6px;
+    }
+    
+    .cb-steps {
+        gap: 1px;
+        padding: 1px;
+        margin-top: 8px;
+    }
+    
+    .cb-step {
+        padding: 4px 1px;
+    }
+    
+    .cb-step-number {
+        width: 16px;
+        height: 16px;
+        font-size: 8px;
+    }
+    
+    .cb-step-label {
+        font-size: 6px;
+    }
+    
+    .cb-service-card {
+        padding: 8px;
+    }
+    
+    .cb-service-icon,
+    .cb-service-icon-img {
+        width: 28px;
+        height: 28px;
+    }
+    
+    .cb-service-card h4 {
+        font-size: 12px;
+    }
+    
+    .cb-service-card p {
+        font-size: 9px;
+    }
+    
+    .cb-time-slots {
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+    }
+    
+    .cb-time-slot {
+        padding: 7px 3px;
+        font-size: 10px;
+    }
+    
+    .cb-order-summary {
+        padding: 8px;
+    }
+    
+    .cb-order-summary h3 {
+        font-size: 12px;
+    }
+    
+    .cb-btn-checkout {
+        font-size: 10px;
+        padding: 9px 10px;
+        min-height: 42px;
+    }
+    
+    #cb-checkout-price {
+        font-size: 12px;
     }
 }
 
@@ -1644,7 +2580,7 @@ body {
     object-fit: contain;
     display: block;
     margin: 0 auto;
-    border-radius: 8px;
+    border-radius: 8px !important;
 }
 
 .cb-service-icon {
@@ -1685,6 +2621,10 @@ body {
     display: block;
     margin: 0 auto 10px auto;
     border-radius: 8px;
+    background: #f5f5f5;
+    border: 1px solid #e0e0e0 !important;
+    padding: 8px;
+    box-sizing: border-box;
 }
 
 .cb-service-icon {
@@ -1698,6 +2638,8 @@ body {
     background: #f5f5f5;
     border-radius: 8px;
     border: 1px solid #e0e0e0;
+    padding: 8px;
+    box-sizing: border-box;
 }
 
 /* Ensure service cards display properly */

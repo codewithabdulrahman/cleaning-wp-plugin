@@ -21,18 +21,34 @@ if (!defined('ABSPATH')) {
             <table class="form-table">
                 <tr>
                     <th scope="row">
-                        <label for="service-name"><?php _e('Service Name', 'cleaning-booking'); ?></label>
+                        <label for="service-name-en"><?php _e('Service Name (English)', 'cleaning-booking'); ?></label>
                     </th>
                     <td>
-                        <input type="text" id="service-name" name="name" class="regular-text" required>
+                        <input type="text" id="service-name-en" name="name_en" class="regular-text" required>
                     </td>
                 </tr>
                 <tr>
                     <th scope="row">
-                        <label for="service-description"><?php _e('Description', 'cleaning-booking'); ?></label>
+                        <label for="service-name-el"><?php _e('Service Name (Greek)', 'cleaning-booking'); ?></label>
                     </th>
                     <td>
-                        <textarea id="service-description" name="description" rows="3" class="large-text"></textarea>
+                        <input type="text" id="service-name-el" name="name_el" class="regular-text" required>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">
+                        <label for="service-description-en"><?php _e('Description (English)', 'cleaning-booking'); ?></label>
+                    </th>
+                    <td>
+                        <textarea id="service-description-en" name="description_en" rows="3" class="large-text"></textarea>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">
+                        <label for="service-description-el"><?php _e('Description (Greek)', 'cleaning-booking'); ?></label>
+                    </th>
+                    <td>
+                        <textarea id="service-description-el" name="description_el" rows="3" class="large-text"></textarea>
                     </td>
                 </tr>
                 <tr>
@@ -41,7 +57,7 @@ if (!defined('ABSPATH')) {
                     </th>
                     <td>
                         <input type="number" id="service-base-price" name="base_price" step="0.01" min="0" class="small-text" required>
-                        <span class="description"><?php _e('Base price in USD', 'cleaning-booking'); ?></span>
+                        <span class="description"><?php _e('Base price in Euro', 'cleaning-booking'); ?></span>
                     </td>
                 </tr>
                 <tr>
@@ -169,9 +185,9 @@ if (!defined('ABSPATH')) {
                                         <br><small><?php echo esc_html($service->description); ?></small>
                                     <?php endif; ?>
                                 </td>
-                                <td>$<?php echo esc_html(number_format($service->base_price, 2)); ?></td>
+                                <td>€<?php echo esc_html(number_format($service->base_price, 2)); ?></td>
                                 <td><?php echo esc_html($service->base_duration); ?> min</td>
-                                <td>$<?php echo esc_html(number_format($service->sqm_multiplier, 4)); ?></td>
+                                <td>€<?php echo esc_html(number_format($service->sqm_multiplier, 4)); ?></td>
                                 <td><?php echo esc_html(number_format($service->sqm_duration_multiplier, 4)); ?> min</td>
                                 <td><?php echo esc_html($service->default_area ?? 0); ?> m²</td>
                                 <td>
@@ -213,35 +229,80 @@ if (!defined('ABSPATH')) {
                 <table class="form-table">
                     <tr>
                         <th scope="row">
-                            <label for="create-extra-name"><?php _e('Extra Name', 'cleaning-booking'); ?></label>
+                            <label for="create-extra-name-en"><?php _e('Extra Name (English)', 'cleaning-booking'); ?></label>
                         </th>
                         <td>
-                            <input type="text" id="create-extra-name" name="name" class="regular-text" required>
+                            <input type="text" id="create-extra-name-en" name="name_en" class="regular-text">
                         </td>
                     </tr>
                     <tr>
                         <th scope="row">
-                            <label for="create-extra-description"><?php _e('Description', 'cleaning-booking'); ?></label>
+                            <label for="create-extra-name-el"><?php _e('Extra Name (Greek)', 'cleaning-booking'); ?></label>
                         </th>
                         <td>
-                            <textarea id="create-extra-description" name="description" rows="2" class="large-text"></textarea>
+                            <input type="text" id="create-extra-name-el" name="name_el" class="regular-text">
                         </td>
                     </tr>
                     <tr>
+                        <th scope="row">
+                            <label for="create-extra-description-en"><?php _e('Description (English)', 'cleaning-booking'); ?></label>
+                        </th>
+                        <td>
+                            <textarea id="create-extra-description-en" name="description_en" rows="2" class="large-text"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="create-extra-description-el"><?php _e('Description (Greek)', 'cleaning-booking'); ?></label>
+                        </th>
+                        <td>
+                            <textarea id="create-extra-description-el" name="description_el" rows="2" class="large-text"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="create-extra-pricing-type"><?php _e('Pricing Type', 'cleaning-booking'); ?></label>
+                        </th>
+                        <td>
+                            <select id="create-extra-pricing-type" name="pricing_type" class="regular-text">
+                                <option value="fixed"><?php _e('Fixed Price', 'cleaning-booking'); ?></option>
+                                <option value="per_sqm"><?php _e('Per Square Meter', 'cleaning-booking'); ?></option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr id="create-extra-price-row">
                         <th scope="row">
                             <label for="create-extra-price"><?php _e('Price', 'cleaning-booking'); ?></label>
                         </th>
                         <td>
-                            <input type="number" id="create-extra-price" name="price" step="0.01" min="0" class="small-text" required>
-                            <span class="description"><?php _e('Price in USD', 'cleaning-booking'); ?></span>
+                            <input type="number" id="create-extra-price" name="price" step="0.01" min="0" class="small-text" value="0">
+                            <span class="description" id="create-extra-price-desc"><?php _e('Fixed price in Euro', 'cleaning-booking'); ?></span>
                         </td>
                     </tr>
-                    <tr>
+                    <tr id="create-extra-price-per-sqm-row" style="display: none;">
+                        <th scope="row">
+                            <label for="create-extra-price-per-sqm"><?php _e('Price per m²', 'cleaning-booking'); ?></label>
+                        </th>
+                        <td>
+                            <input type="number" id="create-extra-price-per-sqm" name="price_per_sqm" step="0.01" min="0" class="small-text">
+                            <span class="description"><?php _e('Price per square meter in Euro', 'cleaning-booking'); ?></span>
+                        </td>
+                    </tr>
+                    <tr id="create-extra-duration-per-sqm-row" style="display: none;">
+                        <th scope="row">
+                            <label for="create-extra-duration-per-sqm"><?php _e('Duration per m²', 'cleaning-booking'); ?></label>
+                        </th>
+                        <td>
+                            <input type="number" id="create-extra-duration-per-sqm" name="duration_per_sqm" min="0" class="small-text">
+                            <span class="description"><?php _e('Additional duration per square meter in minutes', 'cleaning-booking'); ?></span>
+                        </td>
+                    </tr>
+                    <tr id="create-extra-duration-row">
                         <th scope="row">
                             <label for="create-extra-duration"><?php _e('Duration', 'cleaning-booking'); ?></label>
                         </th>
                         <td>
-                            <input type="number" id="create-extra-duration" name="duration" min="0" class="small-text" required>
+                            <input type="number" id="create-extra-duration" name="duration" min="0" class="small-text" value="0">
                             <span class="description"><?php _e('Additional duration in minutes', 'cleaning-booking'); ?></span>
                         </td>
                     </tr>
@@ -267,11 +328,19 @@ if (!defined('ABSPATH')) {
         </div>
         
         
+        <!-- Search Bar for Extras -->
+        <div class="cb-search-section" style="margin-bottom: 20px;">
+            <input type="text" id="cb-extras-search" placeholder="<?php _e('Search extras by name or description...', 'cleaning-booking'); ?>" class="cb-search-input">
+            <button type="button" id="cb-search-extras" class="button button-primary"><?php _e('Search', 'cleaning-booking'); ?></button>
+            <button type="button" id="cb-clear-extras-search" class="button"><?php _e('Clear', 'cleaning-booking'); ?></button>
+        </div>
+        
         <div id="cb-service-extras-list">
             <table class="wp-list-table widefat fixed striped">
                 <thead>
                     <tr>
                         <th><?php _e('Extra Name', 'cleaning-booking'); ?></th>
+                        <th><?php _e('Pricing Type', 'cleaning-booking'); ?></th>
                         <th><?php _e('Price', 'cleaning-booking'); ?></th>
                         <th><?php _e('Duration', 'cleaning-booking'); ?></th>
                         <th><?php _e('Status', 'cleaning-booking'); ?></th>

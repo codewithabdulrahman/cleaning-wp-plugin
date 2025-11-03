@@ -104,7 +104,7 @@ if (!defined('ABSPATH')) {
                             <label for="cb-square-meters"><?php _e('Space (m²)', 'cleaning-booking'); ?></label>
                             <input type="number" id="cb-square-meters" name="square_meters" class="cb-input" min="0" max="1000" placeholder="0" value="0">
                             <div class="cb-field-hint" id="cb-sqm-hint" style="display: none;">
-                                <small><?php _e('Enter additional space beyond the default area, or leave as 0 to skip', 'cleaning-booking'); ?></small>
+                                <small><?php _e('Enter total space beyond the default area, or leave as 0 to skip', 'cleaning-booking'); ?></small>
                             </div>
                             <div class="cb-base-area-info" id="cb-base-area-info" style="display: none;">
                                 <div class="cb-base-info-card">
@@ -133,8 +133,12 @@ if (!defined('ABSPATH')) {
                                     <span><?php _e('Service Price:', 'cleaning-booking'); ?></span>
                                     <span id="cb-step3-service-price">€0.00</span>
                                 </div>
+                                <div class="cb-price-item" id="cb-step3-extra-sqm-item" style="display: none;">
+                                    <span><?php _e('Extra m²:', 'cleaning-booking'); ?></span>
+                                    <span id="cb-step3-extra-sqm-price">€0.00</span>
+                                </div>
                                 <div class="cb-price-item">
-                                    <span><?php _e('Extras:', 'cleaning-booking'); ?></span>
+                                    <span><?php _e('Service Extras:', 'cleaning-booking'); ?></span>
                                     <span id="cb-step3-extras-price">€0.00</span>
                                 </div>
                                 <div class="cb-price-item cb-price-total">
@@ -147,8 +151,12 @@ if (!defined('ABSPATH')) {
                                     <span><?php _e('Service Duration:', 'cleaning-booking'); ?></span>
                                     <span id="cb-step3-service-duration">0h 0m</span>
                                 </div>
+                                <div class="cb-duration-item" id="cb-step3-extra-sqm-duration-item" style="display: none;">
+                                    <span><?php _e('Extra m² Duration:', 'cleaning-booking'); ?></span>
+                                    <span id="cb-step3-extra-sqm-duration">0h 0m</span>
+                                </div>
                                 <div class="cb-duration-item">
-                                    <span><?php _e('Extras Duration:', 'cleaning-booking'); ?></span>
+                                    <span><?php _e('Service Extras Duration:', 'cleaning-booking'); ?></span>
                                     <span id="cb-step3-extras-duration">0h 0m</span>
                                 </div>
                                 <div class="cb-duration-item cb-duration-total">
@@ -179,6 +187,13 @@ if (!defined('ABSPATH')) {
                             <label for="cb-booking-date"><?php _e('Date', 'cleaning-booking'); ?></label>
                             <input type="date" id="cb-booking-date" name="booking_date" class="cb-input" min="<?php echo date('Y-m-d'); ?>" value="<?php echo date('Y-m-d'); ?>" required>
                             <div class="cb-error-message" id="cb-date-error"></div>
+                        </div>
+                        
+                        <div class="cb-form-group">
+                            <label class="cb-checkbox-label">
+                                <input type="checkbox" id="cb-express-cleaning" name="express_cleaning" class="cb-checkbox">
+                                <span id="cb-express-cleaning-label"><?php _e('Εξπρές Καθαρισμός', 'cleaning-booking'); ?> (+20%)</span>
+                            </label>
                         </div>
                         
                         <div class="cb-form-group">

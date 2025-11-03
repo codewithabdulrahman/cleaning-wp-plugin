@@ -65,14 +65,24 @@ class CB_Translations {
         // Check cache first
         $cached = get_transient($cache_key);
         if ($cached !== false) {
-            return $cached;
+            return !empty($cached) ? $cached : null;
         }
         
         $translation = CB_Database::get_translation($string_key, $language, $category);
         
-        // Cache the result
+        // Cache the result (including null values)
         set_transient($cache_key, $translation, self::$cache_expiry);
         
+        return $translation;
+    }
+    
+    /**
+     * Get full translation object by string_key
+     */
+    public static function get_translation_by_key($string_key) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_translations';
+        $translation = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE string_key = %s", $string_key));
         return $translation;
     }
     
