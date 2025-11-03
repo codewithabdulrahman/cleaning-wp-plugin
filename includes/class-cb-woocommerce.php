@@ -1116,7 +1116,34 @@ $this->display_booking_details($order);
         $booking->booking_date = $booking_data['booking_date'];
         $booking->booking_time = $booking_data['booking_time'];
         $booking->total_duration = $booking_data['pricing']['total_duration'] ?? 120;
-        $booking->extras_data = json_encode($booking_data['extras']);
+        
+        // Add extras data - ensure it's properly formatted
+        if (!empty($booking_data['extras']) && is_array($booking_data['extras'])) {
+            $booking->extras_data = json_encode($booking_data['extras']);
+        } else {
+            $booking->extras_data = null;
+        }
+        
+        // Add customer details from WooCommerce session if available (from checkout form)
+        $booking->customer_name = '';
+        $booking->customer_email = '';
+        $booking->customer_phone = '';
+        $booking->address = '';
+        $booking->notes = '';
+        
+        // Try to get customer data from WooCommerce session (pre-filled from booking or entered in checkout form)
+        if (WC()->session) {
+            $first_name = WC()->session->get('billing_first_name');
+            $last_name = WC()->session->get('billing_last_name');
+            if ($first_name || $last_name) {
+                $booking->customer_name = trim($first_name . ' ' . $last_name);
+            }
+            
+            $booking->customer_email = WC()->session->get('billing_email') ?: '';
+            $booking->customer_phone = WC()->session->get('billing_phone') ?: '';
+            $booking->address = WC()->session->get('billing_address_1') ?: '';
+            $booking->notes = WC()->session->get('order_comments') ?: '';
+        }
         
         echo '<div class="cb-checkout-booking-summary" style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px; margin-bottom: 20px;">';
         echo '<h3 style="margin-top: 0; color: #495057;">' . __('Your Booking Summary', 'cleaning-booking') . '</h3>';
@@ -1171,8 +1198,33 @@ $this->display_booking_details($order);
             if (!empty($extras) && is_array($extras)) {
                 echo '<tr><td><strong>' . __('Additional Services', 'cleaning-booking') . ':</strong></td><td>';
                 foreach ($extras as $extra) {
-                    if (is_array($extra) && isset($extra['name']) && isset($extra['quantity'])) {
-                        echo esc_html($extra['name']) . ' (x' . esc_html($extra['quantity']) . ')<br>';
+                    if (is_array($extra)) {
+                        // Handle different extra formats
+                        if (isset($extra['name']) && isset($extra['quantity'])) {
+                            // Format: {'name': 'Extra Name', 'quantity': 1}
+                            echo esc_html($extra['name']) . ' (x' . esc_html($extra['quantity']) . ')<br>';
+                        } elseif (isset($extra['id'])) {
+                            // Format: {'id': 1, 'quantity': 1} - need to get name from database
+                            global $wpdb;
+                            $extra_row = $wpdb->get_row($wpdb->prepare(
+                                "SELECT name FROM {$wpdb->prefix}cb_extras WHERE id = %d",
+                                intval($extra['id'])
+                            ));
+                            if ($extra_row) {
+                                $quantity = isset($extra['quantity']) ? intval($extra['quantity']) : 1;
+                                echo esc_html($extra_row->name) . ' (x' . esc_html($quantity) . ')<br>';
+                            }
+                        }
+                    } elseif (is_numeric($extra)) {
+                        // Format: [1, 2, 3] - array of IDs
+                        global $wpdb;
+                        $extra_row = $wpdb->get_row($wpdb->prepare(
+                            "SELECT name FROM {$wpdb->prefix}cb_extras WHERE id = %d",
+                            intval($extra)
+                        ));
+                        if ($extra_row) {
+                            echo esc_html($extra_row->name) . '<br>';
+                        }
                     }
                 }
                 echo '</td></tr>';
