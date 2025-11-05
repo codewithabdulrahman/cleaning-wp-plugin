@@ -2663,3 +2663,104 @@ body {
     background-color: rgba(0, 115, 170, 0.05);
     box-shadow: 0 2px 8px rgba(0, 115, 170, 0.2);
 }
+
+/* Slider Styles */
+.cb-square-meters-slider-container {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+    margin-top: 10px;
+}
+
+.cb-square-meters-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: #ddd;
+    outline: none;
+    margin: 10px 0;
+}
+
+.cb-square-meters-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #007cba;
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.cb-square-meters-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #007cba;
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.cb-slider-header {
+    font-weight: 600;
+    color: #333;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.cb-slider-value {
+    font-weight: bold;
+    color: #007cba;
+}
+
+.cb-slider-ticks {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 5px;
+    font-size: 11px;
+    color: #666;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .cb-slider-header {
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    .cb-slider-ticks {
+        font-size: 10px;
+    }
+}
+
+.cb-special-day-message {
+    margin-top: 8px;
+    transition: all 0.3s ease;
+}
+
+.cb-special-day-message .special-day-alert {
+    padding: 12px 15px;
+    border-radius: 6px;
+    font-size: 14px;
+    line-height: 1.4;
+    border-left: 4px solid #d63638;
+}
+
+.cb-special-day-message .special-day-alert strong {
+    display: block;
+    margin-bottom: 5px;
+    color: #d63638;
+}
+
+.cb-special-day-message .special-day-alert .select-another {
+    font-size: 13px;
+    color: #666;
+    font-style: italic;
+}
