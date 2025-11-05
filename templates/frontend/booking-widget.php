@@ -61,7 +61,7 @@ if (!defined('ABSPATH')) {
                         
                         <div class="cb-form-group">
                             <label for="cb-zip-code"><?php _e('ZIP Code', 'cleaning-booking'); ?></label>
-                            <input type="text" id="cb-zip-code" name="zip_code" class="cb-input" placeholder="e.g.10672" maxlength="10" required>
+                            <input type="text" id="cb-zip-code" name="zip_code" class="cb-input" placeholder="π.χ. 10672" maxlength="10" required>
                             <div class="cb-error-message" id="cb-zip-error"></div>
                         </div>
                         
@@ -93,115 +93,94 @@ if (!defined('ABSPATH')) {
                         </div>
                     </div>
                     
-                  <!-- Step 3: Square Meters & Extras -->
-<div class="cb-step-content cb-step-3">
-    <div class="cb-step-header">
-        <h2><?php _e('Service Details', 'cleaning-booking'); ?></h2>
-        <p><?php _e('Tell us about your space and any additional services', 'cleaning-booking'); ?></p>
-    </div>
-    
-    <div class="cb-form-group">
-        <label for="cb-square-meters"><?php _e('Space (m²)', 'cleaning-booking'); ?></label>
-        
-        <!-- Number Input Field -->
-        <input type="number" id="cb-square-meters" name="square_meters" class="cb-input" min="0" max="1000" placeholder="0" value="0">
-          <div class="cb-field-hint" id="cb-sqm-hint" style="display: none;">
-            <small><?php _e('Enter total area in square meters', 'cleaning-booking'); ?></small>
-        </div>
-        
-        <!-- Slider Container -->
-        <div class="cb-square-meters-slider-container" style="margin-top: 15px;">
-            <div class="cb-slider-header" style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                <span class="cb-slider-min">0 m²</span>
-                <span class="cb-slider-value" id="cb-slider-value-display">0 m²</span>
-                <span class="cb-slider-max">1000 m²</span>
-            </div>
-            <input type="range" 
-                   id="cb-square-meters-slider" 
-                   class="cb-square-meters-slider" 
-                   min="0" 
-                   max="1000" 
-                   value="0"
-                   step="1"
-                   style="width: 100%; height: 6px; border-radius: 3px; background: #ddd; outline: none;">
-            <div class="cb-slider-ticks" style="display: flex; justify-content: space-between; margin-top: 5px; font-size: 11px; color: #666;">
-                <span>0</span>
-                <span>250</span>
-                <span>500</span>
-                <span>750</span>
-                <span>1000</span>
-            </div>
-        </div>
-        <div class="cb-base-area-info" id="cb-base-area-info" style="display: none;">
-            <div class="cb-base-info-card">
-                <h4><?php _e('Base Service Included', 'cleaning-booking'); ?></h4>
-                <p id="cb-base-area-message"></p>
-                <div class="cb-base-pricing">
-                    <span id="cb-base-price-display"></span>
-                    <span id="cb-base-duration-display"></span>
-                </div>
-            </div>
-        </div>
-        <div class="cb-error-message" id="cb-sqm-error"></div>
-    </div>
-    
-    <!-- Rest of the step 3 content remains the same -->
-    <div class="cb-form-group">
-        <label><?php _e('Additional Services', 'cleaning-booking'); ?></label>
-        <div class="cb-extras-grid" id="cb-extras-container">
-            <div class="cb-loading"><?php _e('Loading extras...', 'cleaning-booking'); ?></div>
-        </div>
-    </div>
-    
-    <!-- Price & Duration Display for Step 3 -->
-    <div class="cb-price-summary cb-step-3-price">
-        <div class="cb-price-breakdown">
-            <div class="cb-price-item">
-                <span><?php _e('Service Price:', 'cleaning-booking'); ?></span>
-                <span id="cb-step3-service-price">€0.00</span>
-            </div>
-            <div class="cb-price-item" id="cb-step3-extra-sqm-item" style="display: none;">
-                <span><?php _e('Extra m²:', 'cleaning-booking'); ?></span>
-                <span id="cb-step3-extra-sqm-price">€0.00</span>
-            </div>
-            <div class="cb-price-item">
-                <span><?php _e('Service Extras:', 'cleaning-booking'); ?></span>
-                <span id="cb-step3-extras-price">€0.00</span>
-            </div>
-            <div class="cb-price-item cb-price-total">
-                <span><?php _e('Total:', 'cleaning-booking'); ?></span>
-                <span id="cb-step3-total-price">€0.00</span>
-            </div>
-        </div>
-        <div class="cb-duration-breakdown">
-            <div class="cb-duration-item">
-                <span><?php _e('Service Duration:', 'cleaning-booking'); ?></span>
-                <span id="cb-step3-service-duration">0h 0m</span>
-            </div>
-            <div class="cb-duration-item" id="cb-step3-extra-sqm-duration-item" style="display: none;">
-                <span><?php _e('Extra m² Duration:', 'cleaning-booking'); ?></span>
-                <span id="cb-step3-extra-sqm-duration">0h 0m</span>
-            </div>
-            <div class="cb-duration-item">
-                <span><?php _e('Service Extras Duration:', 'cleaning-booking'); ?></span>
-                <span id="cb-step3-extras-duration">0h 0m</span>
-            </div>
-            <div class="cb-duration-item cb-duration-total">
-                <span><?php _e('Total Duration:', 'cleaning-booking'); ?></span>
-                <span id="cb-step3-total-duration">0h 0m</span>
-            </div>
-        </div>
-    </div>
-    
-    <div class="cb-form-actions">
-        <button type="button" class="cb-btn cb-btn-secondary cb-prev-step" data-prev="2">
-            <?php _e('Back', 'cleaning-booking'); ?>
-        </button>
-        <button type="button" class="cb-btn cb-btn-primary cb-next-step" data-next="4" disabled>
-            <?php _e('Continue', 'cleaning-booking'); ?>
-        </button>
-    </div>
-</div>
+                    <!-- Step 3: Square Meters & Extras -->
+                    <div class="cb-step-content cb-step-3">
+                        <div class="cb-step-header">
+                            <h2><?php _e('Service Details', 'cleaning-booking'); ?></h2>
+                            <p><?php _e('Tell us about your space and any additional services', 'cleaning-booking'); ?></p>
+                        </div>
+                        
+                        <div class="cb-form-group">
+                            <label for="cb-square-meters"><?php _e('Space (m²)', 'cleaning-booking'); ?></label>
+                            <input type="range" id="cb-square-meters-slider" name="square_meters_slider" class="cb-input-range" min="0" max="1000" value="0" step="1" style="width: 100%; margin-bottom: 10px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 12px; color: #666;">
+                                <span>0</span>
+                                <span id="cb-slider-value">0</span>
+                                <span>1000</span>
+                            </div>
+                            <input type="number" id="cb-square-meters" name="square_meters" class="cb-input" min="0" max="1000" placeholder="0" value="0">
+                            <div class="cb-field-hint" id="cb-sqm-hint" style="display: none;">
+                                <small><?php _e('Enter total area in square meters', 'cleaning-booking'); ?></small>
+                            </div>
+                            <div class="cb-base-area-info" id="cb-base-area-info" style="display: none;">
+                                <div class="cb-base-info-card">
+                                    <h4><?php _e('Base Service Included', 'cleaning-booking'); ?></h4>
+                                    <p id="cb-base-area-message"></p>
+                                    <div class="cb-base-pricing">
+                                        <span id="cb-base-price-display"></span>
+                                        <span id="cb-base-duration-display"></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="cb-error-message" id="cb-sqm-error"></div>
+                        </div>
+                        
+                        <div class="cb-form-group">
+                            <label><?php _e('Additional Services', 'cleaning-booking'); ?></label>
+                            <div class="cb-extras-grid" id="cb-extras-container">
+                                <div class="cb-loading"><?php _e('Loading extras...', 'cleaning-booking'); ?></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Price & Duration Display for Step 3 -->
+                        <div class="cb-price-summary cb-step-3-price">
+                            <div class="cb-price-breakdown">
+                                <div class="cb-price-item">
+                                    <span><?php _e('Service Price:', 'cleaning-booking'); ?></span>
+                                    <span id="cb-step3-service-price">€0.00</span>
+                                </div>
+                                <div class="cb-price-item" id="cb-step3-extra-sqm-item" style="display: none;">
+                                    <span><?php _e('Extra m²:', 'cleaning-booking'); ?></span>
+                                    <span id="cb-step3-extra-sqm-price">€0.00</span>
+                                </div>
+                                <div class="cb-price-item">
+                                    <span><?php _e('Service Extras:', 'cleaning-booking'); ?></span>
+                                    <span id="cb-step3-extras-price">€0.00</span>
+                                </div>
+                                <div class="cb-price-item cb-price-total">
+                                    <span><?php _e('Total:', 'cleaning-booking'); ?></span>
+                                    <span id="cb-step3-total-price">€0.00</span>
+                                </div>
+                            </div>
+                            <div class="cb-duration-breakdown">
+                                <div class="cb-duration-item">
+                                    <span><?php _e('Service Duration:', 'cleaning-booking'); ?></span>
+                                    <span id="cb-step3-service-duration">0h 0m</span>
+                                </div>
+                                <div class="cb-duration-item" id="cb-step3-extra-sqm-duration-item" style="display: none;">
+                                    <span><?php _e('Extra m² Duration:', 'cleaning-booking'); ?></span>
+                                    <span id="cb-step3-extra-sqm-duration">0h 0m</span>
+                                </div>
+                                <div class="cb-duration-item">
+                                    <span><?php _e('Service Extras Duration:', 'cleaning-booking'); ?></span>
+                                    <span id="cb-step3-extras-duration">0h 0m</span>
+                                </div>
+                                <div class="cb-duration-item cb-duration-total">
+                                    <span><?php _e('Total Duration:', 'cleaning-booking'); ?></span>
+                                    <span id="cb-step3-total-duration">0h 0m</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="cb-form-actions">
+                            <button type="button" class="cb-btn cb-btn-secondary cb-prev-step" data-prev="2">
+                                <?php _e('Back', 'cleaning-booking'); ?>
+                            </button>
+                            <button type="button" class="cb-btn cb-btn-primary cb-next-step" data-next="4" disabled>
+                                <?php _e('Continue', 'cleaning-booking'); ?>
+                            </button>
+                        </div>
+                    </div>
                     
                     <!-- Step 4: Date & Time Selection -->
                     <div class="cb-step-content cb-step-4">

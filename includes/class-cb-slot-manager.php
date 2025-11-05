@@ -17,6 +17,13 @@ class CB_Slot_Manager {
     public function get_available_slots($date, $duration) {
         global $wpdb;
         
+        // Check if this is a special day (holiday, maintenance, etc.)
+        $special_day = CB_Database::get_special_day($date);
+        if ($special_day) {
+            // Return empty slots array - day is unavailable
+            return array();
+        }
+        
         // Get business hours for the day
         $business_hours = get_option('cb_business_hours', array());
         $day_name = strtolower(date('l', strtotime($date)));
@@ -329,6 +336,9 @@ class CB_Slot_Manager {
         $current_date = strtotime($start_date);
         $end_timestamp = strtotime($end_date);
         
+        // Get all special days for this date range
+        $special_days = CB_Database::get_special_days_range($start_date, $end_date);
+        
         while ($current_date <= $end_timestamp) {
             $date = date('Y-m-d', $current_date);
             $day_name = strtolower(date('l', $current_date));
@@ -337,12 +347,22 @@ class CB_Slot_Manager {
             $business_hours = get_option('cb_business_hours', array());
             $has_hours = isset($business_hours[$day_name]) && $business_hours[$day_name]['enabled'];
             
+            // Check if this is a special day
+            $special_day = null;
+            if (isset($special_days[$date])) {
+                $special_day = $special_days[$date];
+            }
+            
             $calendar[$date] = array(
                 'date' => $date,
                 'day_name' => $day_name,
-                'has_hours' => $has_hours,
+                'has_hours' => $has_hours && !$special_day, // Special days override business hours
                 'is_past' => $current_date < strtotime('today'),
-                'is_today' => $date === date('Y-m-d')
+                'is_today' => $date === date('Y-m-d'),
+                'special_day' => $special_day ? array(
+                    'reason' => $special_day['reason'],
+                    'type' => $special_day['type']
+                ) : null
             );
             
             $current_date = strtotime('+1 day', $current_date);

@@ -140,6 +140,16 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update UI translations on initialization
         setTimeout(() => {
             updateUITranslations();
+            // Initialize ZIP code placeholder
+            const zipCodeInput = document.getElementById('cb-zip-code');
+            if (zipCodeInput) {
+                const currentLang = cb_frontend.current_language || 'en';
+                if (currentLang === 'el') {
+                    zipCodeInput.placeholder = 'π.χ. 10672';
+                } else {
+                    zipCodeInput.placeholder = 'e.g. 10672';
+                }
+            }
         }, 100);
         
         // Debug: Check if custom colors are loaded
@@ -382,130 +392,181 @@ document.addEventListener('DOMContentLoaded', function() {
         languageSelector.addEventListener('change', handleLanguageSwitch);
     }
 
-    // Checkout button
-    const proceedCheckoutBtn = document.getElementById('cb-proceed-checkout');
-    if (proceedCheckoutBtn) {
-        proceedCheckoutBtn.addEventListener('click', proceedToCheckout);
-    }
-    
-    // Step navigation
-    const nextStepButtons = document.querySelectorAll('.cb-next-step');
-    nextStepButtons.forEach(button => {
-        button.addEventListener('click', handleNextStep);
-    });
-    
-    const prevStepButtons = document.querySelectorAll('.cb-prev-step');
-    prevStepButtons.forEach(button => {
-        button.addEventListener('click', handlePrevStep);
-    });
-    
-    // Form inputs
-    const zipCodeInput = document.getElementById('cb-zip-code');
-    if (zipCodeInput) {
-        zipCodeInput.addEventListener('input', handleZipCodeChange);
-    }
-    
-    const squareMetersInput = document.getElementById('cb-square-meters');
-    if (squareMetersInput) {
-        squareMetersInput.addEventListener('input', handleSquareMetersChange);
-    }
-    
-    const bookingDateInput = document.getElementById('cb-booking-date');
-    if (bookingDateInput) {
-        bookingDateInput.addEventListener('change', handleDateChange);
-    }
-    
-    // Square meters slider
-    const squareMetersSlider = document.getElementById('cb-square-meters-slider');
-    const sliderValueDisplay = document.getElementById('cb-slider-value-display');
-    
-    if (squareMetersSlider && squareMetersInput && sliderValueDisplay) {
-        // Update slider when input changes
-        squareMetersInput.addEventListener('input', function(e) {
-            const value = parseInt(e.target.value) || 0;
-            const clampedValue = Math.min(1000, Math.max(0, value));
-            
-            squareMetersSlider.value = clampedValue;
-            sliderValueDisplay.textContent = clampedValue + ' m²';
-            squareMetersInput.value = clampedValue;
+        // Checkout button
+        const proceedCheckoutBtn = document.getElementById('cb-proceed-checkout');
+        if (proceedCheckoutBtn) {
+            proceedCheckoutBtn.addEventListener('click', proceedToCheckout);
+        }
+        
+        // Step navigation
+        const nextStepButtons = document.querySelectorAll('.cb-next-step');
+        nextStepButtons.forEach(button => {
+            button.addEventListener('click', handleNextStep);
         });
         
-        // Update input when slider changes
-        squareMetersSlider.addEventListener('input', function(e) {
-            const value = parseInt(e.target.value);
-            squareMetersInput.value = value;
-            sliderValueDisplay.textContent = value + ' m²';
-            
-            // Create and trigger input event on the number input
-            const inputEvent = new Event('input', { bubbles: true });
-            squareMetersInput.dispatchEvent(inputEvent);
+        const prevStepButtons = document.querySelectorAll('.cb-prev-step');
+        prevStepButtons.forEach(button => {
+            button.addEventListener('click', handlePrevStep);
         });
         
-        // Initialize slider display
-        sliderValueDisplay.textContent = squareMetersInput.value + ' m²';
-    }
-    
-    // Promocode
-    const applyPromocodeBtn = document.getElementById('cb-apply-promocode');
-    if (applyPromocodeBtn) {
-        applyPromocodeBtn.addEventListener('click', handlePromocodeApply);
-    }
-    
-    const promocodeInput = document.getElementById('cb-promocode');
-    if (promocodeInput) {
-        promocodeInput.addEventListener('keypress', function(e) {
-        if (e.which === 13) {
-            handlePromocodeApply();
+        // Form inputs
+        const zipCodeInput = document.getElementById('cb-zip-code');
+        if (zipCodeInput) {
+            zipCodeInput.addEventListener('input', handleZipCodeChange);
         }
-    });
+        
+        // Declare squareMetersInput in function scope for reuse with slider
+        const squareMetersInput = document.getElementById('cb-square-meters');
+        if (squareMetersInput) {
+            squareMetersInput.addEventListener('input', handleSquareMetersChange);
+        }
+        
+        const bookingDateInput = document.getElementById('cb-booking-date');
+        if (bookingDateInput) {
+            bookingDateInput.addEventListener('change', handleDateChange);
+        }
+        
+        // Promocode
+        const applyPromocodeBtn = document.getElementById('cb-apply-promocode');
+        if (applyPromocodeBtn) {
+            applyPromocodeBtn.addEventListener('click', handlePromocodeApply);
+        }
+        
+        const promocodeInput = document.getElementById('cb-promocode');
+        if (promocodeInput) {
+            promocodeInput.addEventListener('keypress', function(e) {
+            if (e.which === 13) {
+                handlePromocodeApply();
+            }
+        });
+        }
+        
+        // Sidebar checkout button
+        const sidebarCheckout = document.getElementById('cb-sidebar-checkout');
+        if (sidebarCheckout) {
+            sidebarCheckout.addEventListener('click', proceedToCheckout);
+        }
+        
+        // Form submission
+        const bookingForm = document.getElementById('cb-booking-form');
+        if (bookingForm) {
+            bookingForm.addEventListener('submit', handleFormSubmit);
+        }
+        
+        // Service selection
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.cb-service-card')) {
+                handleServiceSelect(e);
+            }
+        });
+        
+        // Extra selection
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.cb-extra-item')) {
+                handleExtraSelect(e);
+            }
+        });
+        
+        // Extra space input changes (for per m² extras)
+        document.addEventListener('input', function(e) {
+            if (e.target.classList.contains('cb-extra-space-input')) {
+                handleExtraSpaceChange(e);
+            }
+        });
+        
+        // Time slot selection
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.cb-time-slot')) {
+                handleTimeSlotSelect(e);
+            }
+        });
+        
+        // Express cleaning checkbox
+        const expressCleaningCheckbox = document.getElementById('cb-express-cleaning');
+        if (expressCleaningCheckbox) {
+            expressCleaningCheckbox.addEventListener('change', handleExpressCleaningChange);
+        }
+        
+        // Slider initialization will happen when step 3 becomes visible
+        // This prevents trying to initialize elements that don't exist yet
     }
     
-    // Sidebar checkout button
-    const sidebarCheckout = document.getElementById('cb-sidebar-checkout');
-    if (sidebarCheckout) {
-        sidebarCheckout.addEventListener('click', proceedToCheckout);
+    /**
+     * Initialize slider sync with input field
+     * Called when step 3 becomes visible
+     */
+    function initializeSlider() {
+        try {
+            const squareMetersSlider = document.getElementById('cb-square-meters-slider');
+            const squareMetersInput = document.getElementById('cb-square-meters');
+            const sliderValueDisplay = document.getElementById('cb-slider-value');
+            
+            // Check if elements exist
+            if (!squareMetersSlider || !squareMetersInput) {
+                console.warn('Slider or input element not found, retrying...');
+                // Retry after a short delay if elements don't exist yet
+                setTimeout(initializeSlider, 100);
+                return;
+            }
+            
+            // Check if already initialized to prevent duplicate event listeners
+            if (squareMetersSlider.dataset.initialized === 'true') {
+                return;
+            }
+            
+            // Mark as initialized
+            squareMetersSlider.dataset.initialized = 'true';
+            
+            // Sync slider to input
+            squareMetersSlider.addEventListener('input', function(e) {
+                try {
+                    const value = e.target.value;
+                    squareMetersInput.value = value;
+                    if (sliderValueDisplay) {
+                        sliderValueDisplay.textContent = value;
+                    }
+                    // Trigger input event to calculate price
+                    squareMetersInput.dispatchEvent(new Event('input', { bubbles: true }));
+                } catch (error) {
+                    console.error('Error syncing slider to input:', error);
+                }
+            });
+            
+            // Sync input to slider - but don't override existing handler
+            // We need to wrap the existing handler to also update slider
+            const existingInputHandler = squareMetersInput.oninput;
+            squareMetersInput.addEventListener('input', function(e) {
+                try {
+                    let value = parseInt(e.target.value) || 0;
+                    if (value < 0) value = 0;
+                    if (value > 1000) value = 1000;
+                    if (squareMetersSlider) {
+                        squareMetersSlider.value = value;
+                    }
+                    if (sliderValueDisplay) {
+                        sliderValueDisplay.textContent = value;
+                    }
+                } catch (error) {
+                    console.error('Error syncing input to slider:', error);
+                }
+            });
+            
+            // Initialize slider value display
+            if (sliderValueDisplay && squareMetersSlider) {
+                sliderValueDisplay.textContent = squareMetersSlider.value || '0';
+            }
+            
+            console.log('Slider initialized successfully');
+        } catch (error) {
+            console.error('Error initializing slider:', error);
+            // Retry initialization
+            setTimeout(function() {
+                if (document.getElementById('cb-square-meters-slider')) {
+                    initializeSlider();
+                }
+            }, 200);
+        }
     }
-    
-    // Form submission
-    const bookingForm = document.getElementById('cb-booking-form');
-    if (bookingForm) {
-        bookingForm.addEventListener('submit', handleFormSubmit);
-    }
-    
-    // Service selection
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.cb-service-card')) {
-            handleServiceSelect(e);
-        }
-    });
-    
-    // Extra selection
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.cb-extra-item')) {
-            handleExtraSelect(e);
-        }
-    });
-    
-    // Extra space input changes (for per m² extras)
-    document.addEventListener('input', function(e) {
-        if (e.target.classList.contains('cb-extra-space-input')) {
-            handleExtraSpaceChange(e);
-        }
-    });
-    
-    // Time slot selection
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.cb-time-slot')) {
-            handleTimeSlotSelect(e);
-        }
-    });
-    
-    // Express cleaning checkbox
-    const expressCleaningCheckbox = document.getElementById('cb-express-cleaning');
-    if (expressCleaningCheckbox) {
-        expressCleaningCheckbox.addEventListener('change', handleExpressCleaningChange);
-    }
-}
     
     function handleNextStep(e) {
         const button = e.target;
@@ -635,10 +696,68 @@ document.addEventListener('DOMContentLoaded', function() {
     function handleDateChange(e) {
         bookingData.booking_date = e.target.value;
         bookingData.booking_time = '';
-        loadAvailableSlots();
+        
+        // Check for special day first
+        checkSpecialDay(bookingData.booking_date).then(() => {
+            loadAvailableSlots();
+        });
         
         // Update checkout button state
         updateCheckoutButton();
+    }
+    
+    // Check if selected date is a special day
+    function checkSpecialDay(date) {
+        return fetch(cb_frontend.rest_url + 'special-day?date=' + date)
+            .then(response => response.json())
+            .then(response => {
+                if (response.success && response.special_day) {
+                    // Show special day message with reason and prompt to select another day
+                    const dateError = document.getElementById('cb-date-error');
+                    const timeSlotsContainer = document.getElementById('cb-time-slots');
+                    
+                    // Get translations for "Please select another day"
+                    const selectAnotherDayEn = 'Please select another day.';
+                    const selectAnotherDayEl = 'Παρακαλούμε επιλέξτε άλλη ημερομηνία.';
+                    const selectAnotherDay = cb_frontend.current_language === 'el' ? selectAnotherDayEl : selectAnotherDayEn;
+                    
+                    if (dateError) {
+                        dateError.innerHTML = '<strong>' + response.special_day.reason + '</strong><br>' + selectAnotherDay;
+                        dateError.style.display = 'block';
+                        dateError.style.color = '#d63638';
+                        dateError.style.fontWeight = 'normal';
+                        dateError.style.padding = '10px';
+                        dateError.style.backgroundColor = '#ffeaea';
+                        dateError.style.border = '1px solid #d63638';
+                        dateError.style.borderRadius = '4px';
+                        dateError.style.marginTop = '5px';
+                    }
+                    
+                    if (timeSlotsContainer) {
+                        timeSlotsContainer.innerHTML = '<div style="color: #d63638; font-weight: bold; padding: 15px; background-color: #ffeaea; border: 1px solid #d63638; border-radius: 4px; text-align: center;">' + 
+                            '<div style="margin-bottom: 8px;"><strong>' + response.special_day.reason + '</strong></div>' +
+                            '<div style="font-size: 14px; color: #666;">' + selectAnotherDay + '</div>' +
+                            '</div>';
+                    }
+                    
+                    // Clear any selected time
+                    bookingData.booking_time = '';
+                    availableSlots = [];
+                } else {
+                    // Clear special day message if date is not special
+                    const dateError = document.getElementById('cb-date-error');
+                    if (dateError) {
+                        dateError.textContent = '';
+                        dateError.style.display = 'none';
+                        dateError.style.backgroundColor = '';
+                        dateError.style.border = '';
+                        dateError.style.padding = '';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error checking special day:', error);
+            });
     }
     
     function handlePromocodeApply() {
@@ -664,61 +783,73 @@ document.addEventListener('DOMContentLoaded', function() {
         updateSidebarDisplay();
     }
     
-  function handleServiceSelect(e) {
-    e.preventDefault();
-    
-    const clickedCard = e.target.closest('.cb-service-card');
-    
-    // Remove previous selection
-    const serviceCards = document.querySelectorAll('.cb-service-card');
-    serviceCards.forEach(card => card.classList.remove('selected'));
-    
-    // Add selection to clicked card
-    clickedCard.classList.add('selected');
-    
-    const newServiceId = clickedCard.dataset.serviceId;
-    
-    // If service changed, reset extras
-    if (bookingData.service_id != newServiceId) {
-        extras = []; // Clear cached extras
-        bookingData.extras = []; // Clear selected extras
-        bookingData.extra_spaces = {}; // Clear extra spaces
-    }
-    
-    bookingData.service_id = newServiceId;
-    
-    // Set square meters to 0 and update the input field
-    bookingData.square_meters = 0;
-    const squareMetersInput = document.getElementById('cb-square-meters');
-    if (squareMetersInput) {
-        squareMetersInput.value = '0';
-    }
-    
-    // Enable next button
-    const nextStepBtn = document.querySelector('.cb-step-2 .cb-next-step');
-    if (nextStepBtn) {
-        nextStepBtn.disabled = false;
-    }
-    
-    // Calculate price and load extras (immediate for service selection)
-    checkAndCalculatePrice(true);
-    loadExtras();
-    
-    // Update sidebar display
-    updateSidebarDisplay();
-    
-    // AUTO-ADVANCE TO NEXT STEP AFTER A BRIEF DELAY
-    setTimeout(() => {
-        // Validate service selection first
-        if (validateServiceSelection()) {
-            currentStep++;
-            updateStepDisplay();
-            
-            // Show success notification
-            showNotification(cb_frontend.translations['Service selected successfully'] || 'Η υπηρεσία επιλέχθηκε με επιτυχία', 'success');
+    function handleServiceSelect(e) {
+        e.preventDefault();
+        
+        const clickedCard = e.target.closest('.cb-service-card');
+        
+        // Remove previous selection
+        const serviceCards = document.querySelectorAll('.cb-service-card');
+        serviceCards.forEach(card => card.classList.remove('selected'));
+        
+        // Add selection to clicked card
+        clickedCard.classList.add('selected');
+        
+        const newServiceId = clickedCard.dataset.serviceId;
+        
+        // If service changed, reset extras
+        if (bookingData.service_id != newServiceId) {
+            extras = []; // Clear cached extras
+            bookingData.extras = []; // Clear selected extras
+            bookingData.extra_spaces = {}; // Clear extra spaces
         }
-    }, 800); // 800ms delay to give user visual feedback
-}
+        
+        bookingData.service_id = newServiceId;
+        
+        
+        
+        // Set square meters to 0 and update the input field
+        bookingData.square_meters = 0;
+        const squareMetersInput = document.getElementById('cb-square-meters');
+        if (squareMetersInput) {
+            squareMetersInput.value = '0';
+        }
+        
+        // Enable next button
+        const nextStepBtn = document.querySelector('.cb-step-2 .cb-next-step');
+        if (nextStepBtn) {
+            nextStepBtn.disabled = false;
+        }
+        
+        // Calculate price and load extras (immediate for service selection)
+        try {
+            checkAndCalculatePrice(true);
+            loadExtras();
+        } catch (error) {
+            console.error('Error in service selection:', error);
+        }
+        
+        // Update sidebar display
+        updateSidebarDisplay();
+        
+        // Auto-advance to next step when service is selected
+        // Use longer delay to ensure async operations complete
+        setTimeout(function() {
+            try {
+                currentStep = 3;
+                updateStepDisplay();
+                // Scroll to top for better UX
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } catch (error) {
+                console.error('Error advancing to step 3:', error);
+                // Fallback: try manual navigation
+                const nextBtn = document.querySelector('.cb-step-2 .cb-next-step');
+                if (nextBtn && !nextBtn.disabled) {
+                    nextBtn.click();
+                }
+            }
+        }, 500); // Increased delay to ensure everything loads
+    }
     
     function handleExtraSelect(e) {
         // Don't handle if clicking on space input or its container (including label)
@@ -916,6 +1047,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Update language selector value
                     if (languageSelector) {
                         languageSelector.value = targetLanguage;
+                    }
+                    
+                    // Update ZIP code placeholder based on language
+                    const zipCodeInput = document.getElementById('cb-zip-code');
+                    if (zipCodeInput) {
+                        if (targetLanguage === 'el') {
+                            zipCodeInput.placeholder = 'π.χ. 10672';
+                        } else {
+                            zipCodeInput.placeholder = 'e.g. 10672';
+                        }
                     }
                     
                     // Save language preference
@@ -1120,9 +1261,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Update placeholders
-        if (translations['Enter total area in square meters']) {
-            const spacePlaceholder = document.querySelector('#cb-square-meters + small');
-            if (spacePlaceholder) spacePlaceholder.textContent = translations['Enter total area in square meters'];
+        const spaceHintText = translations['Enter total area in square meters'] || translations['Enter total space beyond the default area, or leave as 0 to skip'];
+        if (spaceHintText) {
+            const spacePlaceholder = document.querySelector('#cb-sqm-hint small');
+            if (spacePlaceholder) spacePlaceholder.textContent = spaceHintText;
+        }
+        
+        // Update ZIP code placeholder based on language
+        const zipCodeInput = document.getElementById('cb-zip-code');
+        if (zipCodeInput) {
+            const currentLang = cb_frontend.current_language || 'en';
+            if (currentLang === 'el') {
+                zipCodeInput.placeholder = 'π.χ. 10672';
+            } else {
+                zipCodeInput.placeholder = 'e.g. 10672';
+            }
         }
         
         // Update Step 3 pricing labels
@@ -1515,6 +1668,42 @@ document.addEventListener('DOMContentLoaded', function() {
             clearTimeout(timeoutId); // Clear timeout
             window.loadingSlots = false; // Reset loading flag
             
+            // Check if this is a special day
+            if (response.success && response.data && response.data.special_day) {
+                // This is a special day - show reason and prompt to select another day
+                availableSlots = [];
+                
+                // Get translations for "Please select another day"
+                const selectAnotherDayEn = 'Please select another day.';
+                const selectAnotherDayEl = 'Παρακαλούμε επιλέξτε άλλη ημερομηνία.';
+                const selectAnotherDay = cb_frontend.current_language === 'el' ? selectAnotherDayEl : selectAnotherDayEn;
+                
+                const specialDay = response.data.special_day;
+                
+                if (timeSlotsContainer) {
+                    timeSlotsContainer.innerHTML = '<div style="color: #d63638; font-weight: bold; padding: 15px; background-color: #ffeaea; border: 1px solid #d63638; border-radius: 4px; text-align: center;">' + 
+                        '<div style="margin-bottom: 8px;"><strong>' + specialDay.reason + '</strong></div>' +
+                        '<div style="font-size: 14px; color: #666;">' + selectAnotherDay + '</div>' +
+                        '</div>';
+                }
+                
+                // Update date error message
+                const dateError = document.getElementById('cb-date-error');
+                if (dateError) {
+                    dateError.innerHTML = '<strong>' + specialDay.reason + '</strong><br>' + selectAnotherDay;
+                    dateError.style.display = 'block';
+                    dateError.style.color = '#d63638';
+                    dateError.style.fontWeight = 'normal';
+                    dateError.style.padding = '10px';
+                    dateError.style.backgroundColor = '#ffeaea';
+                    dateError.style.border = '1px solid #d63638';
+                    dateError.style.borderRadius = '4px';
+                    dateError.style.marginTop = '5px';
+                }
+                
+                return;
+            }
+            
             if (response.success && response.data && response.data.slots) {
                 availableSlots = response.data.slots;
                 try {
@@ -1631,6 +1820,11 @@ document.addEventListener('DOMContentLoaded', function() {
             case 3:
                 // Service details step
                 
+                // Initialize slider when step 3 becomes visible
+                // Use setTimeout to ensure DOM is fully rendered
+                setTimeout(function() {
+                    initializeSlider();
+                }, 100);
                 
                 // Auto-trigger calculation when entering step 3
                 if (bookingData.service_id) {
@@ -1884,7 +2078,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Show hint about total space
         if (hintElement) {
             hintElement.style.display = 'block';
-            const hintText = cb_frontend.translations['Enter total area in square meters'] || 'Εισάγετε Σύνολικό χώρο σε τετραγωνικά μέτρα';
+            const hintText = cb_frontend.translations['Enter total area in square meters'] || cb_frontend.translations['Enter total space beyond the default area, or leave as 0 to skip'] || 'Εισάγετε Σύνολικό χώρο σε τετραγωνικά μέτρα';
             hintElement.innerHTML = `<small>${hintText.replace('default area', `default ${service.default_area} m²`)}</small>`;
         }
         
