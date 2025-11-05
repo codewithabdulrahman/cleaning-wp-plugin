@@ -32,19 +32,6 @@ if (!defined('ABSPATH')) {
                 </tr>
                 <tr>
                     <th scope="row">
-                        <label for="special_day_type"><?php _e('Type', 'cleaning-booking'); ?></label>
-                    </th>
-                    <td>
-                        <select id="special_day_type" name="type" class="regular-text">
-                            <option value="holiday"><?php _e('Holiday', 'cleaning-booking'); ?></option>
-                            <option value="maintenance"><?php _e('Maintenance', 'cleaning-booking'); ?></option>
-                            <option value="custom" selected><?php _e('Custom', 'cleaning-booking'); ?></option>
-                        </select>
-                        <p class="description"><?php _e('Select the type of special day', 'cleaning-booking'); ?></p>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row">
                         <label for="special_day_reason"><?php _e('Reason', 'cleaning-booking'); ?></label>
                     </th>
                     <td>
@@ -72,7 +59,6 @@ if (!defined('ABSPATH')) {
                 <thead>
                     <tr>
                         <th scope="col"><?php _e('Date', 'cleaning-booking'); ?></th>
-                        <th scope="col"><?php _e('Type', 'cleaning-booking'); ?></th>
                         <th scope="col"><?php _e('Reason', 'cleaning-booking'); ?></th>
                         <th scope="col"><?php _e('Actions', 'cleaning-booking'); ?></th>
                     </tr>
@@ -81,11 +67,6 @@ if (!defined('ABSPATH')) {
                     <?php foreach ($special_days as $special_day) : ?>
                         <tr data-special-day-id="<?php echo esc_attr($special_day->id); ?>">
                             <td><?php echo esc_html(date_i18n(get_option('date_format'), strtotime($special_day->date))); ?></td>
-                            <td>
-                                <span class="cb-badge cb-badge-<?php echo esc_attr($special_day->type); ?>">
-                                    <?php echo esc_html(ucfirst($special_day->type)); ?>
-                                </span>
-                            </td>
                             <td><?php echo esc_html($special_day->reason); ?></td>
                             <td>
                                 <button type="button" class="button button-small cb-edit-special-day" data-id="<?php echo esc_attr($special_day->id); ?>" data-date="<?php echo esc_attr($special_day->date); ?>" data-type="<?php echo esc_attr($special_day->type); ?>" data-reason="<?php echo esc_attr($special_day->reason); ?>">
@@ -176,7 +157,6 @@ jQuery(document).ready(function($) {
         
         $('#special_day_id').val(id);
         $('#special_day_date').val(date);
-        $('#special_day_type').val(type);
         $('#special_day_reason').val(reason);
         $('#cb-save-special-day-btn').text('<?php _e('Update Special Day', 'cleaning-booking'); ?>');
         $('#cb-cancel-special-day-btn').show();
@@ -191,7 +171,6 @@ jQuery(document).ready(function($) {
     $('#cb-cancel-special-day-btn').on('click', function() {
         $('#special_day_id').val('');
         $('#special_day_date').val('');
-        $('#special_day_type').val('custom');
         $('#special_day_reason').val('');
         $('#cb-save-special-day-btn').text('<?php _e('Save Special Day', 'cleaning-booking'); ?>');
         $(this).hide();

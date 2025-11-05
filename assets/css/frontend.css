@@ -2739,3 +2739,28 @@ body {
         font-size: 10px;
     }
 }
+
+.cb-special-day-message {
+    margin-top: 8px;
+    transition: all 0.3s ease;
+}
+
+.cb-special-day-message .special-day-alert {
+    padding: 12px 15px;
+    border-radius: 6px;
+    font-size: 14px;
+    line-height: 1.4;
+    border-left: 4px solid #d63638;
+}
+
+.cb-special-day-message .special-day-alert strong {
+    display: block;
+    margin-bottom: 5px;
+    color: #d63638;
+}
+
+.cb-special-day-message .special-day-alert .select-another {
+    font-size: 13px;
+    color: #666;
+    font-style: italic;
+}

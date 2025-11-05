@@ -192,6 +192,8 @@ if (!defined('ABSPATH')) {
                         <div class="cb-form-group">
                             <label for="cb-booking-date"><?php _e('Date', 'cleaning-booking'); ?></label>
                             <input type="date" id="cb-booking-date" name="booking_date" class="cb-input" min="<?php echo date('Y-m-d'); ?>" value="<?php echo date('Y-m-d'); ?>" required>
+                               <!-- Special Day Message Container -->
+                             <div class="cb-special-day-message" id="cb-special-day-message" style="display: none;"></div>
                             <div class="cb-error-message" id="cb-date-error"></div>
                         </div>
                         
