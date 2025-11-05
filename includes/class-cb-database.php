@@ -70,6 +70,7 @@ class CB_Database {
             $tables_created &= self::create_zip_codes_table($charset_collate);
             $tables_created &= self::create_translations_table($charset_collate);
             $tables_created &= self::create_slot_holds_table($charset_collate);
+            $tables_created &= self::create_special_days_table($charset_collate);
             
             if ($tables_created) {
                 // Run migrations after tables are created
@@ -434,6 +435,34 @@ class CB_Database {
     }
     
     /**
+     * Create special days table for holidays, maintenance, and custom off days
+     * 
+     * @param string $charset_collate Database charset collate
+     * @return bool True on success, false on failure
+     */
+    private static function create_special_days_table($charset_collate) {
+        global $wpdb;
+        
+        // Special days table for holidays, maintenance, and custom off days
+        $special_days_table = $wpdb->prefix . 'cb_special_days';
+        $special_days_sql = "CREATE TABLE $special_days_table (
+            id mediumint(9) NOT NULL AUTO_INCREMENT,
+            date date NOT NULL,
+            reason text NOT NULL,
+            type varchar(50) NOT NULL DEFAULT 'custom',
+            is_active tinyint(1) NOT NULL DEFAULT 1,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY date (date),
+            KEY type (type),
+            KEY is_active (is_active)
+        ) $charset_collate;";
+        
+        return self::execute_create_table($special_days_table, $special_days_sql);
+    }
+    
+    /**
      * Migrate database to specific version
      * 
      * @param string $version Target version
@@ -461,6 +490,7 @@ class CB_Database {
         self::check_greek_columns();
         self::check_extras_pricing_columns();
         self::check_express_cleaning_column();
+        self::check_special_days_table();
 
         // Ensure new global extras tables exist (idempotent when updating plugin)
         global $wpdb;
@@ -2118,6 +2148,178 @@ class CB_Database {
     private static function seed_default_translations() {
         if (class_exists('CB_Translation_Seeder')) {
             CB_Translation_Seeder::seed_all();
+        }
+    }
+    
+    // Special Days Management Methods
+    /**
+     * Get all special days
+     * 
+     * @param bool $active_only Only return active special days
+     * @return array Array of special days
+     */
+    public static function get_special_days($active_only = true) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_special_days';
+        
+        $where = '';
+        if ($active_only) {
+            $where = "WHERE is_active = 1";
+        }
+        
+        $results = $wpdb->get_results("SELECT * FROM $table $where ORDER BY date ASC");
+        
+        $special_days = array();
+        foreach ($results as $row) {
+            $special_days[] = (object) array(
+                'id' => $row->id,
+                'date' => $row->date,
+                'reason' => $row->reason,
+                'type' => $row->type,
+                'is_active' => $row->is_active,
+                'created_at' => $row->created_at,
+                'updated_at' => $row->updated_at
+            );
+        }
+        
+        return $special_days;
+    }
+    
+    /**
+     * Get special day by date
+     * 
+     * @param string $date Date in Y-m-d format
+     * @return object|null Special day object or null
+     */
+    public static function get_special_day($date) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_special_days';
+        
+        $result = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $table WHERE date = %s AND is_active = 1",
+            $date
+        ));
+        
+        return $result;
+    }
+    
+    /**
+     * Create or update a special day
+     * 
+     * @param string $date Date in Y-m-d format
+     * @param string $reason Reason for the special day
+     * @param string $type Type of special day (holiday, maintenance, custom, etc.)
+     * @param int $special_day_id Optional ID for update
+     * @return int|false Special day ID on success, false on failure
+     */
+    public static function save_special_day($date, $reason, $type = 'custom', $special_day_id = null) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_special_days';
+        
+        $data = array(
+            'date' => sanitize_text_field($date),
+            'reason' => sanitize_textarea_field($reason),
+            'type' => sanitize_text_field($type),
+            'is_active' => 1
+        );
+        
+        if ($special_day_id) {
+            // Update existing special day
+            $result = $wpdb->update($table, $data, array('id' => intval($special_day_id)));
+            return $result !== false ? intval($special_day_id) : false;
+        } else {
+            // Check if date already exists
+            $existing = $wpdb->get_var($wpdb->prepare(
+                "SELECT id FROM $table WHERE date = %s",
+                $date
+            ));
+            
+            if ($existing) {
+                // Update existing
+                $result = $wpdb->update($table, $data, array('id' => intval($existing)));
+                return $result !== false ? intval($existing) : false;
+            } else {
+                // Insert new
+                $result = $wpdb->insert($table, $data);
+                return $result ? $wpdb->insert_id : false;
+            }
+        }
+    }
+    
+    /**
+     * Delete a special day
+     * 
+     * @param int $special_day_id Special day ID
+     * @return bool True on success, false on failure
+     */
+    public static function delete_special_day($special_day_id) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_special_days';
+        
+        return $wpdb->delete($table, array('id' => intval($special_day_id))) !== false;
+    }
+    
+    /**
+     * Get special days for a date range
+     * 
+     * @param string $start_date Start date in Y-m-d format
+     * @param string $end_date End date in Y-m-d format
+     * @return array Array of special days
+     */
+    public static function get_special_days_range($start_date, $end_date) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'cb_special_days';
+        
+        $results = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM $table WHERE date >= %s AND date <= %s AND is_active = 1 ORDER BY date ASC",
+            $start_date,
+            $end_date
+        ));
+        
+        $special_days = array();
+        foreach ($results as $row) {
+            $special_days[$row->date] = array(
+                'id' => $row->id,
+                'date' => $row->date,
+                'reason' => $row->reason,
+                'type' => $row->type
+            );
+        }
+        
+        return $special_days;
+    }
+    
+    /**
+     * Check if special days table exists, create if not
+     */
+    private static function check_special_days_table() {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'cb_special_days';
+        
+        // Check if table exists
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'") == $table_name;
+        
+        if (!$table_exists) {
+            $charset_collate = $wpdb->get_charset_collate();
+            
+            // Create the table
+            $special_days_sql = "CREATE TABLE $table_name (
+                id mediumint(9) NOT NULL AUTO_INCREMENT,
+                date date NOT NULL,
+                reason text NOT NULL,
+                type varchar(50) NOT NULL DEFAULT 'custom',
+                is_active tinyint(1) NOT NULL DEFAULT 1,
+                created_at datetime DEFAULT CURRENT_TIMESTAMP,
+                updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                UNIQUE KEY date (date),
+                KEY type (type),
+                KEY is_active (is_active)
+            ) $charset_collate;";
+            
+            require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+            dbDelta($special_days_sql);
         }
     }
 }

@@ -92,6 +92,19 @@ class CB_REST_API {
             )
         ));
         
+        register_rest_route('cleaning-booking/v1', '/special-day', array(
+            'methods' => 'GET',
+            'callback' => array($this, 'get_special_day'),
+            'permission_callback' => '__return_true',
+            'args' => array(
+                'date' => array(
+                    'required' => true,
+                    'type' => 'string',
+                    'sanitize_callback' => 'sanitize_text_field'
+                )
+            )
+        ));
+        
         register_rest_route('cleaning-booking/v1', '/hold-slot', array(
             'methods' => 'POST',
             'callback' => array($this, 'hold_slot'),
@@ -379,12 +392,47 @@ class CB_REST_API {
         $date = $request->get_param('date');
         $duration = $request->get_param('duration');
         
+        // Check if this is a special day
+        $special_day = CB_Database::get_special_day($date);
+        
         $slot_manager = new CB_Slot_Manager();
         $slots = $slot_manager->get_available_slots($date, $duration);
         
-        return new WP_REST_Response(array(
+        $response = array(
             'success' => true,
             'slots' => $slots
+        );
+        
+        // Add special day information if exists
+        if ($special_day) {
+            $response['special_day'] = array(
+                'reason' => $special_day->reason,
+                'type' => $special_day->type
+            );
+        }
+        
+        return new WP_REST_Response($response, 200);
+    }
+    
+    public function get_special_day($request) {
+        $date = $request->get_param('date');
+        
+        $special_day = CB_Database::get_special_day($date);
+        
+        if ($special_day) {
+            return new WP_REST_Response(array(
+                'success' => true,
+                'special_day' => array(
+                    'date' => $special_day->date,
+                    'reason' => $special_day->reason,
+                    'type' => $special_day->type
+                )
+            ), 200);
+        }
+        
+        return new WP_REST_Response(array(
+            'success' => true,
+            'special_day' => null
         ), 200);
     }
     

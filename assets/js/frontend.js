@@ -696,10 +696,68 @@ document.addEventListener('DOMContentLoaded', function() {
     function handleDateChange(e) {
         bookingData.booking_date = e.target.value;
         bookingData.booking_time = '';
-        loadAvailableSlots();
+        
+        // Check for special day first
+        checkSpecialDay(bookingData.booking_date).then(() => {
+            loadAvailableSlots();
+        });
         
         // Update checkout button state
         updateCheckoutButton();
+    }
+    
+    // Check if selected date is a special day
+    function checkSpecialDay(date) {
+        return fetch(cb_frontend.rest_url + 'special-day?date=' + date)
+            .then(response => response.json())
+            .then(response => {
+                if (response.success && response.special_day) {
+                    // Show special day message with reason and prompt to select another day
+                    const dateError = document.getElementById('cb-date-error');
+                    const timeSlotsContainer = document.getElementById('cb-time-slots');
+                    
+                    // Get translations for "Please select another day"
+                    const selectAnotherDayEn = 'Please select another day.';
+                    const selectAnotherDayEl = 'Παρακαλούμε επιλέξτε άλλη ημερομηνία.';
+                    const selectAnotherDay = cb_frontend.current_language === 'el' ? selectAnotherDayEl : selectAnotherDayEn;
+                    
+                    if (dateError) {
+                        dateError.innerHTML = '<strong>' + response.special_day.reason + '</strong><br>' + selectAnotherDay;
+                        dateError.style.display = 'block';
+                        dateError.style.color = '#d63638';
+                        dateError.style.fontWeight = 'normal';
+                        dateError.style.padding = '10px';
+                        dateError.style.backgroundColor = '#ffeaea';
+                        dateError.style.border = '1px solid #d63638';
+                        dateError.style.borderRadius = '4px';
+                        dateError.style.marginTop = '5px';
+                    }
+                    
+                    if (timeSlotsContainer) {
+                        timeSlotsContainer.innerHTML = '<div style="color: #d63638; font-weight: bold; padding: 15px; background-color: #ffeaea; border: 1px solid #d63638; border-radius: 4px; text-align: center;">' + 
+                            '<div style="margin-bottom: 8px;"><strong>' + response.special_day.reason + '</strong></div>' +
+                            '<div style="font-size: 14px; color: #666;">' + selectAnotherDay + '</div>' +
+                            '</div>';
+                    }
+                    
+                    // Clear any selected time
+                    bookingData.booking_time = '';
+                    availableSlots = [];
+                } else {
+                    // Clear special day message if date is not special
+                    const dateError = document.getElementById('cb-date-error');
+                    if (dateError) {
+                        dateError.textContent = '';
+                        dateError.style.display = 'none';
+                        dateError.style.backgroundColor = '';
+                        dateError.style.border = '';
+                        dateError.style.padding = '';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error checking special day:', error);
+            });
     }
     
     function handlePromocodeApply() {
@@ -1609,6 +1667,42 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => {
             clearTimeout(timeoutId); // Clear timeout
             window.loadingSlots = false; // Reset loading flag
+            
+            // Check if this is a special day
+            if (response.success && response.data && response.data.special_day) {
+                // This is a special day - show reason and prompt to select another day
+                availableSlots = [];
+                
+                // Get translations for "Please select another day"
+                const selectAnotherDayEn = 'Please select another day.';
+                const selectAnotherDayEl = 'Παρακαλούμε επιλέξτε άλλη ημερομηνία.';
+                const selectAnotherDay = cb_frontend.current_language === 'el' ? selectAnotherDayEl : selectAnotherDayEn;
+                
+                const specialDay = response.data.special_day;
+                
+                if (timeSlotsContainer) {
+                    timeSlotsContainer.innerHTML = '<div style="color: #d63638; font-weight: bold; padding: 15px; background-color: #ffeaea; border: 1px solid #d63638; border-radius: 4px; text-align: center;">' + 
+                        '<div style="margin-bottom: 8px;"><strong>' + specialDay.reason + '</strong></div>' +
+                        '<div style="font-size: 14px; color: #666;">' + selectAnotherDay + '</div>' +
+                        '</div>';
+                }
+                
+                // Update date error message
+                const dateError = document.getElementById('cb-date-error');
+                if (dateError) {
+                    dateError.innerHTML = '<strong>' + specialDay.reason + '</strong><br>' + selectAnotherDay;
+                    dateError.style.display = 'block';
+                    dateError.style.color = '#d63638';
+                    dateError.style.fontWeight = 'normal';
+                    dateError.style.padding = '10px';
+                    dateError.style.backgroundColor = '#ffeaea';
+                    dateError.style.border = '1px solid #d63638';
+                    dateError.style.borderRadius = '4px';
+                    dateError.style.marginTop = '5px';
+                }
+                
+                return;
+            }
             
             if (response.success && response.data && response.data.slots) {
                 availableSlots = response.data.slots;

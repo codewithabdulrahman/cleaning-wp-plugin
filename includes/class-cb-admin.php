@@ -49,6 +49,11 @@ class CB_Admin {
         // Style Settings AJAX handlers
         add_action('wp_ajax_cb_save_style_setting', array($this, 'ajax_save_style_setting'));
         add_action('wp_ajax_cb_reset_style_settings', array($this, 'ajax_reset_style_settings'));
+        
+        // Special Days AJAX handlers
+        add_action('wp_ajax_cb_save_special_day', array($this, 'ajax_save_special_day'));
+        add_action('wp_ajax_cb_delete_special_day', array($this, 'ajax_delete_special_day'));
+        add_action('wp_ajax_cb_get_special_days', array($this, 'ajax_get_special_days'));
     }
     
     public function add_admin_menu() {
@@ -133,6 +138,15 @@ class CB_Admin {
             'manage_options',
             'cb-trucks',
             array($this, 'trucks_page')
+        );
+        
+        add_submenu_page(
+            'cleaning-booking',
+            __('Special Days', 'cleaning-booking'),
+            __('Special Days', 'cleaning-booking'),
+            'manage_options',
+            'cb-special-days',
+            array($this, 'special_days_page')
         );
         
         add_submenu_page(
@@ -1477,5 +1491,101 @@ class CB_Admin {
      */
     private function log_error($context, $exception) {
         error_log("CB_Admin::{$context} error: " . $exception->getMessage());
+    }
+    
+    /**
+     * Special Days page
+     */
+    public function special_days_page() {
+        $special_days = CB_Database::get_special_days();
+        include CB_PLUGIN_DIR . 'templates/admin/special-days.php';
+    }
+    
+    /**
+     * AJAX handler for saving special day
+     */
+    public function ajax_save_special_day() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Insufficient permissions', 'cleaning-booking')));
+        }
+        
+        $date = isset($_POST['date']) ? sanitize_text_field($_POST['date']) : '';
+        $reason = isset($_POST['reason']) ? sanitize_textarea_field($_POST['reason']) : '';
+        $type = isset($_POST['type']) ? sanitize_text_field($_POST['type']) : 'custom';
+        $special_day_id = isset($_POST['special_day_id']) ? intval($_POST['special_day_id']) : null;
+        
+        if (empty($date)) {
+            wp_send_json_error(array('message' => __('Date is required', 'cleaning-booking')));
+        }
+        
+        if (empty($reason)) {
+            wp_send_json_error(array('message' => __('Reason is required', 'cleaning-booking')));
+        }
+        
+        // Validate date format
+        $date_obj = DateTime::createFromFormat('Y-m-d', $date);
+        if (!$date_obj || $date_obj->format('Y-m-d') !== $date) {
+            wp_send_json_error(array('message' => __('Invalid date format', 'cleaning-booking')));
+        }
+        
+        $result = CB_Database::save_special_day($date, $reason, $type, $special_day_id);
+        
+        if ($result) {
+            wp_send_json_success(array(
+                'message' => __('Special day saved successfully!', 'cleaning-booking'),
+                'special_day_id' => $result
+            ));
+        } else {
+            wp_send_json_error(array('message' => __('Error saving special day', 'cleaning-booking')));
+        }
+    }
+    
+    /**
+     * AJAX handler for deleting special day
+     */
+    public function ajax_delete_special_day() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Insufficient permissions', 'cleaning-booking')));
+        }
+        
+        $special_day_id = isset($_POST['special_day_id']) ? intval($_POST['special_day_id']) : 0;
+        
+        if (!$special_day_id) {
+            wp_send_json_error(array('message' => __('Special day ID is required', 'cleaning-booking')));
+        }
+        
+        $result = CB_Database::delete_special_day($special_day_id);
+        
+        if ($result) {
+            wp_send_json_success(array('message' => __('Special day deleted successfully!', 'cleaning-booking')));
+        } else {
+            wp_send_json_error(array('message' => __('Error deleting special day', 'cleaning-booking')));
+        }
+    }
+    
+    /**
+     * AJAX handler for getting special days
+     */
+    public function ajax_get_special_days() {
+        check_ajax_referer('cb_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Insufficient permissions', 'cleaning-booking')));
+        }
+        
+        $start_date = isset($_POST['start_date']) ? sanitize_text_field($_POST['start_date']) : '';
+        $end_date = isset($_POST['end_date']) ? sanitize_text_field($_POST['end_date']) : '';
+        
+        if ($start_date && $end_date) {
+            $special_days = CB_Database::get_special_days_range($start_date, $end_date);
+        } else {
+            $special_days = CB_Database::get_special_days();
+        }
+        
+        wp_send_json_success(array('special_days' => $special_days));
     }
 }
