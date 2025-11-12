@@ -251,6 +251,7 @@ class CB_REST_API {
             'sqm_multiplier' => floatval($service->sqm_multiplier),
             'sqm_duration_multiplier' => floatval($service->sqm_duration_multiplier),
             'default_area' => isset($service->default_area) ? intval($service->default_area) : 0,
+            'discount' => isset($service->discount) ? floatval($service->discount) : null,
             'icon_url' => isset($service->icon_url) ? $service->icon_url : '', // Add this line
             'is_active' => $service->is_active,
             'sort_order' => $service->sort_order
@@ -285,7 +286,11 @@ class CB_REST_API {
                     'price' => floatval($extra->price),
                     'duration' => intval($extra->duration),
                     'is_active' => isset($extra->is_active) ? intval($extra->is_active) : 1,
-                    'sort_order' => isset($extra->sort_order) ? intval($extra->sort_order) : 0
+                    'sort_order' => isset($extra->sort_order) ? intval($extra->sort_order) : 0,
+                    'pricing_type' => isset($extra->pricing_type) ? $extra->pricing_type : 'fixed',
+                    'price_per_sqm' => isset($extra->price_per_sqm) ? floatval($extra->price_per_sqm) : null,
+                    'duration_per_sqm' => isset($extra->duration_per_sqm) ? intval($extra->duration_per_sqm) : null,
+                    'discount' => isset($extra->discount) ? floatval($extra->discount) : null
                 );
             }
         }

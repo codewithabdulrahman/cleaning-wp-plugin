@@ -2058,7 +2058,17 @@ function checkSpecialDay(date) {
             <p>${service.description}</p>
             <div class="cb-service-details">
                 <div class="cb-service-price">
-                    <span class="cb-price-current">€${parseFloat(service.base_price).toFixed(2)}</span>
+                    ${service.discount !== null && service.discount !== undefined && !isNaN(parseFloat(service.discount)) && parseFloat(service.discount) > 0 ? `
+                        <div class="cb-price-wrapper">
+                            <span class="cb-discount-badge">-${parseFloat(service.discount).toFixed(0)}%</span>
+                            <div class="cb-price-container">
+                                <span class="cb-price-original"><del>€${parseFloat(service.base_price).toFixed(2)}</del></span>
+                                <span class="cb-price-current">€${(parseFloat(service.base_price) * (1 - parseFloat(service.discount) / 100)).toFixed(2)}</span>
+                            </div>
+                        </div>
+                    ` : `
+                        <span class="cb-price-current">€${parseFloat(service.base_price).toFixed(2)}</span>
+                    `}
                 </div>
                 <div class="cb-service-duration">
                     <span class="cb-duration-label">${cb_frontend.translations['Duration:'] || 'Διάρκεια:'}</span>
@@ -2222,14 +2232,59 @@ function checkSpecialDay(date) {
             const currentSpace = bookingData.extra_spaces && bookingData.extra_spaces[extra.id] ? bookingData.extra_spaces[extra.id] : '';
             
             let priceDisplay = '€0.00';
+            let originalPrice = 0;
+            let hasDiscount = extra.discount && parseFloat(extra.discount) > 0;
+            
             if (isPerSqm && isSelected && currentSpace) {
-                const calculatedPrice = parseFloat(extra.price_per_sqm) * parseFloat(currentSpace);
-                priceDisplay = '€' + calculatedPrice.toFixed(2);
+                originalPrice = parseFloat(extra.price_per_sqm) * parseFloat(currentSpace);
+                if (hasDiscount) {
+                    const discountedPrice = originalPrice * (1 - parseFloat(extra.discount) / 100);
+                    priceDisplay = `
+                        <div class="cb-price-wrapper">
+                            <span class="cb-discount-badge">-${parseFloat(extra.discount).toFixed(0)}%</span>
+                            <div class="cb-price-container">
+                                <span class="cb-price-original"><del>€${originalPrice.toFixed(2)}</del></span>
+                                <span class="cb-price-current">€${discountedPrice.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    priceDisplay = '€' + originalPrice.toFixed(2);
+                }
             } else if (isPerSqm) {
                 // Show per m² rate for unselected per sqm extras
-                priceDisplay = '€' + parseFloat(extra.price_per_sqm || 0).toFixed(2) + ' per m²';
+                const perSqmPrice = parseFloat(extra.price_per_sqm || 0);
+                if (hasDiscount) {
+                    const discountedPrice = perSqmPrice * (1 - parseFloat(extra.discount) / 100);
+                    priceDisplay = `
+                        <div class="cb-price-wrapper">
+                            <span class="cb-discount-badge">-${parseFloat(extra.discount).toFixed(0)}%</span>
+                            <div class="cb-price-container">
+                                <span class="cb-price-original"><del>€${perSqmPrice.toFixed(2)}</del></span>
+                                <span class="cb-price-current">€${discountedPrice.toFixed(2)}</span>
+                            </div>
+                            <span style="font-size: 11px; color: #666;">per m²</span>
+                        </div>
+                    `;
+                } else {
+                    priceDisplay = '€' + perSqmPrice.toFixed(2) + ' per m²';
+                }
             } else {
-                priceDisplay = '€' + parseFloat(extra.price).toFixed(2);
+                originalPrice = parseFloat(extra.price);
+                if (hasDiscount) {
+                    const discountedPrice = originalPrice * (1 - parseFloat(extra.discount) / 100);
+                    priceDisplay = `
+                        <div class="cb-price-wrapper">
+                            <span class="cb-discount-badge">-${parseFloat(extra.discount).toFixed(0)}%</span>
+                            <div class="cb-price-container">
+                                <span class="cb-price-original"><del>€${originalPrice.toFixed(2)}</del></span>
+                                <span class="cb-price-current">€${discountedPrice.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    priceDisplay = '€' + originalPrice.toFixed(2);
+                }
             }
             
             let spaceInput = '';
@@ -2412,6 +2467,10 @@ function checkSpecialDay(date) {
         const step3TotalPrice = document.getElementById('cb-step3-total-price');
         
         if (step3ServicePrice) {
+            const hasDiscount = pricing.service_discount && parseFloat(pricing.service_discount) > 0;
+            const originalPrice = parseFloat(pricing.service_original_price) || parseFloat(pricing.service_price) || 0;
+            const discountedPrice = parseFloat(pricing.service_price) || 0;
+            
             if (pricing.smart_area && pricing.smart_area.use_smart_area) {
                 // Show base service price with inline breakdown
                 const basePrice = parseFloat(pricing.smart_area.base_price) || 0;
@@ -2419,13 +2478,29 @@ function checkSpecialDay(date) {
                 const zipSurcharge = parseFloat(pricing.zip_surcharge) || 0;
                 
                 // Show base service price with inline breakdown including extra m²
-                step3ServicePrice.innerHTML = `
+                let priceHtml = `
                     <div class="cb-price-breakdown">
                         <div>Base: ${formatPrice(basePrice)}</div>
                         ${additionalPrice > 0 ? `<div>Extra m²: ${formatPrice(additionalPrice)}</div>` : ''}
                         ${zipSurcharge > 0 ? `<div>Zip Fee: ${formatPrice(zipSurcharge)}</div>` : ''}
                     </div>
                 `;
+                
+                // Add discount display if available
+                if (hasDiscount) {
+                    priceHtml = `
+                        <div class="cb-price-wrapper">
+                            <span class="cb-discount-badge">-${parseFloat(pricing.service_discount).toFixed(0)}% OFF</span>
+                            <div class="cb-price-container">
+                                <span class="cb-price-original"><del>${formatPrice(originalPrice)}</del></span>
+                                <span class="cb-price-current">${formatPrice(discountedPrice)}</span>
+                            </div>
+                        </div>
+                        ${priceHtml}
+                    `;
+                }
+                
+                step3ServicePrice.innerHTML = priceHtml;
                 
                 // Hide separate extra m² row since it's shown inline
                 if (step3ExtraSqmItem) {
@@ -2438,17 +2513,46 @@ function checkSpecialDay(date) {
                 
                 if (additionalPrice > 0 && pricing.smart_area) {
                     // Show with inline breakdown
-                    step3ServicePrice.innerHTML = `
+                    let priceHtml = `
                         <div class="cb-price-breakdown">
                             <div>Base: ${formatPrice(basePrice)}</div>
                             <div>Extra m²: ${formatPrice(additionalPrice)}</div>
                         </div>
                     `;
+                    
+                    // Add discount display if available
+                    if (hasDiscount) {
+                        priceHtml = `
+                            <div class="cb-price-wrapper">
+                                <span class="cb-discount-badge">-${parseFloat(pricing.service_discount).toFixed(0)}%</span>
+                                <div class="cb-price-container">
+                                    <span class="cb-price-original"><del>${formatPrice(originalPrice)}</del></span>
+                                    <span class="cb-price-current">${formatPrice(discountedPrice)}</span>
+                                </div>
+                            </div>
+                            ${priceHtml}
+                        `;
+                    }
+                    
+                    step3ServicePrice.innerHTML = priceHtml;
                     if (step3ExtraSqmItem) {
                         step3ExtraSqmItem.style.display = 'none';
                     }
                 } else {
-                    step3ServicePrice.textContent = formatPrice(pricing.service_price);
+                    // Simple price display with discount if available
+                    if (hasDiscount) {
+                        step3ServicePrice.innerHTML = `
+                            <div class="cb-price-wrapper">
+                                <span class="cb-discount-badge">-${parseFloat(pricing.service_discount).toFixed(0)}%</span>
+                                <div class="cb-price-container">
+                                    <span class="cb-price-original"><del>${formatPrice(originalPrice)}</del></span>
+                                    <span class="cb-price-current">${formatPrice(discountedPrice)}</span>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        step3ServicePrice.textContent = formatPrice(pricing.service_price);
+                    }
                     if (step3ExtraSqmItem) {
                         step3ExtraSqmItem.style.display = 'none';
                     }

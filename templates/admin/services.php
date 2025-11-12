@@ -98,6 +98,15 @@ if (!defined('ABSPATH')) {
                 </tr>
                 <tr>
                     <th scope="row">
+                        <label for="service-discount"><?php _e('Discount (%)', 'cleaning-booking'); ?></label>
+                    </th>
+                    <td>
+                        <input type="number" id="service-discount" name="discount" step="0.01" min="0" max="100" class="small-text" value="">
+                        <span class="description"><?php _e('Optional discount percentage (0-100)', 'cleaning-booking'); ?></span>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">
                         <label for="service-icon"><?php _e('Service Icon', 'cleaning-booking'); ?></label>
                     </th>
                     <td>
@@ -160,6 +169,7 @@ if (!defined('ABSPATH')) {
                         <th><?php _e('Price/m²', 'cleaning-booking'); ?></th>
                         <th><?php _e('Duration/m²', 'cleaning-booking'); ?></th>
                         <th><?php _e('Default Area', 'cleaning-booking'); ?></th>
+                        <th><?php _e('Discount', 'cleaning-booking'); ?></th>
                         <th><?php _e('Status', 'cleaning-booking'); ?></th>
                         <th><?php _e('Actions', 'cleaning-booking'); ?></th>
                     </tr>
@@ -167,7 +177,7 @@ if (!defined('ABSPATH')) {
                 <tbody>
                     <?php if (empty($services)): ?>
                         <tr>
-                            <td colspan="9" class="text-center"><?php _e('No services found', 'cleaning-booking'); ?></td>
+                            <td colspan="10" class="text-center"><?php _e('No services found', 'cleaning-booking'); ?></td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($services as $service): ?>
@@ -190,6 +200,13 @@ if (!defined('ABSPATH')) {
                                 <td>€<?php echo esc_html(number_format($service->sqm_multiplier, 4)); ?></td>
                                 <td><?php echo esc_html(number_format($service->sqm_duration_multiplier, 4)); ?> min</td>
                                 <td><?php echo esc_html($service->default_area ?? 0); ?> m²</td>
+                                <td>
+                                    <?php if (!empty($service->discount) && $service->discount > 0): ?>
+                                        <?php echo esc_html(number_format($service->discount, 2)); ?>%
+                                    <?php else: ?>
+                                        -
+                                    <?php endif; ?>
+                                </td>
                                 <td>
                                     <span class="cb-status cb-status-<?php echo $service->is_active ? 'active' : 'inactive'; ?>">
                                         <?php echo $service->is_active ? __('Active', 'cleaning-booking') : __('Inactive', 'cleaning-booking'); ?>

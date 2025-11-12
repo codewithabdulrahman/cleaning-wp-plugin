@@ -110,6 +110,7 @@ class CB_Database {
             sqm_multiplier decimal(10,4) NOT NULL DEFAULT 0.0000,
             sqm_duration_multiplier decimal(10,4) NOT NULL DEFAULT 0.0000,
             default_area int(11) NOT NULL DEFAULT 0,
+            discount decimal(5,2) DEFAULT NULL,
             icon_url varchar(500) DEFAULT NULL,
             is_active tinyint(1) NOT NULL DEFAULT 1,
             sort_order int(11) NOT NULL DEFAULT 0,
@@ -193,6 +194,7 @@ class CB_Database {
             duration int(11) NOT NULL DEFAULT 0,
             price_per_sqm decimal(10,2) DEFAULT NULL,
             duration_per_sqm int(11) DEFAULT NULL,
+            discount decimal(5,2) DEFAULT NULL,
             is_active tinyint(1) NOT NULL DEFAULT 1,
             sort_order int(11) NOT NULL DEFAULT 0,
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
@@ -491,6 +493,7 @@ class CB_Database {
         self::check_extras_pricing_columns();
         self::check_express_cleaning_column();
         self::check_special_days_table();
+        self::check_discount_columns();
 
         // Ensure new global extras tables exist (idempotent when updating plugin)
         global $wpdb;
@@ -1633,7 +1636,8 @@ class CB_Database {
             'sort_order' => isset($extra_data['sort_order']) ? intval($extra_data['sort_order']) : 0,
             'pricing_type' => isset($extra_data['pricing_type']) ? sanitize_text_field($extra_data['pricing_type']) : 'fixed',
             'price_per_sqm' => isset($extra_data['price_per_sqm']) ? floatval($extra_data['price_per_sqm']) : null,
-            'duration_per_sqm' => isset($extra_data['duration_per_sqm']) ? intval($extra_data['duration_per_sqm']) : null
+            'duration_per_sqm' => isset($extra_data['duration_per_sqm']) ? intval($extra_data['duration_per_sqm']) : null,
+            'discount' => isset($extra_data['discount']) && !empty($extra_data['discount']) ? floatval($extra_data['discount']) : null
         );
         $inserted = $wpdb->insert($extras_table, $data);
         if ($inserted === false) return false;
@@ -1656,7 +1660,8 @@ class CB_Database {
             'sort_order' => isset($extra_data['sort_order']) ? intval($extra_data['sort_order']) : 0,
             'pricing_type' => isset($extra_data['pricing_type']) ? sanitize_text_field($extra_data['pricing_type']) : 'fixed',
             'price_per_sqm' => isset($extra_data['price_per_sqm']) ? floatval($extra_data['price_per_sqm']) : null,
-            'duration_per_sqm' => isset($extra_data['duration_per_sqm']) ? intval($extra_data['duration_per_sqm']) : null
+            'duration_per_sqm' => isset($extra_data['duration_per_sqm']) ? intval($extra_data['duration_per_sqm']) : null,
+            'discount' => isset($extra_data['discount']) && !empty($extra_data['discount']) ? floatval($extra_data['discount']) : null
         );
         $inserted = $wpdb->insert($extras_table, $data);
         if ($inserted === false) return false;
@@ -1719,6 +1724,7 @@ class CB_Database {
         if (isset($data['is_active'])) $update_data['is_active'] = intval($data['is_active']);
         if (isset($data['sort_order'])) $update_data['sort_order'] = intval($data['sort_order']);
         if (isset($data['pricing_type'])) $update_data['pricing_type'] = sanitize_text_field($data['pricing_type']);
+        if (isset($data['discount'])) $update_data['discount'] = $data['discount'] !== null && $data['discount'] !== '' ? floatval($data['discount']) : null;
         if (isset($data['price_per_sqm'])) {
             $update_data['price_per_sqm'] = !empty($data['price_per_sqm']) ? floatval($data['price_per_sqm']) : null;
         }
@@ -2320,6 +2326,35 @@ class CB_Database {
             
             require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
             dbDelta($special_days_sql);
+        }
+    }
+    
+    /**
+     * Check and add discount columns to services and extras tables
+     */
+    private static function check_discount_columns() {
+        global $wpdb;
+        
+        // Check services table
+        $services_table = $wpdb->prefix . 'cb_services';
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$services_table'") == $services_table;
+        
+        if ($table_exists) {
+            $discount_column = $wpdb->get_results("SHOW COLUMNS FROM $services_table LIKE 'discount'");
+            if (empty($discount_column)) {
+                $wpdb->query("ALTER TABLE $services_table ADD COLUMN discount decimal(5,2) DEFAULT NULL AFTER default_area");
+            }
+        }
+        
+        // Check extras table
+        $extras_table = $wpdb->prefix . 'cb_extras';
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$extras_table'") == $extras_table;
+        
+        if ($table_exists) {
+            $discount_column = $wpdb->get_results("SHOW COLUMNS FROM $extras_table LIKE 'discount'");
+            if (empty($discount_column)) {
+                $wpdb->query("ALTER TABLE $extras_table ADD COLUMN discount decimal(5,2) DEFAULT NULL AFTER duration_per_sqm");
+            }
         }
     }
 }

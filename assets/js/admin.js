@@ -54,6 +54,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const editBtn = e.target.closest('.cb-edit-service');
             const service = JSON.parse(editBtn.dataset.service);
             
+            // Debug: Check if discount is in the service object
+            console.log('Service object:', service);
+            console.log('Has discount property:', 'discount' in service);
+            console.log('Discount value:', service.discount);
+            console.log('Discount type:', typeof service.discount);
+            
             const serviceIdInput = document.getElementById('service-id');
             const serviceNameEnInput = document.getElementById('service-name-en');
             const serviceNameElInput = document.getElementById('service-name-el');
@@ -64,6 +70,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const serviceSqmMultiplierInput = document.getElementById('service-sqm-multiplier');
             const serviceSqmDurationMultiplierInput = document.getElementById('service-sqm-duration-multiplier');
             const serviceDefaultAreaInput = document.getElementById('service-default-area');
+            const serviceDiscountInput = document.getElementById('service-discount');
             const serviceSortOrderInput = document.getElementById('service-sort-order');
             const serviceIsActiveInput = document.getElementById('service-is-active');
             const serviceIconUrlInput = document.getElementById('service-icon-url');
@@ -85,6 +92,26 @@ document.addEventListener('DOMContentLoaded', function() {
             if (serviceSqmMultiplierInput) serviceSqmMultiplierInput.value = service.sqm_multiplier;
             if (serviceSqmDurationMultiplierInput) serviceSqmDurationMultiplierInput.value = service.sqm_duration_multiplier;
             if (serviceDefaultAreaInput) serviceDefaultAreaInput.value = service.default_area || 0;
+            if (serviceDiscountInput) {
+                // Handle discount: use the value directly if it exists and is valid
+                let discountValue = '';
+                // Check if discount property exists in the service object
+                if (service.hasOwnProperty('discount')) {
+                    const discount = service.discount;
+                    // If discount is not null/undefined/empty, use it
+                    if (discount !== null && discount !== undefined && discount !== '') {
+                        // Convert to string, handling both number and string types
+                        discountValue = String(discount);
+                    }
+                } else if (service.discount !== undefined) {
+                    // Fallback: if property exists but might be null
+                    if (service.discount !== null && service.discount !== '') {
+                        discountValue = String(service.discount);
+                    }
+                }
+                serviceDiscountInput.value = discountValue;
+                console.log('Setting discount input value to:', discountValue);
+            }
             if (serviceSortOrderInput) serviceSortOrderInput.value = service.sort_order;
             if (serviceIsActiveInput) serviceIsActiveInput.checked = service.is_active == 1;
             

@@ -580,6 +580,7 @@ public function ajax_get_services() {
                 'sqm_multiplier' => floatval($service->sqm_multiplier),
                 'sqm_duration_multiplier' => floatval($service->sqm_duration_multiplier),
                 'default_area' => isset($service->default_area) ? intval($service->default_area) : 0,
+                'discount' => isset($service->discount) && !empty($service->discount) ? floatval($service->discount) : null,
                 'icon_url' => isset($service->icon_url) ? $service->icon_url : '', // Make sure this is included
                 'is_active' => $service->is_active,
                 'sort_order' => $service->sort_order
@@ -639,7 +640,8 @@ public function ajax_get_services() {
                 'sort_order' => isset($extra->sort_order) ? intval($extra->sort_order) : 0,
                 'pricing_type' => isset($extra->pricing_type) ? $extra->pricing_type : 'fixed',
                 'price_per_sqm' => isset($extra->price_per_sqm) ? $extra->price_per_sqm : null,
-                'duration_per_sqm' => isset($extra->duration_per_sqm) ? $extra->duration_per_sqm : null
+                'duration_per_sqm' => isset($extra->duration_per_sqm) ? $extra->duration_per_sqm : null,
+                'discount' => isset($extra->discount) ? floatval($extra->discount) : null
             );
         }
         
@@ -860,6 +862,7 @@ public function ajax_get_services() {
         $translated_service->sqm_multiplier = $service->sqm_multiplier;
         $translated_service->sqm_duration_multiplier = $service->sqm_duration_multiplier;
         $translated_service->default_area = isset($service->default_area) ? $service->default_area : 0;
+        $translated_service->discount = isset($service->discount) && !empty($service->discount) ? floatval($service->discount) : null;
         $translated_service->icon_url = isset($service->icon_url) ? $service->icon_url : ''; // CRITICAL: Preserve icon_url
         $translated_service->is_active = $service->is_active;
         $translated_service->sort_order = $service->sort_order;
@@ -1064,6 +1067,7 @@ public function rest_get_services($request) {
                 'sqm_multiplier' => floatval($service->sqm_multiplier),
                 'sqm_duration_multiplier' => floatval($service->sqm_duration_multiplier),
                 'default_area' => isset($service->default_area) ? intval($service->default_area) : 0,
+                'discount' => isset($service->discount) ? floatval($service->discount) : null,
                 'icon_url' => isset($service->icon_url) ? $service->icon_url : '', // Make sure this is included
                 'is_active' => $service->is_active,
                 'sort_order' => $service->sort_order
@@ -1186,14 +1190,26 @@ public function rest_get_services($request) {
             if ($use_smart_area && $service->default_area > 0) {
                 // For smart area, we want base service + actual additional area pricing
                 // Only add additional area pricing if actual_additional_area > 0
+                $service_price_before_discount = 0;
                 if ($actual_additional_area > 0) {
-                    $pricing['service_price'] = floatval($service->base_price) + ($actual_additional_area * floatval($service->sqm_multiplier));
+                    $service_price_before_discount = floatval($service->base_price) + ($actual_additional_area * floatval($service->sqm_multiplier));
                     $pricing['service_duration'] = intval($service->base_duration) + ($actual_additional_area * floatval($service->sqm_duration_multiplier));
                 } else {
                     // When no additional area, use base service only
-                    $pricing['service_price'] = floatval($service->base_price);
+                    $service_price_before_discount = floatval($service->base_price);
                     $pricing['service_duration'] = intval($service->base_duration);
                 }
+                
+                // Apply service discount if available
+                if (!empty($service->discount) && floatval($service->discount) > 0) {
+                    $discount_percent = floatval($service->discount);
+                    $pricing['service_price'] = $service_price_before_discount * (1 - $discount_percent / 100);
+                    $pricing['service_discount'] = $discount_percent;
+                    $pricing['service_original_price'] = $service_price_before_discount;
+                } else {
+                    $pricing['service_price'] = $service_price_before_discount;
+                }
+                
                 $pricing['total_price'] = $pricing['service_price'] + $pricing['extras_price'] + $pricing['zip_surcharge'];
                 $pricing['total_duration'] = max($pricing['service_duration'] + $pricing['extras_duration'], 30);
             }

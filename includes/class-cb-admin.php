@@ -401,6 +401,7 @@ class CB_Admin {
             'sqm_multiplier' => floatval($_POST['sqm_multiplier']),
             'sqm_duration_multiplier' => floatval($_POST['sqm_duration_multiplier']),
             'default_area' => intval($_POST['default_area']),
+            'discount' => isset($_POST['discount']) && !empty($_POST['discount']) ? floatval($_POST['discount']) : null,
             'icon_url' => esc_url_raw($_POST['icon_url']),
             'is_active' => isset($_POST['is_active']) ? 1 : 0,
             'sort_order' => intval($_POST['sort_order'])
@@ -479,7 +480,8 @@ class CB_Admin {
             'sort_order' => intval($_POST['sort_order']),
             'pricing_type' => isset($_POST['pricing_type']) ? sanitize_text_field($_POST['pricing_type']) : 'fixed',
             'price_per_sqm' => isset($_POST['price_per_sqm']) && !empty($_POST['price_per_sqm']) ? floatval($_POST['price_per_sqm']) : null,
-            'duration_per_sqm' => isset($_POST['duration_per_sqm']) && !empty($_POST['duration_per_sqm']) ? intval($_POST['duration_per_sqm']) : null
+            'duration_per_sqm' => isset($_POST['duration_per_sqm']) && !empty($_POST['duration_per_sqm']) ? intval($_POST['duration_per_sqm']) : null,
+            'discount' => isset($_POST['discount']) && !empty($_POST['discount']) ? floatval($_POST['discount']) : null
         );
         
         $extra_id = isset($_POST['id']) && !empty($_POST['id']) ? intval($_POST['id']) : null;
@@ -788,7 +790,8 @@ class CB_Admin {
             'sort_order' => isset($_POST['sort_order']) ? intval($_POST['sort_order']) : 0,
             'pricing_type' => isset($_POST['pricing_type']) ? sanitize_text_field($_POST['pricing_type']) : 'fixed',
             'price_per_sqm' => isset($_POST['price_per_sqm']) && $_POST['price_per_sqm'] !== '' ? floatval($_POST['price_per_sqm']) : null,
-            'duration_per_sqm' => isset($_POST['duration_per_sqm']) && $_POST['duration_per_sqm'] !== '' ? intval($_POST['duration_per_sqm']) : null
+            'duration_per_sqm' => isset($_POST['duration_per_sqm']) && $_POST['duration_per_sqm'] !== '' ? intval($_POST['duration_per_sqm']) : null,
+            'discount' => isset($_POST['discount']) && !empty($_POST['discount']) ? floatval($_POST['discount']) : null
         );
         $service_ids = isset($_POST['service_ids']) ? (array)$_POST['service_ids'] : array();
         $extra_id = isset($_POST['id']) ? intval($_POST['id']) : 0;

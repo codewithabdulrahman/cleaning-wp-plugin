@@ -160,7 +160,17 @@ class CB_Pricing {
         // Calculate service price
         $base_price = floatval($service->base_price);
         $sqm_multiplier = floatval($service->sqm_multiplier);
-        $breakdown['service_price'] = $base_price + ($square_meters * $sqm_multiplier);
+        $service_price_before_discount = $base_price + ($square_meters * $sqm_multiplier);
+        
+        // Apply service discount if available
+        if (!empty($service->discount) && floatval($service->discount) > 0) {
+            $discount_percent = floatval($service->discount);
+            $breakdown['service_price'] = $service_price_before_discount * (1 - $discount_percent / 100);
+            $breakdown['service_discount'] = $discount_percent;
+            $breakdown['service_original_price'] = $service_price_before_discount;
+        } else {
+            $breakdown['service_price'] = $service_price_before_discount;
+        }
         
         // Calculate service duration
         $base_duration = intval($service->base_duration);
@@ -174,17 +184,18 @@ class CB_Pricing {
         if (!empty($extras_data)) {
             foreach ($extras_data as $extra_id) {
                 $extra = $wpdb->get_row($wpdb->prepare(
-                    "SELECT price, duration, pricing_type, price_per_sqm, duration_per_sqm FROM {$wpdb->prefix}cb_extras WHERE id = %d AND is_active = 1",
+                    "SELECT price, duration, pricing_type, price_per_sqm, duration_per_sqm, discount FROM {$wpdb->prefix}cb_extras WHERE id = %d AND is_active = 1",
                     $extra_id
                 ));
                 
                 if ($extra) {
+                    $extra_price_before_discount = 0;
+                    
                     // Check if this extra is charged per m²
                     if ($extra->pricing_type === 'per_sqm' && !empty($extra->price_per_sqm)) {
                         // Get the space for this extra (if provided)
                         $extra_space = isset($extra_spaces[$extra_id]) ? floatval($extra_spaces[$extra_id]) : 0;
-                        $extra_price = floatval($extra->price_per_sqm) * $extra_space;
-                        $breakdown['extras_price'] += $extra_price;
+                        $extra_price_before_discount = floatval($extra->price_per_sqm) * $extra_space;
                         
                         // Calculate duration based on space if duration_per_sqm is set
                         if (!empty($extra->duration_per_sqm)) {
@@ -193,8 +204,17 @@ class CB_Pricing {
                         }
                     } else {
                         // Fixed price and duration
-                        $breakdown['extras_price'] += floatval($extra->price);
+                        $extra_price_before_discount = floatval($extra->price);
                         $breakdown['extras_duration'] += intval($extra->duration);
+                    }
+                    
+                    // Apply extra discount if available
+                    if (!empty($extra->discount) && floatval($extra->discount) > 0) {
+                        $discount_percent = floatval($extra->discount);
+                        $extra_price = $extra_price_before_discount * (1 - $discount_percent / 100);
+                        $breakdown['extras_price'] += $extra_price;
+                    } else {
+                        $breakdown['extras_price'] += $extra_price_before_discount;
                     }
                 }
             }

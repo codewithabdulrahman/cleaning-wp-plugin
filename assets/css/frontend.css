@@ -683,11 +683,82 @@
     color: var(--cb-text-secondary);
 }
 
+.cb-price-wrapper {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+}
+
+.cb-price-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    flex: 1;
+}
+
 .cb-price-original {
-    font-size: 16px;
+    font-size: 14px;
     text-decoration: line-through;
     color: #999;
-    margin-left: 8px;
+}
+
+.cb-price-original del {
+    text-decoration: line-through;
+    color: #999;
+}
+
+.cb-discount-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #28a745;
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+    width: 50px;
+    height: 50px;
+    border-radius: 8px;
+    align-self: flex-start;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-sizing: border-box;
+    text-align: center;
+    line-height: 1.2;
+    padding: 4px;
+}
+
+.cb-service-price {
+    display: flex;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+}
+
+.cb-extra-price {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.cb-extra-price .cb-price-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* Smaller discount badge for extras and step 3 */
+.cb-extra-price .cb-discount-badge,
+.cb-price-breakdown .cb-discount-badge {
+    width: auto;
+    height: auto;
+    min-width: 40px;
+    padding: 4px 8px;
+    font-size: 11px;
 }
 
 /* Extras Grid */
